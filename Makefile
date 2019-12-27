@@ -14,6 +14,10 @@ SOURCES = dl.c dir_list.c
 LOADER_SRC = teeny/LOADER.DO
 DOCS = teeny/teenydoc.txt dl.do README.txt README.md LICENSE
 
+DEFINES = \
+	-DDEFAULT_TTY=$(DEFAULT_TTY) \
+	-DLOADER_FILE=$(LOADER_FILE)
+
 ifdef DEBUG
  CFLAGS += -g
 else
@@ -29,7 +33,7 @@ endif
 all: $(APP_NAME)
 
 $(APP_NAME): $(SOURCES)
-	gcc $(CFLAGS) -DLOADER_FILE=$(LOADER_FILE) -DDEFAULT_TTY=$(DEFAULT_TTY) $(SOURCES) $(LDFLAGS) -o $(@)
+	gcc $(CFLAGS) $(DEFINES) $(SOURCES) $(LDFLAGS) -o $(@)
 
 install: $(APP_NAME) $(LOADER_SRC) $(DOCS)
 	install -o root -m 0755 -d $(APP_LIB_DIR) $(APP_DOC_DIR)

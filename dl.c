@@ -10,7 +10,7 @@
 /*
 DeskLink+
 Extensions and enhancements Copyright (C) 2005 John R. Hogerhuis
-20191226 Brian K. White - repackaging and minor re-organizing
+20191226 Brian K. White - repackaging, reorganizing, added -b bootstrap function
 
 DeskLink+ is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License version 2 or any
@@ -27,7 +27,6 @@ Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 MA 02111, USA.
 */
 
-
 #include <termios.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -41,7 +40,6 @@ MA 02111, USA.
 #include <stdlib.h>
 #include <ctype.h>
 #include "dir_list.h"
-
 
 #if defined(__darwin__)
 #include <util.h>
@@ -61,11 +59,24 @@ MA 02111, USA.
 #endif
 
 #ifndef LOADER_FILE
-#define LOADER_FILE "LOADER.DO"
+#define LOADER_FILE LOADER.DO
 #endif
 
 #ifndef DEFAULT_TTY
-#define DEFAULT_TTY "/dev/ttyS0"
+#define DEFAULT_TTY /dev/ttyS0
+#endif
+
+// There are quotes in the actual string below which the user needs to type into BASIC exactly.
+// So we can't have extra quotes around the string which the user should not type.
+// So, the pre-processor gets confused and generates a warning about unterminated quotes.
+// But, it actually builds, and works the way we need at run-time
+#ifndef LOADER_DIRECTIONS
+// experiment
+//#define LOADER_DIRECTIONS OPEN \"COM:98N1ENN\" FOR OUTPUT AS 1 :PRINT #1,\"XX\" :RUN \"COM:98N1ENN\"
+// functionally same as original directions, but expanded to be easier to read, and type-in without mistakes
+#define LOADER_DIRECTIONS OPEN \"COM:98N1D\" FOR OUTPUT AS 1 :PRINT #1,\"XX\" :RUN \"COM:98N1D\"
+// verbatim original directions from dl.do
+//#define LOADER_DIRECTIONS OPEN\"COM:98N1D\"FOROUTPUTAS1:?#1,\"XX\";:RUN\"COM:98N1D
 #endif
 
 #define STRINGIFY2(X) #X
@@ -86,41 +97,57 @@ DIR *dir=NULL;
 char *dirname;
 char **args;
 struct termios origt;
-struct termios	ti;
+struct termios ti;
 int gettymode;
 int guimode=1;
+int bootstrap=0;
 int debug=0;
 int upcase=1;
-unsigned dot_offset = 6; // standard for M100, NEC
+unsigned dot_offset = 6; // 6 for 100/102/200/NEC/KC85 , 8 for WP-2
 unsigned char buf[131];
-
-void print_usage() {
-	fprintf (stderr, "dl [device_node] [options]\n");
-	fprintf (stderr, "   -v       Verbose (debug) mode\n");
-	fprintf (stderr, "   -p=dir   Path to files to be served\n");
-	fprintf (stderr, "   -w       WP-2 compatibility mode\n");
-	fprintf (stderr, "   -f       Don't upcase file names when enumerating\n");
-	fprintf (stderr, "Example:\n");
-	fprintf (stderr, "   dl /dev/ttyUSB0 -p=/home/john/wp2files -w -v\n");
-	fprintf (stderr, "\n");
-	fprintf (stderr, "Compile-time defaults:\n");
-	fprintf (stderr, "   device_node: " STRINGIFY(DEFAULT_TTY) "\n");
-	fprintf (stderr, "   loader file: " STRINGIFY(LOADER_FILE) "\n");
-	fprintf (stderr, "\n");
-	fprintf (stderr, "Loader: Enter the following in BASIC:\n");
-	fprintf (stderr, "   OPEN\"COM:98N1D\"FOROUTPUTAS1:?#1,\"XX\";:RUN\"COM:98N1D\"\n");
-	fprintf (stderr, "\n");
-}
 
 int bedisk(void);
 
 void out_buf(unsigned char *bufp, unsigned len);
 
+int sendloader(void);
+
+int do_bootstrap(void);
+
+void print_usage() {
+	fprintf (stderr, "DeskLink+ usage:\n");
+	fprintf (stderr, "%s [device_node] [options]\n",args[0]);
+	fprintf (stderr, "   -h       Print this help\n");
+	fprintf (stderr, "   -b       Install " STRINGIFY(LOADER_FILE) " and exit\n");
+	fprintf (stderr, "   -v       Verbose (debug) mode\n");
+	fprintf (stderr, "   -p=dir   Path to files to be served\n");
+	fprintf (stderr, "   -w       WP-2 compatibility mode\n");
+	fprintf (stderr, "   -f       Don't upcase file names when enumerating\n");
+	fprintf (stderr, "Example:\n");
+	fprintf (stderr, "   %s /dev/ttyUSB0 -p=/home/john/wp2files -w -v\n",args[0]);
+	fprintf (stderr, "\n");
+	fprintf (stderr, "   Default device_node: " STRINGIFY(DEFAULT_TTY) "\n");
+	// doesn't actually work, but -b works
+	//fprintf (stderr, "\n");
+	//fprintf (stderr, "Loader function: Enter the following in BASIC :\n");
+	//fprintf (stderr, "   " STRINGIFY(LOADER_DIRECTIONS) "\n");
+	//fprintf (stderr, "\n");
+}
+
+int do_bootstrap() {
+	printf("DeskLink+ bootstrap mode.\n");
+	printf("Installing " STRINGIFY(LOADER_FILE) "\n");
+	printf("Enter the following into BASIC:\n");
+	printf("  RUN \"COM:98N1ENN\"\n");
+	printf("and then press [Enter] here: ");
+	getchar();
+	return(sendloader());
+}
+
 int my_write (int fh, void *srcp, size_t len) {
 	if (debug) {
 		fprintf (stderr, "Writing: ");
 		out_buf (srcp, len);
-		fprintf (stderr, "\n");
 	}
 	return (write (fh, srcp, len));
 }
@@ -152,7 +179,7 @@ int main(int argc, char **argv) {
 	unsigned char path[PATH_MAX];
 	int arg;
 
-	/** create the file list (for reverse order traversal) */
+	/* create the file list (for reverse order traversal) */
 	file_list_init ();
 
 	args = argv;
@@ -181,6 +208,7 @@ int main(int argc, char **argv) {
 						break;
 					case 'f':
 						upcase = 0;
+						break;
 					case 'c':
 						guimode=0;
 						break;
@@ -188,29 +216,41 @@ int main(int argc, char **argv) {
 						debug=1;
 						break;
 					case 'p':
-						/** set the current directory */
-						if (argv[arg][2] != '=') break;
+						if (argv[arg][2] != '=')
+							break;
 						(void)(chdir (argv[arg] + 3)+1);
-						(void)(system ("pwd")+1);
 						break;
 					case 'w':
-						/** set the 'dot' offset to match wp-2 */
 						dot_offset = 8;
 						break;
 					case 'h':
 						print_usage();
 						exit(0);
 						break;
+					case 'b':
+						bootstrap=1;
+						break;
 					default:
 						fprintf(stderr, "Unknown option %s\n",argv[arg]);
 						print_usage();
 						exit(1);
+						break;
 					}
 				break;
 			default:
 				strcpy((char *)path,"/dev/");
 				strcat((char *)path,(char *)(argv[arg]));
 		}
+	}
+
+	if (debug) {
+		fprintf (stderr, "--------------------------------------------------------------------------------\n");
+		fprintf (stderr, "Using Serial Device: %s\n", path);
+		fprintf (stderr, "Working In Directory: ");
+		(void)(system ("pwd;ls -l")+1);
+		fprintf (stderr, "To Install " STRINGIFY(LOADER_FILE) " (does not actually work) : \n");
+		fprintf (stderr, "  " STRINGIFY(LOADER_DIRECTIONS) "\n");
+		fprintf (stderr, "--------------------------------------------------------------------------------\n");
 	}
 
 	if(term<0)
@@ -251,9 +291,12 @@ int main(int argc, char **argv) {
 #ifdef CRTS_IFLOW
 		| CRTS_IFLOW
 #endif
-	;
+		;
 
-	cfsetspeed(&origt,B1200);
+	cfsetspeed(&origt,B19200);  // orig B1200
+
+	if(bootstrap)
+		exit(do_bootstrap());
 
 	while(1)
 		bedisk();
@@ -272,7 +315,7 @@ int out_dirent (unsigned char *fnamep, unsigned len) {
 	if (debug)
 		fprintf (stderr, "out_dirent: %s\n", fnamep);
 
-	/** format the filename */
+	/* format the filename */
 	if (fnamep) {
 
 		if (debug)
@@ -301,10 +344,10 @@ int out_dirent (unsigned char *fnamep, unsigned len) {
 			fprintf (stderr, "str: %24.24s\n", (char *)buf + 2);
 	}
 
-	/** add checksum */
+	/* add checksum */
 	buf[30] = calc_sum (0x11, 0x1C, buf + 2);
 
-	/** write packet */
+	/* write packet */
 	return (my_write (term,buf,31) == 31);
 }
 
@@ -361,7 +404,7 @@ int read_next_dirent(struct stat *st) {
 		if(st->st_size > 65535)
 			continue;
 
-		/** add file to list so we can traverse any order */
+		/* add file to list so we can traverse any order */
 		add_file ((unsigned char *) dire->d_name, st->st_size, ++fname_ndx);
 
 		if (debug)
@@ -564,6 +607,9 @@ int readbytes(int handle, void *buf, int max) {
 	int rval;
 	unsigned i;
 
+	if (debug)
+		fprintf (stderr, "Reading ... ");
+
 	while (r < max) {
 		rval = read (term, buf + r, 1);
 		if (rval < 0)
@@ -571,9 +617,11 @@ int readbytes(int handle, void *buf, int max) {
 		r += rval;
 	}
 
-	if (debug)
+	if (debug) {
 		for (i = 0; r >=0 && i < r; i++)
 			fprintf (stderr, "%02X ", ((unsigned char *)buf)[i]);
+		fprintf (stderr, "\n");
+	}
 
 	return (r);
 }
@@ -595,16 +643,17 @@ int sendloader(void) {
 		fflush(stdout);
 	}
 
-	sleep(1);
+	sleep(1); // orig 1
 
 	while(read(fd,&b,1)==1) {
 		while((i=my_write(term,&b,1))!=1);
 		w+=i;
-		usleep(10000);  // orig 5000
-		if(debug) {
-			fprintf(stderr, "Sent: %d bytes.\n",w);
-			fflush(stdout);
-		}
+		usleep(5000);  // orig 5000
+		if(debug)
+			fprintf(stderr, "Sent: %d bytes\n",w);
+		else
+			fprintf(stderr, ".");
+		fflush(stdout);
 	}
 	b=0x1A;
 	my_write(term,&b,1);
@@ -615,6 +664,8 @@ int sendloader(void) {
 		fprintf(stderr, "Sent " STRINGIFY(LOADER_FILE) "\n");
 		fflush(stdout);
 	}
+	else
+		fprintf(stderr, "\n");
 
 //	if(debug) {
 //		puts("");
@@ -641,7 +692,7 @@ void out_buf(unsigned char *bufp, unsigned len) {
 				fprintf (stderr, "%02X ", bufp[i]);
 			fprintf (stderr, "   ");
 		}
-		fprintf (stderr, "\n");
+		//fprintf (stderr, "\n");
 	}
 	fprintf (stderr, "\n");
 }
@@ -660,11 +711,14 @@ int bedisk(void) {
 	for (precnt = 0; precnt < 2; precnt++) {
 		len = readbytes(term, preamble + precnt, 1);
 		if (len == 0) {
-			fprintf (stderr, "zero length - 1\n");
+			fprintf (stderr, "Zero Length - 1\n");
 			continue;
 		}
-		if (preamble[precnt] != 'Z' && preamble[precnt] != 'Y' && preamble[precnt] != 'X')
+		if (preamble[precnt] != 'Z' && preamble[precnt] != 'Y' && preamble[precnt] != 'X') {
+			if (debug)
+				fprintf(stderr, "Bad preamble: '%s' (%02X %02X)\n",preamble,preamble[0],preamble[1]);
 			return (-1); // no error message... TS-DOS doesn't like that...
+		}
 	}
 
 	if(preamble[0]==preamble[1]) {
@@ -672,11 +726,15 @@ int bedisk(void) {
 			case 'Z':
 				break;
 			case 'Y':
+				if(debug)
+					fprintf(stderr, "Got LOGIN preamble: '%s' (%02X %02X)\n",preamble,preamble[0],preamble[1]);
 				tcsetattr(term,TCSANOW,&origt);
 				(void)(system("login")+1);
 				tcsetattr(term,TCSANOW,&ti);
 				return(10);
-			case 'X':
+			case 'X':	// doesn't actually work
+				if(debug)
+					fprintf(stderr, "Got LOADER preamble: '%s' (%02X %02X)\n",preamble,preamble[0],preamble[1]);
 				return(sendloader());
 			default:
 				if(debug)
