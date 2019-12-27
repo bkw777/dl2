@@ -24,8 +24,8 @@ but you may replace LOADER.DO with another one to install something else like "t
 
 TODO: write up better directions to run teeny.co  
 get the CALL address from teeny-linux to take the place of this loadm  
-:LOADM "TEENY"  
-:look at "Top:"  
-:CLEAR 0,___   (whatever Top: said)  
-:NEW, MENU  
-:run teeny.co from menu  
+ LOADM "TEENY"  
+ look at "Top:"  
+ CLEAR 0,___   (whatever Top: said)  
+ NEW, MENU  
+ run teeny.co from menu  
