@@ -21,12 +21,14 @@ After that, do the following in BASIC:
  NEW
  LOADM "TEENY"
 ```
-look at "Top:"
-```CLEAR 0,___``` (whatever "Top:" said)  
-then run TEENY.CO from the main menu
+look at "Top:#####"  
+then enter:  
+```CLEAR 0,#####``` (##### = the value from "Top:#####")  
+then you may run TEENY.CO from the main menu
 
-This essentially takes the place of teeny-linux / teeny-freebsd / teeny-macosx .
+Any time you run any other *.CO machine language programs, you may need to repeate the CLEAR command before you can run TEENY again.
 
+This essentially takes the place of teeny-linux / teeny-freebsd / teeny-macosx .  
 This just sends LOADER.DO to the M100.  
 The default included LOADER.DO containes a BASIC program which creats TEENY.CO  
 but you may replace LOADER.DO with another one to install something else like "tiny" or "dskmgr" or possibly even ts-dos etc.
