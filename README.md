@@ -12,8 +12,10 @@ Serial Cable: <http://tandy.wiki/Model_100_102_200_600_Serial_Cable>
 ## news
 Added -b option for "bootstrap"
 
-To install teeny* on the Model 100, just run
-```dl -b```
+To install teeny* on the Model 100, just run (on a host linux/osx/freebsd machine):
+```
+dl -b
+```
 and follow the prompt.
 
 After that, do the following in BASIC:
