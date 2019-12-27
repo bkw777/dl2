@@ -13,21 +13,21 @@ Serial Cable: <http://tandy.wiki/Model_100_102_200_600_Serial_Cable>
 Added -b option for "bootstrap"
 
 To install teeny* on the Model 100, just run
-```
-dl -b
-```
+```dl -b```
 and follow the prompt.
 
-This essentially takes the place of teeny-linux|teeny-freebsd|teeny-macosx
+After that, do the following in BASIC:
+```
+ NEW
+ LOADM "TEENY"
+```
+look at "Top:"
+```CLEAR 0,___``` (whatever "Top:" said)  
+then run TEENY.CO from the main menu
+
+This essentially takes the place of teeny-linux / teeny-freebsd / teeny-macosx .
 
 This just sends LOADER.DO to the M100.  
-The default included LOADER.DO containes a BASIC program which creats teeny.co  
+The default included LOADER.DO containes a BASIC program which creats TEENY.CO  
 but you may replace LOADER.DO with another one to install something else like "tiny" or "dskmgr" or possibly even ts-dos etc.
 
-TODO: write up better directions to run teeny.co  
-get the CALL address from teeny-linux to take the place of this loadm  
- LOADM "TEENY"  
- look at "Top:"  
- CLEAR 0,___   (whatever Top: said)  
- NEW, MENU  
- run teeny.co from menu  
