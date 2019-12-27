@@ -9,14 +9,33 @@ Original source: <http://bitchin100.com/files/linux/dlplus.zip>
 
 Serial Cable: <http://tandy.wiki/Model_100_102_200_600_Serial_Cable>
 
-## news
-Added -b option for "bootstrap"
+## install
+```
+make clean all && sudo make install
+```
 
-To install teeny* on the Model 100, just run (on a host linux/osx/freebsd machine):
+## uninstall
+```
+sudo make uninstall
+```
+
+## usage - normal, run the TPDD server
+```
+dl
+```
+
+## usage - bootstrap a TPDD client onto the M100
 ```
 dl -b
 ```
-and follow the prompt.
+
+## news
+Added "bootstrap" -b option
+
+To install TEENY.CO on the Model 100, just run (on a host linux/osx/freebsd machine):
+```
+dl -b
+```
 
 After that, do the following in BASIC:
 ```
