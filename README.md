@@ -10,8 +10,9 @@ Original source: <http://bitchin100.com/files/linux/dlplus.zip>
 ## news
 Added -b option for "bootstrap"
 
-To install teeny* on the Model 100, just run
+To install teeny* on the Model 100, just run  
     dl -b
+
 This essentially takes the place of teeny-linux|teeny-freebsd|teeny-macosx
 
 This just sends LOADER.DO to the M100.  
