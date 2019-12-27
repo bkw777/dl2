@@ -7,6 +7,8 @@ DeskLink+ is a Tandy Portable Disk Drive emulator or "TPDD Server" implimented i
 
 Original source: <http://bitchin100.com/files/linux/dlplus.zip>
 
+Serial Cable: <http://tandy.wiki/Model_100_102_200_600_Serial_Cable>
+
 ## news
 Added -b option for "bootstrap"
 
