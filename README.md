@@ -19,38 +19,25 @@ make clean all && sudo make install
 sudo make uninstall
 ```
 
-## usage - normal, run the TPDD server
+## run the TPDD server
 ```
 dl
 ```
 
-## usage - bootstrap a TPDD client onto the M100
+## bootstrap a TPDD client (TEENY) onto the portable
 ```
 dl -b
 ```
 
 ## news
-Added "bootstrap" -b option
+20191228 Added Model 200 support<br>
+To bootstrap TEENY onto a Tandy 200, run:<br>
+```
+dl -b=200
+```
 
-To install TEENY.CO on the Model 100, just run (on a host linux/osx/freebsd machine):
+20191226 Added "bootstrap" -b option<br>
+To bootstrap TEENY onto a Tandy 100 or 102, just run:<br>
 ```
 dl -b
 ```
-
-After that, do the following in BASIC:
-```
- NEW
- LOADM "TEENY"
-```
-look at "Top:#####"  
-then enter:  
-```CLEAR 0,#####``` (##### = the value from "Top:#####")  
-then you may run TEENY.CO from the main menu
-
-Any time you run any other *.CO machine language programs, you may need to repeate the CLEAR command before you can run TEENY again.
-
-This essentially takes the place of teeny-linux / teeny-freebsd / teeny-macosx .  
-This just sends LOADER.DO to the M100.  
-The default included LOADER.DO containes a BASIC program which creats TEENY.CO  
-but you may replace LOADER.DO with another one to install something else like "tiny" or "dskmgr" or possibly even ts-dos etc.
-

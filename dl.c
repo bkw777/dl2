@@ -58,25 +58,16 @@ MA 02111, USA.
 #include <netinet/in.h>
 #endif
 
-#ifndef LOADER_FILE
-#define LOADER_FILE LOADER.DO
+#ifndef APP_LIB_DIR
+#define APP_LIB_DIR .
 #endif
 
 #ifndef DEFAULT_TTY
 #define DEFAULT_TTY /dev/ttyS0
 #endif
 
-// There are quotes in the actual string below which the user needs to type into BASIC exactly.
-// So we can't have extra quotes around the string which the user should not type.
-// So, the pre-processor gets confused and generates a warning about unterminated quotes.
-// But, it actually builds, and works the way we need at run-time
-#ifndef LOADER_DIRECTIONS
-// experiment
-//#define LOADER_DIRECTIONS OPEN \"COM:98N1ENN\" FOR OUTPUT AS 1 :PRINT #1,\"XX\" :RUN \"COM:98N1ENN\"
-// functionally same as original directions, but expanded to be easier to read, and type-in without mistakes
-#define LOADER_DIRECTIONS OPEN \"COM:98N1D\" FOR OUTPUT AS 1 :PRINT #1,\"XX\" :RUN \"COM:98N1D\"
-// verbatim original directions from dl.do
-//#define LOADER_DIRECTIONS OPEN\"COM:98N1D\"FOROUTPUTAS1:?#1,\"XX\";:RUN\"COM:98N1D
+#ifndef DEFAULT_MODEL
+#define DEFAULT_MODEL 100
 #endif
 
 #define STRINGIFY2(X) #X
@@ -87,22 +78,21 @@ unsigned fname_ndx = 0;
 unsigned file_len;
 LocalID cur_id;
 
-int file=-1;
-int mode=0;	/* 0=unopened, 1=Write, 3=Read, 2=Append */
-int term=-1;
+int file = -1;
+int mode = 0;	/* 0=unopened, 1=Write, 3=Read, 2=Append */
+int client_fd = -1; // client tty file handle
 unsigned char filename[25];
-unsigned char dirp;
+//unsigned char dirp;
 struct dirent *dire;
-DIR *dir=NULL;
+DIR *dir = NULL;
 char *dirname;
 char **args;
 struct termios origt;
 struct termios ti;
-int gettymode;
-int guimode=1;
-int bootstrap=0;
-int debug=0;
-int upcase=1;
+int getty_mode = 0;
+int bootstrap_mode = 0;
+int debug = 0;
+int upcase = 1;
 unsigned dot_offset = 6; // 6 for 100/102/200/NEC/KC85 , 8 for WP-2
 unsigned char buf[131];
 
@@ -110,38 +100,87 @@ int bedisk(void);
 
 void out_buf(unsigned char *bufp, unsigned len);
 
-int sendloader(void);
+int bootstrap(unsigned char *loader_model);
 
-int do_bootstrap(void);
+int send_loader(char *loader_file);
 
 void print_usage() {
 	fprintf (stderr, "DeskLink+ usage:\n");
-	fprintf (stderr, "%s [device_node] [options]\n",args[0]);
+	fprintf (stderr, "\n");
+	fprintf (stderr, "%s [tty_device] [options]\n",args[0]);
+	fprintf (stderr, "\n");
+	fprintf (stderr, "tty_device:\n");
+	fprintf (stderr, "    serial device the client is connected to\n");
+	fprintf (stderr, "    examples: /dev/ttyS0, /dev/ttyUSB0, etc...\n");
+	fprintf (stderr, "    default = " STRINGIFY(DEFAULT_TTY) "\n");
+	fprintf (stderr, "    \"-\" = stdin/stdout (/dev/tty)\n"); // 20191227 bkw - could this be used with inetd to make a network tpdd server?
+	fprintf (stderr, "\n");
+	fprintf (stderr, "options:\n");
 	fprintf (stderr, "   -h       Print this help\n");
-	fprintf (stderr, "   -b       Install " STRINGIFY(LOADER_FILE) " and exit\n");
-	fprintf (stderr, "   -v       Verbose (debug) mode\n");
+	fprintf (stderr, "   -b=model Bootstrap. Install TEENY.model and exit\n");
+	fprintf (stderr, "   -v       Verbose/debug mode\n");
+	fprintf (stderr, "   -g       Getty mode. Run as daemon\n");
 	fprintf (stderr, "   -p=dir   Path to files to be served\n");
 	fprintf (stderr, "   -w       WP-2 compatibility mode\n");
 	fprintf (stderr, "   -f       Don't upcase file names when enumerating\n");
-	fprintf (stderr, "Example:\n");
+	fprintf (stderr, "\n");
+	fprintf (stderr, "Supported Models for Bootstrap:\n");
+	fprintf (stderr, "   -b=100   Install TEENY for Tandy 100 or 102\n");
+	fprintf (stderr, "   -b=200   Install TEENY for Tandy 200\n");
+//	fprintf (stderr, "   -b=nec   Install TEENY for NEC \n");
+//	fprintf (stderr, "   -b=k85   Install TEENY for Kyocera\n");
+	fprintf (stderr, "\n");
+	fprintf (stderr, "Examples:\n");
+	fprintf (stderr, "   %s\n",args[0]);
+	fprintf (stderr, "   %s -b=200\n",args[0]);
 	fprintf (stderr, "   %s /dev/ttyUSB0 -p=/home/john/wp2files -w -v\n",args[0]);
 	fprintf (stderr, "\n");
-	fprintf (stderr, "   Default device_node: " STRINGIFY(DEFAULT_TTY) "\n");
-	// doesn't actually work, but -b works
-	//fprintf (stderr, "\n");
-	//fprintf (stderr, "Loader function: Enter the following in BASIC :\n");
-	//fprintf (stderr, "   " STRINGIFY(LOADER_DIRECTIONS) "\n");
-	//fprintf (stderr, "\n");
 }
 
-int do_bootstrap() {
-	printf("DeskLink+ bootstrap mode.\n");
-	printf("Installing " STRINGIFY(LOADER_FILE) "\n");
-	printf("Enter the following into BASIC:\n");
+void print_after_loader_directions () {
+	/* TODO - switch statement or external config file for different directions for different loaders */
+	printf("Follow the prompts on the portable.\n");
+	printf("\n");
+	printf("Then enter the following in BASIC:\n");
+	printf("  NEW\n");
+	printf("  LOADM \"TEENY\"\n");
+	printf("\n");
+	printf("Look at the line that says \"Top: #####\"\n");
+	printf("Note the value #####, and enter the following in BASIC with that number in place of #####:\n");
+	printf("  CLEAR 0,#####\n");
+	printf("Example: Top: 62213 -> CLEAR 0,62213\n");
+	printf("\n");
+	printf("You can now exit BASIC and run TEENY.CO from the main menu.\n");
+	printf("You probably want to re-run \"%s\" (without -b this time) first, so that TEENY has something to talk to.\n",args[0]);
+	printf("\n");
+}
+
+int bootstrap(unsigned char *loader_model) {
+	int r = 0;
+	char loaders_dir[PATH_MAX];
+	char loader_file[PATH_MAX];
+
+	// FUTURE: search ~/.dl or ~/.config/dl or ~/.local/lib/dl etc before /usr/local/lib/dl
+	strcpy((char *)loaders_dir,(char *)(STRINGIFY(APP_LIB_DIR)));
+
+	strcpy((char *)loader_file,(char *)(loaders_dir));
+	strcat((char *)loader_file,(char *)("/TEENY."));
+	strcat((char *)loader_file,(char *)(loader_model));
+
+	/* before-loader directions should be the same for any loader */
+	printf("Bootstrap mode.\n");
+	printf("Installing %s\n", loader_file);
+	printf("Enter the following in BASIC:\n");
 	printf("  RUN \"COM:98N1ENN\"\n");
-	printf("and then press [Enter] here: ");
+	printf("then press [Enter] here: ");
 	getchar();
-	return(sendloader());
+
+	r = send_loader(loader_file);
+
+	if (r == 0)
+		print_after_loader_directions();
+
+	return(r);
 }
 
 int my_write (int fh, void *srcp, size_t len) {
@@ -168,57 +207,57 @@ void normal_return(unsigned char type) {
 	buf[1]=0x01;
 	buf[2]=type;
 	buf[3]=calc_sum(0x12,0x01,buf+2);
-	my_write(term,buf,4);
+	my_write(client_fd,buf,4);
 	if(debug)
 		fprintf(stderr, "Response: %02X\n",type);
 }
 
 int main(int argc, char **argv) {
 	int off=0;
-	unsigned char *p;
-	unsigned char path[PATH_MAX];
+//	unsigned char *p;
+	unsigned char client_tty[PATH_MAX];
+	unsigned char loader_model[4];  // 100, 200, nec, k85
 	int arg;
 
 	/* create the file list (for reverse order traversal) */
 	file_list_init ();
 
 	args = argv;
+
+/*
 	dirname = (char *)strdup((char *)(argv[0]));
 	p = (unsigned char *) strrchr ((char *)dirname, '/');
 	if (p != NULL) {
 		*p = 0;
 		(void)(chdir ((char *)dirname)+1);
 	}
+*/
 
-	strcpy ((char *)path,STRINGIFY(DEFAULT_TTY));
+	strcpy ((char *)client_tty,STRINGIFY(DEFAULT_TTY));
+
 	for (arg = 1; arg < argc; arg++) {
 		switch (argv[arg][0]) {
 			case '/':
-				strcpy ((char *)path, (char *)(argv[arg]));
+				strcpy ((char *)client_tty, (char *)(argv[arg]));
 				break;
 			case '-':
 				switch (argv [arg][1]) {
 					case 0:
-						strcpy ((char *)path,"/dev/tty");
-						term = 1;
+						strcpy ((char *)client_tty,"/dev/tty");
+						client_fd = 1;
 						break;
 					case 'g':
-						gettymode=1;
-						guimode=0;
+						getty_mode = 1;
 						break;
 					case 'f':
 						upcase = 0;
 						break;
-					case 'c':
-						guimode=0;
-						break;
 					case 'v':
-						debug=1;
+						debug = 1;
 						break;
 					case 'p':
-						if (argv[arg][2] != '=')
-							break;
-						(void)(chdir (argv[arg] + 3)+1);
+						if (argv[arg][2] == '=')
+							(void)(chdir (argv[arg] + 3)+1);
 						break;
 					case 'w':
 						dot_offset = 8;
@@ -228,7 +267,10 @@ int main(int argc, char **argv) {
 						exit(0);
 						break;
 					case 'b':
-						bootstrap=1;
+						bootstrap_mode = 1;
+						strcpy ((char *)loader_model, (char *)(STRINGIFY(DEFAULT_MODEL)));
+						if (argv[arg][2] == '=')
+							strcpy ((char *)loader_model, (char *)(argv[arg] + 3));
 						break;
 					default:
 						fprintf(stderr, "Unknown option %s\n",argv[arg]);
@@ -238,44 +280,45 @@ int main(int argc, char **argv) {
 					}
 				break;
 			default:
-				strcpy((char *)path,"/dev/");
-				strcat((char *)path,(char *)(argv[arg]));
+				strcpy((char *)client_tty,"/dev/");
+				strcat((char *)client_tty,(char *)(argv[arg]));
 		}
 	}
 
+	if (getty_mode)
+		debug = 0;
+
 	if (debug) {
 		fprintf (stderr, "--------------------------------------------------------------------------------\n");
-		fprintf (stderr, "Using Serial Device: %s\n", path);
+		fprintf (stderr, "Using Serial Device: %s\n", client_tty);
 		fprintf (stderr, "Working In Directory: ");
-		(void)(system ("pwd;ls -l")+1);
-		fprintf (stderr, "To Install " STRINGIFY(LOADER_FILE) " (does not actually work) : \n");
-		fprintf (stderr, "  " STRINGIFY(LOADER_DIRECTIONS) "\n");
+		(void)(system ("pwd >&2;ls -l >&2")+1);
 		fprintf (stderr, "--------------------------------------------------------------------------------\n");
 	}
 
-	if(term<0)
-		term=open((char *)path,O_RDWR|O_NONBLOCK);
-	if(term<0)
+	if(client_fd<0)
+		client_fd=open((char *)client_tty,O_RDWR|O_NONBLOCK);
+	if(client_fd<0)
 		return(1);
 
-	if(gettymode) {
-		if(login_tty(term)==0)
-			term=STDIN_FILENO;
+	if(getty_mode) {
+		if(login_tty(client_fd)==0)
+			client_fd = STDIN_FILENO;
 		else
 			(void)(daemon(1,1)+1);
 	}
 
-	(void)(tcflush(term, TCIOFLUSH)+1);	/* clear out the crap */
-	ioctl(term, FIONBIO, &off);	/* turn off non-blocking mode */
-	ioctl(term, FIOASYNC, &off);	/* ditto for async mode */
+	(void)(tcflush(client_fd, TCIOFLUSH)+1);	/* clear out the crap */
+	ioctl(client_fd, FIONBIO, &off);	/* turn off non-blocking mode */
+	ioctl(client_fd, FIOASYNC, &off);	/* ditto for async mode */
 
-	if(tcgetattr(term,&ti)==-1)
+	if(tcgetattr(client_fd,&ti)==-1)
 		return(1);
 	cfmakeraw(&ti);
 	ti.c_cflag |= CLOCAL|CRTSCTS|CS8;
 	if(cfsetspeed(&ti,B19200)==-1)
 		return(1);
-	if(tcsetattr(term,TCSANOW,&ti)==-1)
+	if(tcsetattr(client_fd,TCSANOW,&ti)==-1)
 		return(1);
 
 	/* Set up terminal termios struct */
@@ -295,8 +338,8 @@ int main(int argc, char **argv) {
 
 	cfsetspeed(&origt,B19200);  // orig B1200
 
-	if(bootstrap)
-		exit(do_bootstrap());
+	if(bootstrap_mode)
+		exit(bootstrap(loader_model));
 
 	while(1)
 		bedisk();
@@ -348,7 +391,7 @@ int out_dirent (unsigned char *fnamep, unsigned len) {
 	buf[30] = calc_sum (0x11, 0x1C, buf + 2);
 
 	/* write packet */
-	return (my_write (term,buf,31) == 31);
+	return (my_write (client_fd,buf,31) == 31);
 }
 
 int send_dirent (unsigned char *buf, struct stat *st) {
@@ -378,7 +421,7 @@ int send_dirent (unsigned char *buf, struct stat *st) {
 		}
 	}
 	buf[30] = calc_sum (0x11, 0x1C, buf+2);
-	return (my_write (term, buf, 31) == 31);
+	return (my_write (client_fd, buf, 31) == 31);
 }
 
 int read_next_dirent(struct stat *st) {
@@ -565,7 +608,7 @@ void read_file(void) {
 	in = read (file, buf+2, 128);
 	buf[1] = (unsigned char) in;
 	buf[2+in] = calc_sum(0x10, (unsigned char)in, buf+2);
-	my_write (term, buf, 3+in);
+	my_write (client_fd, buf, 3+in);
 }
 
 void respond_mystery() {
@@ -573,7 +616,7 @@ void respond_mystery() {
 
 	memcpy (buf, canned, sizeof (canned));
 	buf[sizeof(canned)] = calc_sum (canned[0], canned[1], canned + 2);
-	my_write (term, buf, sizeof (canned) + 1);
+	my_write (client_fd, buf, sizeof (canned) + 1);
 }
 
 void respond_mystery2() {
@@ -581,13 +624,13 @@ void respond_mystery2() {
 
 	memcpy (buf, canned, sizeof (canned));
 	buf[sizeof(canned)] = calc_sum (canned[0], canned[1], canned + 2);
-	my_write (term, buf, sizeof (canned) + 1);
+	my_write (client_fd, buf, sizeof (canned) + 1);
 }
 
 void respond_place_path() {
 	static unsigned char canned[] = {0x12, 0x0b, 0x00, 0x52, 0x4f, 0x4f, 0x54, 0x20, 0x20, 0x2e, 0x3c, 0x3e, 0x20, 0x96};
 
-	my_write (term, canned, sizeof (canned));
+	my_write (client_fd, canned, sizeof (canned));
 }
 
 void renamefile(unsigned char *name) {
@@ -608,10 +651,10 @@ int readbytes(int handle, void *buf, int max) {
 	unsigned i;
 
 	if (debug)
-		fprintf (stderr, "Reading ... ");
+		fprintf (stderr, "Read... ");
 
 	while (r < max) {
-		rval = read (term, buf + r, 1);
+		rval = read (client_fd, buf + r, 1);
 		if (rval < 0)
 			continue;
 		r += rval;
@@ -626,39 +669,38 @@ int readbytes(int handle, void *buf, int max) {
 	return (r);
 }
 
-int sendloader(void) {
+int send_loader(char *loader_file) {
 	int w=0;
 	int i=0;
 	int fd;
 	unsigned char b;
 
-	if((fd=open(STRINGIFY(LOADER_FILE),O_RDONLY))<0) {
+	if((fd=open(loader_file,O_RDONLY))<0) {
 		if(debug)
-			fprintf(stderr, "Failed to open " STRINGIFY(LOADER_FILE) " for read.\n");
+			fprintf(stderr, "Failed to open %s for read.\n",loader_file);
 		return(9);
 	}
 
 	if(debug) {
-		fprintf(stderr, "Sending " STRINGIFY(LOADER_FILE) "\n");
+		fprintf(stderr, "Sending %s\n",loader_file);
 		fflush(stdout);
 	}
 
-	sleep(1); // orig 1
-
 	while(read(fd,&b,1)==1) {
-		while((i=my_write(term,&b,1))!=1);
+		while((i=my_write(client_fd,&b,1))!=1);
 		w+=i;
-		usleep(5000);  // orig 5000
+		usleep(5000);
 		if(debug)
 			fprintf(stderr, "Sent: %d bytes\n",w);
 		else
 			fprintf(stderr, ".");
 		fflush(stdout);
 	}
-	b=0x1A;
-	my_write(term,&b,1);
+	fprintf(stderr, "\n");
+	b = 0x1A;
+	my_write(client_fd,&b,1);
 	close(fd);
-	close(term);
+	close(client_fd);
 
 	if(debug) {
 		fprintf(stderr, "Sent " STRINGIFY(LOADER_FILE) "\n");
@@ -666,16 +708,6 @@ int sendloader(void) {
 	}
 	else
 		fprintf(stderr, "\n");
-
-//	if(debug) {
-//		puts("");
-//		if(strlen((char *)(args[0]))>4)
-//			strcpy((char*) (args[0]),"dl");
-//		execvp("dl",args);
-//	}
-//	else {
-//		exit(0);
-//	}
 
 	return(0);
 }
@@ -692,7 +724,6 @@ void out_buf(unsigned char *bufp, unsigned len) {
 				fprintf (stderr, "%02X ", bufp[i]);
 			fprintf (stderr, "   ");
 		}
-		//fprintf (stderr, "\n");
 	}
 	fprintf (stderr, "\n");
 }
@@ -709,65 +740,38 @@ int bedisk(void) {
 	preamble[2]=0;
 
 	for (precnt = 0; precnt < 2; precnt++) {
-		len = readbytes(term, preamble + precnt, 1);
+		len = readbytes(client_fd, preamble + precnt, 1);
 		if (len == 0) {
 			fprintf (stderr, "Zero Length - 1\n");
 			continue;
 		}
-		if (preamble[precnt] != 'Z' && preamble[precnt] != 'Y' && preamble[precnt] != 'X') {
+		if (preamble[precnt] != 'Z') {
 			if (debug)
 				fprintf(stderr, "Bad preamble: '%s' (%02X %02X)\n",preamble,preamble[0],preamble[1]);
-			return (-1); // no error message... TS-DOS doesn't like that...
+			return (-1); // no error message, TS-DOS doesn't like that
 		}
 	}
 
-	if(preamble[0]==preamble[1]) {
-		switch(preamble[0]) {
-			case 'Z':
-				break;
-			case 'Y':
-				if(debug)
-					fprintf(stderr, "Got LOGIN preamble: '%s' (%02X %02X)\n",preamble,preamble[0],preamble[1]);
-				tcsetattr(term,TCSANOW,&origt);
-				(void)(system("login")+1);
-				tcsetattr(term,TCSANOW,&ti);
-				return(10);
-			case 'X':	// doesn't actually work
-				if(debug)
-					fprintf(stderr, "Got LOADER preamble: '%s' (%02X %02X)\n",preamble,preamble[0],preamble[1]);
-				return(sendloader());
-			default:
-				if(debug)
-					fprintf(stderr, "Bad preamble: '%s' (%02X %02X)\n",preamble,preamble[0],preamble[1]);
-				normal_return(0x40);
-				return(2);
-		}
-	}
-	else {
-		if(debug)
-			fprintf(stderr, "Bad preamble: '%s' (%02X %02X)\n",preamble,preamble[0],preamble[1]);
-	}
-
-	len = readbytes(term,&type,1);
+	len = readbytes(client_fd,&type,1);
 	if (!len) {
 		fprintf (stderr, "zero len - 2\n");
 		return (0);
 	}
 
-	len = readbytes(term,&length,1);
+	len = readbytes(client_fd,&length,1);
 	if (!len) {
 		fprintf (stderr, "zero len - 3\n");
 		return (0);
 	}
 
-	len = readbytes(term,data,length);
+	len = readbytes(client_fd,data,length);
 	if (length && !len) {
 		fprintf (stderr, "zero len - 4\n");
 		return (0);
 	}
 
 	data[length]=0;
-	len = readbytes(term,&checksum,1);
+	len = readbytes(client_fd,&checksum,1);
 	if (!len) {
 		fprintf (stderr, "zero len - 5\n");
 		return (0);
@@ -824,8 +828,11 @@ int bedisk(void) {
 		case 0x07:	/* Drive Status */
 			normal_return(0x00);
 			break;
-		case 0x08:	/* Drive condition */
-			respond_place_path ();
+		case 0x08:	/* TS-DOS DME Request */
+			respond_place_path();
+			break;
+		case 0x0C:	/* Condition */
+			normal_return(0x00);
 			break;
 		case 0x0D:	/* Rename File */
 			renamefile(data);
