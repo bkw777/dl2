@@ -1,52 +1,61 @@
-Model 200 teeny loader
+Extracting model-specific BASIC loaders for TEENY from TEENY.EXE
 
 teeny-linux has a bug where the BASIC code that it sends to the client after it detects a Model 200 is missing a ":", and so the code dies with a syntax error.
 This makes it impossible to install teeny on a Model 200, because there is no other way to get the Model 200 version of the loader out of the executable except by running it, and having the Model 200 respond as expected.
 
 I was able to get TEENY.200 this way:
 
-First make a new directory to work in, download dl-arc.exe, and use dosbox to run it.
+Connect a Model 200 to the host with the right kind of serial cable and usb-serial adapter.
+http://tandy.wiki/Model_100_102_200_600_Serial_Cable
+  particularly:
+  https://www.cdw.com/shop/products/C2G-null-modem-cable-6-ft-white/1153481.aspx
+  https://www.amazon.com/dp/B005SYQV9C/
 
-  mkdir dl
-  cd dl
+Assuming the serial device tty is /devttyUSB0
+
+Download dl-arc.exe into a temp working dir
+  mkdir /tmp/dlarc
+  cd /tmp/dlarc
   wget http://ftp.whtech.com/club100/com/dl-arc.exe
-  dosbox dl-arc.exe
 
-This executes dl-arc.exe which extracts itself into the current directory.
-Among the extracted files are TEENY.EXE, but don't run it yet...
-Type "exit" to exit out of dosbox.
+Run dosbox with commandline options to start in the current working dir, and tie COM1 to /dev/ttyUSB0
 
-Get the location of the dosbox config file from the on-screen messages it wrote when it started up:
-  CONFIG:Loading primary settings from config file /home/bkw/.dosbox/dosbox-0.74-3.conf
+  dosbox -c "serial1 directserial realport:ttyUSB0" .
 
-Assuming your serial device tty is /dev/ttyUSB0 ,
-edit the config file above, and find the [serial] section.
+Inside dosbox, run dl-arc, then teeny
 
-Change this line:
-  serial1=dummy
+  C:\>dl-arc
+  ...
+  C:\>teeny
 
-to this:
-  serial1=directserial realport:ttyUSB0
-
-Now run TEENY.EXE:
-  dosbox TEENY.EXE
-
-Follow the prompts in TEENY.EXE and on the Model 200 screen, except at the end, save the loader BASIC code on the Model 200:
+Follow all the prompts from TEENY.EXE and on the Model 200 screen,
+until TEENY.EXE shows:
+  "At Laptop either type NEW and press Enter, or type SAVE"TEENY and press Enter."
+Do that SAVE instead of NEW, except slightly different:
   SAVE "TNY200",A
-
 This will create a file "TNY200.DO" on the Model 200.
 
-Follow the remaining prompts to CLEAR 0,#####, exit to the main menu, and run TEENY.CO from the main menu on the Model 200.
-TEENY.EXE will have automatically started up DeskLink at this point,
-so there should now be a TPDD server running in dosbox on the hos pc,
-which TEENY on the Model 200 should be able to talk to.
+Clean up and exit BASIC
+  NEW
+  POWER 100
+  MENU
 
-Use TEENY to save TNY200.DO back to the host.
+Press Enter a couple more times in dosbox to finish up TEENY.EXE
+TEENY.EXE will end and automatically start Desk-Link. DON'T exit Desk-Link.
+
+Run TEENY.CO from the main menu on the Model 200.
+
+Use TEENY on the Model 200 to save TNY200.DO back to the host.
 In TEENY, type this:
   S TNY200.DO
   Q
 
-You should now have TNY200.DO on the host pc in the dl directory with all the other dl-arc.exe files.
-Now you can exit out of desklink and dosbox on the pc.
-Rename TNY200.DO to TEENY.200 and save it wherever.
+Press F10 in dosbox to exit Desk-Link.
+Type "exit" in dosbox to exit dosbox.
 
+Copy TNY200.DO somewhere else outside of the current temp directory for keeping.
+cp TNY200.DO ~/Documents/
+
+Discard the temp working dir
+  cd
+  rm -rf /tmp/dlarc
