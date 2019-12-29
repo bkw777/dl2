@@ -82,7 +82,6 @@ int file = -1;
 int mode = 0;	/* 0=unopened, 1=Write, 3=Read, 2=Append */
 int client_fd = -1; // client tty file handle
 unsigned char filename[25];
-//unsigned char dirp;
 struct dirent *dire;
 DIR *dir = NULL;
 char *dirname;
@@ -93,14 +92,14 @@ int getty_mode = 0;
 int bootstrap_mode = 0;
 int debug = 0;
 int upcase = 1;
-unsigned dot_offset = 6; // 6 for 100/102/200/NEC/KC85 , 8 for WP-2
+unsigned dot_offset = 6; // 6 for 100/102/200/NEC/K85/M10 , 8 for WP-2
 unsigned char buf[131];
 
-int bedisk(void);
+int be_disk(void);
 
 void out_buf(unsigned char *bufp, unsigned len);
 
-int bootstrap(unsigned char *loader_model);
+int bootstrap(char *loader_model);
 
 int send_loader(char *loader_file);
 
@@ -110,8 +109,8 @@ void print_usage() {
 	fprintf (stderr, "%s [tty_device] [options]\n",args[0]);
 	fprintf (stderr, "\n");
 	fprintf (stderr, "tty_device:\n");
-	fprintf (stderr, "    serial device the client is connected to\n");
-	fprintf (stderr, "    examples: /dev/ttyS0, /dev/ttyUSB0, etc...\n");
+	fprintf (stderr, "    Serial device the client is connected to, with or without leading \"/dev/\".\n");
+	fprintf (stderr, "    examples: ttyS0, ttyUSB0, etc...\n");
 	fprintf (stderr, "    default = " STRINGIFY(DEFAULT_TTY) "\n");
 	fprintf (stderr, "    \"-\" = stdin/stdout (/dev/tty)\n"); // 20191227 bkw - could this be used with inetd to make a network tpdd server?
 	fprintf (stderr, "\n");
@@ -125,10 +124,12 @@ void print_usage() {
 	fprintf (stderr, "   -f       Don't upcase file names when enumerating\n");
 	fprintf (stderr, "\n");
 	fprintf (stderr, "Supported Models for Bootstrap:\n");
-	fprintf (stderr, "   -b=100   Install TEENY for Tandy 100 or 102\n");
+	fprintf (stderr, "   -b       Install TEENY for Tandy 100 or 102\n");
 	fprintf (stderr, "   -b=200   Install TEENY for Tandy 200\n");
-//	fprintf (stderr, "   -b=nec   Install TEENY for NEC \n");
-//	fprintf (stderr, "   -b=k85   Install TEENY for Kyocera\n");
+// These probably do not exist. teenydoc.txt repeatedly only says 100, 102, and 200
+//	fprintf (stderr, "   -b=nec   Install TEENY for NEC PC-8201 PC-8201A PC-8300\n");
+//	fprintf (stderr, "   -b=k85   Install TEENY for Kyocera/Kyotronic KC-85\n");
+//	fprintf (stderr, "   -b=m10   Install TEENY for Olivetti M-10\n");
 	fprintf (stderr, "\n");
 	fprintf (stderr, "Examples:\n");
 	fprintf (stderr, "   %s\n",args[0]);
@@ -137,37 +138,23 @@ void print_usage() {
 	fprintf (stderr, "\n");
 }
 
-void print_after_loader_directions () {
-	/* TODO - switch statement or external config file for different directions for different loaders */
-	printf("Follow the prompts on the portable.\n");
-	printf("\n");
-	printf("Then enter the following in BASIC:\n");
-	printf("  NEW\n");
-	printf("  LOADM \"TEENY\"\n");
-	printf("\n");
-	printf("Look at the line that says \"Top: #####\"\n");
-	printf("Note the value #####, and enter the following in BASIC with that number in place of #####:\n");
-	printf("  CLEAR 0,#####\n");
-	printf("Example: Top: 62213 -> CLEAR 0,62213\n");
-	printf("\n");
-	printf("You can now exit BASIC and run TEENY.CO from the main menu.\n");
-	printf("You probably want to re-run \"%s\" (without -b this time) first, so that TEENY has something to talk to.\n",args[0]);
-	printf("\n");
-}
-
-int bootstrap(unsigned char *loader_model) {
+int bootstrap(char *loader_model) {
 	int r = 0;
 	char loaders_dir[PATH_MAX];
 	char loader_file[PATH_MAX];
+	char call_addr[6] = "9643"; // teenydoc.txt: "CALL9643   (for Models 100 and 102)"
 
-	// FUTURE: search ~/.dl or ~/.config/dl or ~/.local/lib/dl etc before /usr/local/lib/dl
-	strcpy((char *)loaders_dir,(char *)(STRINGIFY(APP_LIB_DIR)));
+	// teenydoc.txt: "CALL13072  (for Model 200)"
+	if (strcmp(loader_model,"200")==0)
+		strcpy(call_addr,"13072");
 
-	strcpy((char *)loader_file,(char *)(loaders_dir));
-	strcat((char *)loader_file,(char *)("/TEENY."));
-	strcat((char *)loader_file,(char *)(loader_model));
+	// FUTURE: search for ~/.dl or ~/.config/dl or ~/.local/lib/dl etc before /usr/local/lib/dl
+	strcpy(loaders_dir,STRINGIFY(APP_LIB_DIR));
 
-	/* before-loader directions should be the same for any loader */
+	strcpy(loader_file,loaders_dir);
+	strcat(loader_file,"/TEENY.");
+	strcat(loader_file,loader_model);
+
 	printf("Bootstrap mode.\n");
 	printf("Installing %s\n", loader_file);
 	printf("Enter the following in BASIC:\n");
@@ -176,11 +163,25 @@ int bootstrap(unsigned char *loader_model) {
 	getchar();
 
 	r = send_loader(loader_file);
+	if (r != 0)
+		return(r);
 
-	if (r == 0)
-		print_after_loader_directions();
+	printf("Follow the prompts on the portable.\n");
+	printf("\n");
+	printf("Then enter the following in BASIC:\n");
+	printf("  NEW\n");
+	printf("  CALL %s\n",call_addr);
+	printf("\n");
+	printf("Look at the line that says \"Top: #####\"\n");
+	printf("Note the value #####, and enter the following in BASIC with that number in place of #####:\n");
+	printf("  CLEAR 0,#####\n");
+	printf("\n");
+	printf("You can now exit BASIC and run TEENY.CO from the main menu.\n");
+	printf("\"%s -b\" will now exit.\n",args[0]);
+	printf("Re-run \"%s\" (without -b this time) so that TEENY has something to talk to.\n",args[0]);
+	printf("\n");
 
-	return(r);
+	return(0);
 }
 
 int my_write (int fh, void *srcp, size_t len) {
@@ -214,24 +215,14 @@ void normal_return(unsigned char type) {
 
 int main(int argc, char **argv) {
 	int off=0;
-//	unsigned char *p;
 	unsigned char client_tty[PATH_MAX];
-	unsigned char loader_model[4];  // 100, 200, nec, k85
+	char loader_model[4];
 	int arg;
 
 	/* create the file list (for reverse order traversal) */
 	file_list_init ();
 
 	args = argv;
-
-/*
-	dirname = (char *)strdup((char *)(argv[0]));
-	p = (unsigned char *) strrchr ((char *)dirname, '/');
-	if (p != NULL) {
-		*p = 0;
-		(void)(chdir ((char *)dirname)+1);
-	}
-*/
 
 	strcpy ((char *)client_tty,STRINGIFY(DEFAULT_TTY));
 
@@ -268,9 +259,9 @@ int main(int argc, char **argv) {
 						break;
 					case 'b':
 						bootstrap_mode = 1;
-						strcpy ((char *)loader_model, (char *)(STRINGIFY(DEFAULT_MODEL)));
+						strcpy (loader_model,STRINGIFY(DEFAULT_MODEL));
 						if (argv[arg][2] == '=')
-							strcpy ((char *)loader_model, (char *)(argv[arg] + 3));
+							strcpy (loader_model,(char *)(argv[arg]+3));
 						break;
 					default:
 						fprintf(stderr, "Unknown option %s\n",argv[arg]);
@@ -336,13 +327,13 @@ int main(int argc, char **argv) {
 #endif
 		;
 
-	cfsetspeed(&origt,B19200);  // orig B1200
+	cfsetspeed(&origt,B19200);
 
 	if(bootstrap_mode)
 		exit(bootstrap(loader_model));
 
 	while(1)
-		bedisk();
+		be_disk();
 
 	file_list_cleanup ();
 
@@ -703,7 +694,7 @@ int send_loader(char *loader_file) {
 	close(client_fd);
 
 	if(debug) {
-		fprintf(stderr, "Sent " STRINGIFY(LOADER_FILE) "\n");
+		fprintf(stderr, "Sent %s\n",loader_file);
 		fflush(stdout);
 	}
 	else
@@ -728,7 +719,7 @@ void out_buf(unsigned char *bufp, unsigned len) {
 	fprintf (stderr, "\n");
 }
 
-int bedisk(void) {
+int be_disk(void) {
 	unsigned char preamble[3];
 	unsigned char type;
 	unsigned char length;
