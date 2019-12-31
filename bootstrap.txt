@@ -1,0 +1,19 @@
+
+TRS-80 100, Tandy 102:
+  RUN "COM:98N1E"
+
+Tandy 200:
+  RUN "COM:98N1ENN"
+
+NEC PC-8201 PC-8201a PC-8300:
+  RUN "COM:9N81XN"
+
+Kyotronic KC-85:
+  RUN "COM:98N1EN"
+
+Olivetti M-10:
+  RUN "COM:98N1EN"
+
+Aditionally,
+100 & 102 also accept "COM:98N1EN"
+All but NEC also accept "COM:98N1ENN"

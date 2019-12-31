@@ -62,12 +62,16 @@ MA 02111, USA.
 #define APP_LIB_DIR .
 #endif
 
-#ifndef DEFAULT_TTY
-#define DEFAULT_TTY /dev/ttyS0
+#ifndef DEFAULT_CLIENT_TTY
+#define DEFAULT_CLIENT_TTY ttyS0
 #endif
 
-#ifndef DEFAULT_MODEL
-#define DEFAULT_MODEL 100
+#ifndef DEFAULT_CLIENT_MODEL
+#define DEFAULT_CLIENT_MODEL 100
+#endif
+
+#ifndef DEFAULT_CLIENT_APP
+#define DEFAULT_CLIENT_APP TEENY
 #endif
 
 #define STRINGIFY2(X) #X
@@ -99,9 +103,9 @@ int be_disk(void);
 
 void out_buf(unsigned char *bufp, unsigned len);
 
-int bootstrap(char *loader_model);
+int bootstrap(char *f);
 
-int send_loader(char *loader_file);
+int send_installer(char *f);
 
 void print_usage() {
 	fprintf (stderr, "DeskLink+ usage:\n");
@@ -109,76 +113,100 @@ void print_usage() {
 	fprintf (stderr, "%s [tty_device] [options]\n",args[0]);
 	fprintf (stderr, "\n");
 	fprintf (stderr, "tty_device:\n");
-	fprintf (stderr, "    Serial device the client is connected to, with or without leading \"/dev/\".\n");
-	fprintf (stderr, "    examples: ttyS0, ttyUSB0, etc...\n");
-	fprintf (stderr, "    default = " STRINGIFY(DEFAULT_TTY) "\n");
+	fprintf (stderr, "    Serial device the client is connected to\n");
+	fprintf (stderr, "    examples: ttyS0, ttyUSB0, /dev/pts/foo4, etc...\n");
+	fprintf (stderr, "    default = " STRINGIFY(DEFAULT_CLIENT_TTY) "\n");
 	fprintf (stderr, "    \"-\" = stdin/stdout (/dev/tty)\n"); // 20191227 bkw - could this be used with inetd to make a network tpdd server?
 	fprintf (stderr, "\n");
 	fprintf (stderr, "options:\n");
 	fprintf (stderr, "   -h       Print this help\n");
-	fprintf (stderr, "   -b=model Bootstrap. Install TEENY.model and exit\n");
+	fprintf (stderr, "   -b=file  Bootstrap: Install <file> onto the portable\n");
 	fprintf (stderr, "   -v       Verbose/debug mode\n");
 	fprintf (stderr, "   -g       Getty mode. Run as daemon\n");
-	fprintf (stderr, "   -p=dir   Path to files to be served\n");
+	fprintf (stderr, "   -p=dir   Path to files to be served, default is \".\"\n");
 	fprintf (stderr, "   -w       WP-2 compatibility mode\n");
 	fprintf (stderr, "   -f       Don't upcase file names when enumerating\n");
 	fprintf (stderr, "\n");
-	fprintf (stderr, "Supported Models for Bootstrap:\n");
-	fprintf (stderr, "   -b       Install TEENY for Tandy 100 or 102\n");
-	fprintf (stderr, "   -b=200   Install TEENY for Tandy 200\n");
-// These probably do not exist. teenydoc.txt repeatedly only says 100, 102, and 200
-//	fprintf (stderr, "   -b=nec   Install TEENY for NEC PC-8201 PC-8201A PC-8300\n");
-//	fprintf (stderr, "   -b=k85   Install TEENY for Kyocera/Kyotronic KC-85\n");
-//	fprintf (stderr, "   -b=m10   Install TEENY for Olivetti M-10\n");
-	fprintf (stderr, "\n");
+	fprintf (stderr, "available bootstrap files:\n");
+	// blargh ...
+	//(void)(system ("find " STRINGIFY(APP_LIB_DIR) " -regex \'.*/.+\\.\\(100\\|200\\|NEC\\|M10\\|K85\\)$\' -printf \'\%f\\n\' >&2")+1);
+	// more blargh...
+	fprintf (stderr,   "   TRS-80 Model 100 / Tandy 102 : ");
+	(void)(system ("find " STRINGIFY(APP_LIB_DIR) " -regex \'.*/.+\\.100$\' -printf \'\%f \' >&2")+1);
+	fprintf (stderr, "\n   Tandy 200                    : ");
+	(void)(system ("find " STRINGIFY(APP_LIB_DIR) " -regex \'.*/.+\\.200$\' -printf \'\%f \' >&2")+1);
+	fprintf (stderr, "\n   NEC PC-8201/PC-8201a/PC-8300 : ");
+	(void)(system ("find " STRINGIFY(APP_LIB_DIR) " -regex \'.*/.+\\.NEC$\' -printf \'\%f \' >&2")+1);
+	fprintf (stderr, "\n   Kyotronic KC-85              : ");
+	(void)(system ("find " STRINGIFY(APP_LIB_DIR) " -regex \'.*/.+\\.K85$\' -printf \'\%f \' >&2")+1);
+	fprintf (stderr, "\n   Olivetti M-10                : ");
+	(void)(system ("find " STRINGIFY(APP_LIB_DIR) " -regex \'.*/.+\\.M10$\' -printf \'\%f \' >&2")+1);
+	fprintf (stderr, "\n\n");
 	fprintf (stderr, "Examples:\n");
 	fprintf (stderr, "   %s\n",args[0]);
-	fprintf (stderr, "   %s -b=200\n",args[0]);
-	fprintf (stderr, "   %s /dev/ttyUSB0 -p=/home/john/wp2files -w -v\n",args[0]);
+	fprintf (stderr, "   %s -b=TEENY.200\n",args[0]);
+	fprintf (stderr, "   %s -b=~/Documents/TRS-80/M100SIG/Lib-03-TELCOM/XMDPW5.100\n",args[0]);
+	fprintf (stderr, "   %s ttyUSB1 -p=/home/john/wp2files -w -v\n",args[0]);
 	fprintf (stderr, "\n");
 }
 
-int bootstrap(char *loader_model) {
+void cat(char *f) {
+	int h = -1;
+	char b[4097];
+
+	if((h=open(f,O_RDONLY))<0)
+		return;
+	while(read(h,&b,4096)>0)
+		printf("%s",b);
+	close(h);
+}
+
+int bootstrap(char *f) {
 	int r = 0;
-	char loaders_dir[PATH_MAX];
-	char loader_file[PATH_MAX];
-	char call_addr[6] = "9643"; // teenydoc.txt: "CALL9643   (for Models 100 and 102)"
+	char installer_file[PATH_MAX]="";
+	char pre_install_txt_file[PATH_MAX]="";
+	char post_install_txt_file[PATH_MAX]="";
 
-	// teenydoc.txt: "CALL13072  (for Model 200)"
-	if (strcmp(loader_model,"200")==0)
-		strcpy(call_addr,"13072");
+	if (f[0]=='~'&&f[1]=='/') {
+		strcpy(installer_file,getenv("HOME"));
+		strcat(installer_file,f+1);
+	}
 
-	// FUTURE: search for ~/.dl or ~/.config/dl or ~/.local/lib/dl etc before /usr/local/lib/dl
-	strcpy(loaders_dir,STRINGIFY(APP_LIB_DIR));
+	if (f[0]=='.'&&f[1]=='/')
+		strcpy(installer_file,f);
 
-	strcpy(loader_file,loaders_dir);
-	strcat(loader_file,"/TEENY.");
-	strcat(loader_file,loader_model);
+	if(installer_file[0]==0) {
+		strcpy(installer_file,STRINGIFY(APP_LIB_DIR));
+		strcat(installer_file,"/");
+		strcat(installer_file,f);
+	}
 
-	printf("Bootstrap mode.\n");
-	printf("Installing %s\n", loader_file);
-	printf("Enter the following in BASIC:\n");
-	printf("  RUN \"COM:98N1ENN\"\n");
-	printf("then press [Enter] here: ");
+	strcpy(pre_install_txt_file,installer_file);
+	strcat(pre_install_txt_file,".pre-install.txt");
+
+	strcpy(post_install_txt_file,installer_file);
+	strcat(post_install_txt_file,".post-install.txt");
+
+	printf("Bootstrap: Installing %s\n", installer_file);
+
+	if(access(installer_file,F_OK)==-1) {
+		if(debug)
+			fprintf(stderr, "Not found.\n");
+		return(1);
+	}
+
+	cat(pre_install_txt_file);
+
+	printf("Press [Enter] when ready...");
 	getchar();
 
-	r = send_loader(loader_file);
-	if (r != 0)
+	if ((r=send_installer(installer_file))!=0)
 		return(r);
 
-	printf("Follow the prompts on the portable.\n");
-	printf("\n");
-	printf("Then enter the following in BASIC:\n");
-	printf("  NEW\n");
-	printf("  CALL %s\n",call_addr);
-	printf("\n");
-	printf("Look at the line that says \"Top: #####\"\n");
-	printf("Note the value #####, and enter the following in BASIC with that number in place of #####:\n");
-	printf("  CLEAR 0,#####\n");
-	printf("\n");
-	printf("You can now exit BASIC and run TEENY.CO from the main menu.\n");
-	printf("\"%s -b\" will now exit.\n",args[0]);
-	printf("Re-run \"%s\" (without -b this time) so that TEENY has something to talk to.\n",args[0]);
+	cat(post_install_txt_file);
+
+	printf("\n\n\"%s -b\" will now exit.\n",args[0]);
+	printf("Re-run \"%s\" (without -b this time) to run the TPDD server.\n",args[0]);
 	printf("\n");
 
 	return(0);
@@ -216,7 +244,7 @@ void normal_return(unsigned char type) {
 int main(int argc, char **argv) {
 	int off=0;
 	unsigned char client_tty[PATH_MAX];
-	char loader_model[4];
+	char bootstrap_file[PATH_MAX];
 	int arg;
 
 	/* create the file list (for reverse order traversal) */
@@ -224,7 +252,12 @@ int main(int argc, char **argv) {
 
 	args = argv;
 
-	strcpy ((char *)client_tty,STRINGIFY(DEFAULT_TTY));
+// ugly redundant with default: below...
+	strcpy ((char *)client_tty,STRINGIFY(DEFAULT_CLIENT_TTY));
+	if (client_tty[0]!='/') {
+		strcpy((char *)client_tty,"/dev/");
+		strcat((char *)client_tty,(char *)STRINGIFY(DEFAULT_CLIENT_TTY));
+	}
 
 	for (arg = 1; arg < argc; arg++) {
 		switch (argv[arg][0]) {
@@ -259,9 +292,9 @@ int main(int argc, char **argv) {
 						break;
 					case 'b':
 						bootstrap_mode = 1;
-						strcpy (loader_model,STRINGIFY(DEFAULT_MODEL));
+						strcpy (bootstrap_file,STRINGIFY(DEFAULT_CLIENT_APP) "." STRINGIFY(DEFAULT_CLIENT_MODEL));
 						if (argv[arg][2] == '=')
-							strcpy (loader_model,(char *)(argv[arg]+3));
+							strcpy (bootstrap_file,(char *)(argv[arg]+3));
 						break;
 					default:
 						fprintf(stderr, "Unknown option %s\n",argv[arg]);
@@ -280,17 +313,21 @@ int main(int argc, char **argv) {
 		debug = 0;
 
 	if (debug) {
-		fprintf (stderr, "--------------------------------------------------------------------------------\n");
 		fprintf (stderr, "Using Serial Device: %s\n", client_tty);
-		fprintf (stderr, "Working In Directory: ");
-		(void)(system ("pwd >&2;ls -l >&2")+1);
-		fprintf (stderr, "--------------------------------------------------------------------------------\n");
+		if(!bootstrap_mode) {
+			fprintf (stderr, "Working In Directory: ");
+			fprintf (stderr, "--------------------------------------------------------------------------------\n");
+			(void)(system ("pwd >&2;ls -l >&2")+1);
+			fprintf (stderr, "--------------------------------------------------------------------------------\n");
+		}
 	}
 
 	if(client_fd<0)
 		client_fd=open((char *)client_tty,O_RDWR|O_NONBLOCK);
-	if(client_fd<0)
+	if(client_fd<0) {
+		fprintf (stderr,"Error: open(%s,...)=%d\n",client_tty,client_fd);
 		return(1);
+	}
 
 	if(getty_mode) {
 		if(login_tty(client_fd)==0)
@@ -330,7 +367,7 @@ int main(int argc, char **argv) {
 	cfsetspeed(&origt,B19200);
 
 	if(bootstrap_mode)
-		exit(bootstrap(loader_model));
+		exit(bootstrap(bootstrap_file));
 
 	while(1)
 		be_disk();
@@ -660,20 +697,20 @@ int readbytes(int handle, void *buf, int max) {
 	return (r);
 }
 
-int send_loader(char *loader_file) {
+int send_installer(char *f) {
 	int w=0;
 	int i=0;
 	int fd;
 	unsigned char b;
 
-	if((fd=open(loader_file,O_RDONLY))<0) {
+	if((fd=open(f,O_RDONLY))<0) {
 		if(debug)
-			fprintf(stderr, "Failed to open %s for read.\n",loader_file);
+			fprintf(stderr, "Failed to open %s for read.\n",f);
 		return(9);
 	}
 
 	if(debug) {
-		fprintf(stderr, "Sending %s\n",loader_file);
+		fprintf(stderr, "Sending %s\n",f);
 		fflush(stdout);
 	}
 
@@ -694,7 +731,7 @@ int send_loader(char *loader_file) {
 	close(client_fd);
 
 	if(debug) {
-		fprintf(stderr, "Sent %s\n",loader_file);
+		fprintf(stderr, "Sent %s\n",f);
 		fflush(stdout);
 	}
 	else
