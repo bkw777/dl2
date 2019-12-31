@@ -172,7 +172,7 @@ int bootstrap(char *f) {
 		strcat(installer_file,f+1);
 	}
 
-	if (f[0]=='.'&&f[1]=='/')
+	if ((f[0]=='/')||(f[0]=='.'&&f[1]=='/'))
 		strcpy(installer_file,f);
 
 	if(installer_file[0]==0) {
