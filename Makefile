@@ -12,7 +12,7 @@ DEFAULT_CLIENT_MODEL = 100
 DEFAULT_CLIENT_APP = TEENY
 
 TEENY_INSTALLERS = clients/teeny/TEENY.100 clients/teeny/TEENY.200 clients/teeny/TEENY.NEC
-TEENY_DOCS = clients/teeny/teenydoc.txt
+TEENY_DOCS = clients/teeny/teenydoc.txt clients/teeny/hownec.do
 DSKMGR_INSTALLERS = clients/dskmgr/DSKMGR.100 clients/dskmgr/DSKMGR.200 clients/dskmgr/DSKMGR.K85 clients/dskmgr/DSKMGR.M10
 DSKMGR_DOCS = clients/dskmgr/DSKMGR.DOC
 #TS-DOS_INSTALLERS = clients/ts-dos/TS-DOS.100 clients/ts-dos/TS-DOS.200 clients/ts-dos/TS-DOS.NEC
