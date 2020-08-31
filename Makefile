@@ -15,17 +15,15 @@ TEENY_INSTALLERS = clients/teeny/TEENY.100 clients/teeny/TEENY.200 clients/teeny
 TEENY_DOCS = clients/teeny/teenydoc.txt clients/teeny/hownec.do
 DSKMGR_INSTALLERS = clients/dskmgr/DSKMGR.100 clients/dskmgr/DSKMGR.200 clients/dskmgr/DSKMGR.K85 clients/dskmgr/DSKMGR.M10
 DSKMGR_DOCS = clients/dskmgr/DSKMGR.DOC
-#TS-DOS_INSTALLERS = clients/ts-dos/TS-DOS.100 clients/ts-dos/TS-DOS.200 clients/ts-dos/TS-DOS.NEC
-#TS-DOS_DOCS = clients/ts-dos/ts-dos.txt
+TS-DOS_INSTALLERS = clients/ts-dos/TS-DOS.100 clients/ts-dos/TS-DOS.200 clients/ts-dos/TS-DOS.NEC
+TS-DOS_DOCS = clients/ts-dos/tsdos.pdf
+TINY_INSTALLERS = clients/tiny/TINY.100
+TINY_DOCS = clients/tiny/tindoc.do
 #POWR-D_INSTALLERS = clients/power-dos/POWR-D.100
-#POWR-D_DOCS = clients/power-dos-dos/ts-dos.txt
-#TINY_INSTALLERS = clients/tiny/TINY.100
-#TINY_DOCS = clients/tiny/tiny.txt
+#POWR-D_DOCS = clients/power-dos/powr-d.txt
 
-CLIENT_APP_INSTALLERS = $(TEENY_INSTALLERS) $(DSKMGR_INSTALLERS)
-CLIENT_APP_DOCS = $(TEENY_DOCS) $(DSKMGR_DOCS)
-#CLIENT_APP_INSTALLERS = $(TEENY_INSTALLERS) $(TINY_INSTALLERS) $(TS-DOS_INSTALLERS) $(DSKMGR_INSTALLERS)
-#CLIENT_APP_DOCS = $(TEENY_DOCS) $(TINY_DOCS) $(TS-DOS_DOCS) $(DSKMGR_DOCS)
+CLIENT_APP_INSTALLERS = $(TEENY_INSTALLERS) $(TINY_INSTALLERS) $(TS-DOS_INSTALLERS) $(DSKMGR_INSTALLERS)
+CLIENT_APP_DOCS = $(TEENY_DOCS) $(TINY_DOCS) $(TS-DOS_DOCS) $(DSKMGR_DOCS)
 
 DOCS = dl.do README.txt README.md LICENSE $(CLIENT_APP_DOCS)
 SOURCES = dl.c dir_list.c

@@ -1,0 +1,13 @@
+dlplus:
+Stephen Hurd		Initial version?
+John R. Hogerhuis	Enhancements including WP-2 support
+Brian K. White		Bootstrap function and loaders library
+
+TPDD Clients & loaders:
+Kurt McCullum		TS-DOS loaders
+Ron Weisen		TEENY loaders
+J.K. Heilman		DSKMGR
+Phil Wheeler		DSKMGR loaders
+A. Ryan			Port of DSKMGR & loader for Olivetti M10
+ACROATIX		TINY
+Tracy Allen		TINY loader

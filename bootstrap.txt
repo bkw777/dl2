@@ -1,3 +1,4 @@
+Syntax differences for the RUN "COM:..." command on the different machines.
 
 TRS-80 100, Tandy 102:
   RUN "COM:98N1E"

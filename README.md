@@ -3,11 +3,11 @@ DeskLink+ is a Tandy Portable Disk Drive emulator or "TPDD Server" implimented i
 
 [Original README](README.txt)
 
-[Documentation for DeskLink](dl.do)
+[Documentation for the original DeskLink](dl.do) (No longer exactly matches this program)
 
-Original source: <http://bitchin100.com/files/linux/dlplus.zip>
+[Original source](http://bitchin100.com/files/linux/dlplus.zip)
 
-Serial Cable: <http://tandy.wiki/Model_100_102_200_600_Serial_Cable>
+[Serial Cable](http://tandy.wiki/Model_T_Serial_Cable)
 
 ## install
 ```
@@ -24,12 +24,21 @@ sudo make uninstall
 dl
 ```
 
-## bootstrap a TPDD client (TEENY) onto the portable
+## bootstrap the default TPDD client (TEENY) onto the portable
 ```
 dl -b
 ```
 
+## list all available TPDD client installers, and then bootstrap one of them (TS-DOS for Model 100)
+```
+dl -h
+dl -b=TS-DOS.100
+```
+
 ## news
+### 20200830 Added TS-DOS loaders provided by Kurt McCullum
+ TS-DOS.100 TS-DOS.200 TS-DOS.NEC
+
 ### 20191231 Expanded bootstrap to support multiple client apps and machine models.
 Included bootstrap files:<br>
  TEENY.100 TEENY.200 TEENY.NEC<br>
