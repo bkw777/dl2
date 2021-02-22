@@ -40,6 +40,7 @@ MA 02111, USA.
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <stdbool.h>
 #include "dir_list.h"
 
 #if defined(__darwin__)
@@ -79,8 +80,14 @@ MA 02111, USA.
 #define DEFAULT_CLIENT_APP TEENY
 #endif
 
-#ifndef DEFAULT_BOOTSTRAP_BYTE_MSEC
 #define DEFAULT_BOOTSTRAP_BYTE_MSEC 6
+
+/* Enable/disable 64K file size limit and -xs option */
+#define ENABLE_FLEN_LIMIT 0
+#if ENABLE_FLEN_LIMIT
+ #ifndef DEFAULT_MAX_FLEN
+ #define DEFAULT_MAX_FLEN 65535
+ #endif
 #endif
 
 #define STRINGIFY2(X) #X
@@ -101,14 +108,17 @@ char *dirname;
 char **args;
 struct termios origt;
 struct termios ti;
-int getty_mode = 0;
-int bootstrap_mode = 0;
+bool getty_mode = false;
+bool bootstrap_mode = false;
 int bootstrap_byte_msec = DEFAULT_BOOTSTRAP_BYTE_MSEC;
-int debug = 0;
-int upcase = 0;
+bool debug = false;
+bool upcase = false;
 unsigned dot_offset = 6; // 6 for 100/102/200/NEC/K85/M10 , 8 for WP-2
 unsigned char buf[131];
 int client_baud = DEFAULT_CLIENT_BAUD;
+#if ENABLE_FLEN_LIMIT
+int max_flen = DEFAULT_MAX_FLEN;
+#endif
 
 int be_disk(void);
 
@@ -138,6 +148,9 @@ void print_usage() {
 	fprintf (stderr, "   -w       WP-2 compatibility mode (8.2 filenames)\n");
 	fprintf (stderr, "   -u       Uppercase all filenames\n");
 	fprintf (stderr, "   -z=#     Sleep # milliseconds between each byte while sending bootstrap file (default " STRINGIFY(DEFAULT_BOOTSTRAP_BYTE_MSEC) ")\n");
+#if ENABLE_FLEN_LIMIT
+	fprintf (stderr, "   -xs      Don't limit files to " STRINGIFY(DEFAULT_MAX_FLEN) "bytes\n");
+#endif
 	fprintf (stderr, "\n");
 	fprintf (stderr, "available bootstrap files:\n");
 	// blargh ...
@@ -287,13 +300,13 @@ int main(int argc, char **argv) {
 						client_fd = 1;
 						break;
 					case 'g':
-						getty_mode = 1;
+						getty_mode = true;
 						break;
 					case 'u':
-						upcase = 1;
+						upcase = true;
 						break;
 					case 'v':
-						debug = 1;
+						debug = true;
 						break;
 					case 'p':
 						if (argv[arg][2] == '=')
@@ -307,7 +320,7 @@ int main(int argc, char **argv) {
 						exit(0);
 						break;
 					case 'b':
-						bootstrap_mode = 1;
+						bootstrap_mode = true;
 						strcpy (bootstrap_file,STRINGIFY(DEFAULT_CLIENT_APP) "." STRINGIFY(DEFAULT_CLIENT_MODEL));
 						if (argv[arg][2] == '=')
 							strcpy (bootstrap_file,(char *)(argv[arg]+3));
@@ -316,6 +329,12 @@ int main(int argc, char **argv) {
 						if (argv[arg][2] == '=')
 							bootstrap_byte_msec = atoi(argv[arg]+3);
 						break;
+#if ENABLE_FLEN_LIMIT
+					case 'x':
+					    if (argv[arg][2] == 's')
+							max_flen = 0;
+						break;
+#endif
 					default:
 						fprintf(stderr, "Unknown option %s\n",argv[arg]);
 						print_usage();
@@ -492,8 +511,10 @@ int read_next_dirent(struct stat *st) {
 		if (!S_ISREG (st->st_mode))
 			continue;
 
-		if(st->st_size > 65535)
+#if ENABLE_FLEN_LIMIT
+		if(max_flen > 0 && st->st_size > max_flen)
 			continue;
+#endif
 
 		/* add file to list so we can traverse any order */
 		add_file ((unsigned char *) dire->d_name, st->st_size, ++fname_ndx);
@@ -582,7 +603,9 @@ int directory(unsigned char length, unsigned char *data) {
 }
 
 int open_file(unsigned char omode) {
+#if ENABLE_FLEN_LIMIT
 	struct stat st;
+#endif
 
 	if(debug)
 		fprintf (stderr, "Open Mode: %d\n", omode);
@@ -606,11 +629,13 @@ int open_file(unsigned char omode) {
 				close(file);
 				file=-1;
 			}
+#if ENABLE_FLEN_LIMIT
 			stat ((char *) filename, &st);
-			if(st.st_size>65535) {
+			if(max_flen > 0 && st.st_size > max_flen) {
 				normal_return (0x6E);
 				break;
 			}
+#endif
 			file = open ((char *) filename, O_WRONLY | O_APPEND);
 			if (file < 0)
 				normal_return (0x37);
@@ -624,11 +649,13 @@ int open_file(unsigned char omode) {
 				close (file);
 				file=-1;
 			}
+#if ENABLE_FLEN_LIMIT
 			stat ((char *)filename, &st);
-			if (st.st_size > 65535) {
+			if (max_flen > 0 && st.st_size > max_flen) {
 				normal_return (0x6E);
 				break;
 			}
+#endif
 			file = open ((char *)filename, O_RDONLY);
 			if(file<0)
 				normal_return(0x37);

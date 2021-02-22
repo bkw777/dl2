@@ -35,8 +35,9 @@ dl -h
 dl -b=TS-DOS.100
 ```
 
-## bootstrap a REXCPM with rxcini.DO, then run the TPDD server so that rxcini can load RXC_##.BR
+## bootstrap a REXCPM
 ```
 dl -b=./rxcini.DO ;dl
 ```
-Enter (example) RXC_12 at the XXXXXX prompt
+
+

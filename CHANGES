@@ -5,6 +5,9 @@
 
  Changed -f to -u, change to not uppercase by default
 
+ Removed the 64K file size limit
+ This version or later is required to load Cpm###.bk disk images for REXCPM
+
 20200830
  Added TS-DOS loaders provided by Kurt McCullum
  TS-DOS.100 TS-DOS.200 TS-DOS.NEC
