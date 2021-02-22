@@ -10,7 +10,8 @@
 /*
 DeskLink+
 Extensions and enhancements Copyright (C) 2005 John R. Hogerhuis
-20191226 Brian K. White - repackaging, reorganizing, added -b bootstrap function
+20191226 Brian K. White - repackaging, reorganizing, bootstrap function
+         Kurt McCullum - TS-DOS loaders
 
 DeskLink+ is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License version 2 or any
@@ -66,12 +67,20 @@ MA 02111, USA.
 #define DEFAULT_CLIENT_TTY ttyS0
 #endif
 
+#ifndef DEFAULT_CLIENT_BAUD
+#define DEFAULT_CLIENT_BAUD B19200
+#endif
+
 #ifndef DEFAULT_CLIENT_MODEL
 #define DEFAULT_CLIENT_MODEL 100
 #endif
 
 #ifndef DEFAULT_CLIENT_APP
 #define DEFAULT_CLIENT_APP TEENY
+#endif
+
+#ifndef DEFAULT_BOOTSTRAP_BYTE_MSEC
+#define DEFAULT_BOOTSTRAP_BYTE_MSEC 6
 #endif
 
 #define STRINGIFY2(X) #X
@@ -94,10 +103,12 @@ struct termios origt;
 struct termios ti;
 int getty_mode = 0;
 int bootstrap_mode = 0;
+int bootstrap_byte_msec = DEFAULT_BOOTSTRAP_BYTE_MSEC;
 int debug = 0;
-int upcase = 1;
+int upcase = 0;
 unsigned dot_offset = 6; // 6 for 100/102/200/NEC/K85/M10 , 8 for WP-2
 unsigned char buf[131];
+int client_baud = DEFAULT_CLIENT_BAUD;
 
 int be_disk(void);
 
@@ -124,8 +135,9 @@ void print_usage() {
 	fprintf (stderr, "   -v       Verbose/debug mode\n");
 	fprintf (stderr, "   -g       Getty mode. Run as daemon\n");
 	fprintf (stderr, "   -p=dir   Path to files to be served, default is \".\"\n");
-	fprintf (stderr, "   -w       WP-2 compatibility mode\n");
-	fprintf (stderr, "   -f       Don't upcase file names when enumerating\n");
+	fprintf (stderr, "   -w       WP-2 compatibility mode (8.2 filenames)\n");
+	fprintf (stderr, "   -u       Uppercase all filenames\n");
+	fprintf (stderr, "   -z=#     Sleep # milliseconds between each byte while sending bootstrap file (default " STRINGIFY(DEFAULT_BOOTSTRAP_BYTE_MSEC) ")\n");
 	fprintf (stderr, "\n");
 	fprintf (stderr, "available bootstrap files:\n");
 	// blargh ...
@@ -142,12 +154,16 @@ void print_usage() {
 	fprintf (stderr, "\n   Olivetti M-10                : ");
 	(void)(system ("find " STRINGIFY(APP_LIB_DIR) " -regex \'.*/.+\\.M10$\' -printf \'\%f \' >&2")+1);
 	fprintf (stderr, "\n\n");
-	fprintf (stderr, "Examples:\n");
-	fprintf (stderr, "   %s\n",args[0]);
-	fprintf (stderr, "   %s -b=TEENY.200\n",args[0]);
+	fprintf (stderr, "Bootstrap Examples:\n");
+	fprintf (stderr, "   %s -b=TS-DOS.100\n",args[0]);
 	fprintf (stderr, "   %s -b=~/Documents/TRS-80/M100SIG/Lib-03-TELCOM/XMDPW5.100\n",args[0]);
-	fprintf (stderr, "   %s ttyUSB1 -p=/home/john/wp2files -w -v\n",args[0]);
+	fprintf (stderr, "   %s -b=./rxcini.DO\n",args[0]);
 	fprintf (stderr, "\n");
+	fprintf (stderr, "TPDD Server Examples:\n");
+	fprintf (stderr, "   %s\n",args[0]);
+	fprintf (stderr, "   %s ttyUSB1 -p=~/Documents/wp2files -w -v\n",args[0]);
+	fprintf (stderr, "\n");
+
 }
 
 void cat(char *f) {
@@ -273,8 +289,8 @@ int main(int argc, char **argv) {
 					case 'g':
 						getty_mode = 1;
 						break;
-					case 'f':
-						upcase = 0;
+					case 'u':
+						upcase = 1;
 						break;
 					case 'v':
 						debug = 1;
@@ -295,6 +311,10 @@ int main(int argc, char **argv) {
 						strcpy (bootstrap_file,STRINGIFY(DEFAULT_CLIENT_APP) "." STRINGIFY(DEFAULT_CLIENT_MODEL));
 						if (argv[arg][2] == '=')
 							strcpy (bootstrap_file,(char *)(argv[arg]+3));
+						break;
+					case 'z':
+						if (argv[arg][2] == '=')
+							bootstrap_byte_msec = atoi(argv[arg]+3);
 						break;
 					default:
 						fprintf(stderr, "Unknown option %s\n",argv[arg]);
@@ -344,7 +364,7 @@ int main(int argc, char **argv) {
 		return(1);
 	cfmakeraw(&ti);
 	ti.c_cflag |= CLOCAL|CRTSCTS|CS8;
-	if(cfsetspeed(&ti,B19200)==-1)
+	if(cfsetspeed(&ti,client_baud)==-1)
 		return(1);
 	if(tcsetattr(client_fd,TCSANOW,&ti)==-1)
 		return(1);
@@ -364,7 +384,7 @@ int main(int argc, char **argv) {
 #endif
 		;
 
-	cfsetspeed(&origt,B19200);
+	cfsetspeed(&origt,client_baud);
 
 	if(bootstrap_mode)
 		exit(bootstrap(bootstrap_file));
@@ -701,6 +721,7 @@ int send_installer(char *f) {
 	int w=0;
 	int i=0;
 	int fd;
+	int byte_usleep = bootstrap_byte_msec*1000;
 	unsigned char b;
 
 	if((fd=open(f,O_RDONLY))<0) {
@@ -717,7 +738,7 @@ int send_installer(char *f) {
 	while(read(fd,&b,1)==1) {
 		while((i=my_write(client_fd,&b,1))!=1);
 		w+=i;
-		usleep(5000);
+		usleep(byte_usleep);
 		if(debug)
 			fprintf(stderr, "Sent: %d bytes\n",w);
 		else
