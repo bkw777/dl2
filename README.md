@@ -37,7 +37,7 @@ dl -b=TS-DOS.100
 
 ## bootstrap a REXCPM
 ```
-dl -b=./rxcini.DO ;dl
+unzip REXCPMV21_b18.ZIP
+for n in rxc* ;do mv -v $n ${n^^} ;done
+dl -v -b=./RXCINI.DO ;dl -v
 ```
-
-

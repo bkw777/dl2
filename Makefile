@@ -1,8 +1,9 @@
 # Makefile for DeskLink+
 
-OS := $(shell uname)
+OS ?= $(shell uname)
+CC ?= gcc
 CFLAGS += -O2 -Wall
-PREFIX = /usr/local
+PREFIX ?= /usr/local
 APP_NAME = dl
 APP_LIB_DIR = $(PREFIX)/lib/$(APP_NAME)
 APP_DOC_DIR = $(PREFIX)/share/doc/$(APP_NAME)
@@ -42,14 +43,14 @@ endif
 
 ifeq ($(OS),Darwin)
 else
- LDFLAGS += -lutil
+ LDLIBS += -lutil
 endif
 
 .PHONY: all
 all: $(APP_NAME)
 
 $(APP_NAME): $(SOURCES)
-	gcc $(CFLAGS) $(DEFINES) $(SOURCES) $(LDFLAGS) -o $(@)
+	$(CC) $(CFLAGS) $(DEFINES) $(SOURCES) $(LDLIBS) -o $(@)
 
 install: $(APP_NAME) $(CLIENT_APP_INSTALLERS) $(DOCS)
 	install -o root -m 0755 -d $(APP_LIB_DIR) $(APP_DOC_DIR)
