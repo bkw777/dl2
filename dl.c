@@ -146,7 +146,8 @@ void print_usage() {
 	fprintf (stderr, "   -g       Getty mode. Run as daemon\n");
 	fprintf (stderr, "   -p=dir   Path to files to be served, default is \".\"\n");
 	fprintf (stderr, "   -w       WP-2 compatibility mode (8.2 filenames)\n");
-	fprintf (stderr, "   -u       Uppercase all filenames\n");
+/* not working, displays uppercase to client, fails to find local file */
+/*	fprintf (stderr, "   -u       Uppercase all filenames\n"); */
 	fprintf (stderr, "   -z=#     Sleep # milliseconds between each byte while sending bootstrap file (default " STRINGIFY(DEFAULT_BOOTSTRAP_BYTE_MSEC) ")\n");
 #if ENABLE_FLEN_LIMIT
 	fprintf (stderr, "   -xs      Don't limit files to " STRINGIFY(DEFAULT_MAX_FLEN) "bytes\n");
