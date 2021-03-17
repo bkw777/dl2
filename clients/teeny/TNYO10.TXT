@@ -1,0 +1,872 @@
+                TNYO10.CO MANUAL
+ 
+        Orientation
+ 
+File TNYO10.CO has an image which is simply called "Teeny" throughout
+this manual.  The name Teeny describes the amount of laptop memory that
+is needed to hold the image.  For what it does in comparison to similar
+software, the name is appropriate -- the image is teeny!  Although the
+Teeny image is internally specific by laptop Model type (Tandy M10x,
+Tandy M200, NEC PC-8201A, Olivett1 M10), its size and its usage are
+identical for all laptop models.  Use of, and operational aspects of
+the Olivett1 M10 Teeny image are thoroughly covered in this manual.
+ 
+Teeny gets used most by folks at the extremes of experience with
+laptops.  Many neophytes use Teeny because it is in the public domain
+and easy to acquire.  Many experts use Teeny because its image is so
+very small, and it has certain operational aspects that are not found
+in commercial software.  Often a neophyte starts with Teeny, graduates
+to other software, and returns to Teeny usage at the expert stage.
+ 
+        Invocation Facts
+ 
+The image of Teeny is one contiguous block.  Its size is 747.  A block
+of 747 adjacent cells, within the HIMEM region of the laptop memory,
+holds the image during a session of its use.  In regard to laptop
+operation, there is nothing abnormal about the image of Teeny -- it's
+quite conventional.  If you are an expert, move on to the "Trigger File
+Creation" and "Invocation via Trigger File" sections of this manual
+which may be of some interest.
+ 
+The laptop menu shows a "Bytes free" quantity.  Of the total amount of
+Random Access Memory (RAM) that is equipped in the laptop, "Bytes free"
+is just one portion among several portions.  The "Bytes free" portion
+is the amount of RAM that is not (yet) consumed.  The amount of RAM
+that is consumed is the total of quantities from all other portions.
+As consumption increases and decreases, the "Bytes free" quantity of
+RAM contracts and expands, respectively.  Refer to "About RAM in the
+Model 10x laptops", at the Club 100 site, for complete detail.
+http://www.club100.org/library/doc/ramabout.html
+ 
+Regardless of how the Teeny image is invoked, the HIMEM region of RAM
+is where the action is at during a Teeny session.  The image within the
+HIMEM region is what controls the laptop during a Teeny session.  When
+or how the image gets placed within the HIMEM region is no longer
+pertinent once a Teeny session is under way.  When you end a session of
+Teeny, the Teeny image no longer controls the laptop but it still is
+intact at 747 adjacent cells within the HIMEM region.
+ 
+From the laptop menu, there are two ways to invoke the Teeny image: via
+its laptop command file named TNYO10.CO, or via a trigger file.  Both of
+these files have a ".CO file descriptor" and an appended image.  The
+.CO file descriptor describes the specific RAM addresses where the
+content of the appended image belongs, as well as where to start
+"execution" for an invocation.  The descriptor size is 6, and an image
+content appends it.
+ 
+o  TNYO10.CO file -- file size is 753: 6 for the descriptor, and 747 for
+   the entire content of the Teeny image.  Invocation via TNYO10.CO is
+   recommended for a neophyte.
+ 
+o  Trigger file -- file size is 7: 6 for the descriptor, and 1 for its
+   content which is a vestige of the Teeny image.  The trigger file
+   consumes 746 less RAM than file TNYO10.CO.  Invocation via a trigger
+   file is only recommended for experienced folks because of the
+   unforgiving nature of trigger files.
+ 
+The image of laptop command file TNYO10.CO is address-specific -- it
+has a specific HIMEM requirement which must be met for successful
+invocation.  The trigger file is created from the address-specific
+image of file TNYO10.CO, so it has an inherited HIMEM requirement.
+Whenever you attempt an invocation, the laptop inspects the .CO file
+descriptor to identify the HIMEM requirement.  Based on the point of
+HIMEM, the laptop either allows or disallows the invocation.
+ 
+o  Where the point of HIMEM indicates that address-specific cells are
+   available within the HIMEM region, the laptop "loads" the cells with
+   content from the appended image and then it relinquishes control to
+   the "execution" cell -- a session of Teeny is under way.  For the
+   TNYO10.CO file, 747 cells are loaded.  For the trigger file, only 1
+   cell (the execution cell) is loaded and proper operation depends on
+   remnant content (image of Teeny) in the adjacent block of 746 cells.
+ 
+o  Where the point of HIMEM is "too high", the laptop disallows an
+   invocation because the HIMEM requirement is not met.  All cells in
+   the HIMEM region remain as-is -- the laptop just issues a beep.  A
+   neophyte might think it is Teeny that issues the beep.
+ 
+If the HIMEM requirement of file TNYO10.CO or its related trigger file
+is not met, there is a remedy -- you set the point of HIMEM low enough
+for the requirement to be met.  For file TNYO10.CO, this remedy will be
+effective.  For a related trigger file, this remedy will be effective
+only if the latent image from file TNYO10.CO (i.e., the remnant content
+within the adjacent block of 746 cells) has not been altered.  If that
+latent image has been altered, then some detrimental action likely will
+occur -- this is the unforgiving nature of a trigger file.
+ 
+The HIMEM requirement of file TNYO10.CO or its related trigger file is
+62213.
+ 
+        Invocation via TNYO10.CO File
+ 
+This procedure invokes Teeny by using laptop command file TNYO10.CO and,
+in cases where it is necessary, this procedure also sets the point of
+HIMEM equal to the HIMEM requirement of TNYO10.CO.
+ 
+1.  Use the arrow keys to navigate the wide cursor bar over the name
+TNYO10.CO at the laptop menu.
+ 
+2.  Press the ENTER key.  If the HIMEM requirement is met, the laptop
+relinquishes control to Teeny and its guide/prompt appears.  A session
+of Teeny is under way -- this procedure is complete.
+ 
+Where the HIMEM requirement is not met, the laptop issues a beep.  Go
+on to step 3 of this procedure.
+ 
+3.  Use the arrow keys to navigate the wide cursor bar over the name
+BASIC at the laptop menu.
+ 
+4.  Press the ENTER key.  This invokes the BASIC interpreter.
+ 
+5.  Two entries are illustrated below as they appear on the 40-column
+screen of the laptop.  Type the first entry exactly as shown -- five
+lines then appear as a result of this entry, and then "Ok" appears at
+the following line.
+ 
+Study the result where 5-digit values appear in column 6 to column 10.
+Point of HIMEM is illustrated as "himem".  HIMEM requirement is
+illustrated as "hmreq".  A value that is 746 more than the HIMEM
+requirement is illustrated as "endat".
+ 
+                 1111111111222222222233333333334
+        1234567890123456789012345678901234567890
+        ________________________________________
+       |Ok                                      |
+Type   |?" pH "HIMEM:LOADM"TNYO10               | and then press ENTER.
+       | pH  himem                              | Point of HIMEM
+       |Top: hmreq                              | HIMEM requirement
+       |End: endat                              | HIMEM requirement+746
+       |Exe: hmreq                              |
+       |?OM Error                               | Out-of-Memory Error
+       |Ok                                      |
+Type   |CLEAR0,hmreq:MENU                       | and then press ENTER.
+ 
+6.  Using the "hmreq" value, type the second entry -- the laptop menu
+appears.  Go back to step 1 of this procedure.
+ 
+        Trigger File Creation
+ 
+This procedure eliminates the TNYO10.CO file and replaces it with a
+trigger file named Thmreq.CO where "hmreq" is the 5-digit HIMEM
+requirement.  This procedure also sets the point of HIMEM equal to the
+HIMEM requirement.
+ 
+1.  Use the arrow keys to navigate the wide cursor bar over the name
+BASIC at the laptop menu.
+ 
+2.  Press the ENTER key.  This invokes the BASIC interpreter.
+ 
+3.  An entry is illustrated below as it appears on the 40-column screen
+of the laptop.  Type the entry exactly as it is shown.  As a result of
+this entry, three lines appear that show the "Top", "End", and "Exe"
+addresses of file TNYO10.CO.  The 5-digit value of Top (and Exe) appears
+in column 6 to column 10.  This value is the HIMEM requirement, which
+is illustrated as "hmreq".
+ 
+                 1111111111222222222233333333334
+        1234567890123456789012345678901234567890
+        ________________________________________
+       |Ok                                      |
+Type   |LOADM"TNYO10":R=PEEK(64209)*256+PEEK(642|
+       |08):KILL"TNYO10.CO":SAVEM"T"+MID$(STR$(R|
+       |),2),R,R,R                              | and then press ENTER.
+       |Top: hmreq                              | HIMEM requirement
+       |End: endat                              |
+       |Exe: hmreq                              |
+ 
+Look at the line that directly follows the line that shows the "Exe"
+address.  If "?OM Error" is seen at this line, go to step 5.  If "Ok"
+is seen at this line (then "?OM Error" is not seen), go to step 4.
+ 
+4.  Type the entry shown below.  The laptop menu appears.  File name
+TNYO10.CO is not found -- it has been eliminated.  The trigger file
+name (e.g., T62213.CO) is found on the menu -- the five numerals of the
+name identify the HIMEM requirement of the trigger file.
+ 
+       |Top: hmreq                              | HIMEM requirement
+       |End: endat                              |
+       |Exe: hmreq                              |
+       |Ok                                      | "?OM Error" not seen
+Type   |CLEAR0,R:MENU                           | and then press ENTER.
+ 
+This procedure is complete.  Move on to the "Invocation via Trigger
+File" section of this manual.
+ 
+5.  Using the "hmreq" value, type the entry shown below and then go
+back to step 3 of this procedure.
+ 
+       |Top: hmreq                              | HIMEM requirement
+       |End: endat                              |
+       |Exe: hmreq                              |
+       |?OM Error                               | Out-of-Memory Error
+       |Ok                                      |
+Type   |CLEARFRE(""),hmreq                      | and then press ENTER.
+       |Ok                                      |
+ 
+        Invocation via Trigger File
+ 
+This procedure invokes Teeny by using a trigger file or, in cases where
+it is necessary, this procedure eliminates a trigger file.
+ 
+1.  Use the arrow keys to navigate the wide cursor bar over the name of
+the trigger file (e.g., T62213.CO).
+ 
+2.  Press the ENTER key.  If the HIMEM requirement is met, the laptop
+relinquishes control to Teeny and its guide/prompt appears.  A session
+of Teeny is under way -- this procedure is complete.
+ 
+Where the HIMEM requirement is not met, the laptop issues a beep.  Go
+on to step 3 of this procedure.
+ 
+3.  Use the arrow keys to navigate the wide cursor bar over the name
+BASIC at the laptop menu.
+ 
+4.  Press the ENTER key.  This invokes the BASIC interpreter.
+ 
+5.  An entry is illustrated below as it appears on the 40-column screen
+of the laptop.  Type the entry exactly as it is shown.  As a result of
+this entry, the point of HIMEM appears as a 5-digit value in column 2
+to column 6 on a line by itself.  The value for the point of HIMEM is
+illustrated as "himem".  Directly below it, all of the file names are
+listed with three names per line starting at columns 1, 13 and 25.
+ 
+                 1111111111222222222233333333334
+        1234567890123456789012345678901234567890
+        ________________________________________
+       |Ok                                      |
+Type   |?HIMEM"pH":FILES                        | and then press ENTER.
+       | himem pH                               | Point of HIMEM
+       |T62213.CO   ADRS  .DO   NOTES .DO       | The trigger file name
+       |Ok                                      |
+ 
+Look at the list of file names and find the trigger file name.  A name
+of the Thmreq.CO form identifies a trigger file, where "hmreq" is its
+5-digit HIMEM requirement.  If the point of HIMEM exceeds the HIMEM
+requirement of the trigger file by MORE THAN 1, go to step 7.  If the
+point of HIMEM exceeds the HIMEM requirement of the trigger file by
+EXACTLY 1, go to step 6.
+ 
+6.  Type the entry shown below -- the laptop menu appears.  Go back to
+step 1 of this procedure.
+ 
+       | 62214 pH                               | Point of HIMEM
+       |T62213.CO   ADRS  .DO   NOTES .DO       | exactly hmreq + 1
+       |Ok                                      |
+Type   |CLEAR0,HIMEM-1:MENU                     | and then press ENTER.
+ 
+7.  Type the entry shown below -- the laptop menu appears.  This
+eliminates the trigger file -- this procedure is complete.
+ 
+       | himem pH                               | Point of HIMEM
+       |T62213.CO   ADRS  .DO   NOTES .DO       | more than hmreq + 1
+       |Ok                                      |
+Type   |KILL"T62213.CO":MENU                    | and then press ENTER.
+ 
+        Guide/Prompt
+ 
+Teeny issues a two-line guide/prompt: the upper line is the guide, the
+lower line is the prompt.  These two lines are illustrated below
+exactly as they appear on the 40-column screen of the laptop.
+ 
+The guide line is only a visual aid.  It identifies column positions of
+fields in the prompt line, and it has a notation (C=KLSQ) regarding
+arguments of the command field.  The prompt line has two fields that
+are separated.  The command field [C] is column 3.  Column 4 is merely
+a separator [ ] between fields.  The file name field [FFFFFF.XX] spans
+from column 5 to column 13.
+ 
+Teeny provides a blinking cursor (illustrated by _ below) on the prompt
+line at column 3, which is the command field.  Use of the command field
+is mandatory -- you must type a command.  You do not have to use the
+rest of the prompt line -- its use is optional.
+ 
+                 1111111111222222222233333333334
+        1234567890123456789012345678901234567890
+        ________________________________________
+Guide  |> C FFFFFF.XX (C=KLSQ)                  |
+Prompt |> _                                     |
+ 
+        Command Syntax
+ 
+Regarding arguments of the command field, the notation (C=KLSQ) shows
+an equal sign followed by four upper case letters: K, L, S, and Q.  The
+equal sign denotes the query command.  Upper case letters K, L, S, and
+Q correspond to the Kill, Load, Save, and Quit commands.
+ 
+Command syntax is the same for every command -- you may include a file
+name, but you are not compelled to do so.  If you include a file name,
+then you may also append commentary after the file name -- Teeny
+ignores anything you type at column 14 and onward.
+ 
+Letter "P" is upper case, and letter "p" is lower case.  For file names
+that you type, the case of each and every letter may be important.  For
+example, LAPTOP.CO and LApTOP.CO and LAPTOp.CO are slightly different
+file names that may refer to three distinct files, or they may all
+refer to the same file.  Teeny takes each character of a file name
+precisely the way you type it and, based on the command, treats the
+file name in different ways -- see "File Name Treatment" for detail.
+For convenience however, you can keep the CAPS LOCK key engaged during
+a Teeny session so that file names are always treated in the same way.
+ 
+There are some restrictions on the names of files.  The laptop imposes
+the first restriction, Teeny enforces it, and it applies to every
+command.  The first restriction is that the lead-character of a name
+can not be a numeral or certain special characters.  For example, the
+name 4SCORE.DO is illegal.  To make it compatible with as large a group
+of other masters (e.g., Floppy by Tandy, TS-DOS by Traveling Software)
+as practical, Teeny imposes the second restriction, which applies to
+the Kill, Load, and Save commands.  This second restriction is that the
+lead-character of the file name extension must be one of three letters:
+B, C, or D.  Other masters and Teeny use a convention where the
+lead-letter of the file name extension indicates the laptop file type.
+There are three file types: BASIC, Command, and ASCII.  And the
+corresponding letters are: B for BASIC, C for Command, and D for ASCII.
+For a Load command with a file name such as WONDER.B4 for example,
+Teeny inserts the file content into that portion of laptop memory where
+BASIC file types belong.
+ 
+The slave device that is attached at the RS-232C port of the laptop (a
+Disk Drive, or a PC during a DeskLink session) maintains its disk
+directory of file names and file content within its media.  Certain
+differences among various slave devices are noteworthy and offer useful
+operational potential -- see "Slave Device Nuance" for detail.
+ 
+See the illustration below.  It shows an example for every command.
+Each example is a command which includes a file name.  Note that the
+name included with the example Quit command is not legitimate for use
+with any of the other commands.  Every example also includes commentary
+that begins at column 15.  The file name and comment in each example
+form an explanation of what the command means.  They are elaborate
+examples, yet you can use them as-is during a Teeny session because
+they are correct in their syntax!
+ 
+                 1111111111222222222233333333334
+        1234567890123456789012345678901234567890
+        ________________________________________
+Guide  |> C FFFFFF.XX (C=KLSQ)                  |
+Prompt |> = Wonder.B4 Does file exist at disk?  | Syntax of query
+ 
+Guide  |> C FFFFFF.XX (C=KLSQ)                  |
+Prompt |> K AtDisk.BA BASIC file erase at disk  | Syntax of Kill
+ 
+Guide  |> C FFFFFF.XX (C=KLSQ)                  |
+Prompt |> L Laptop.CO Command file into memory  | Syntax of Load
+ 
+Guide  |> C FFFFFF.XX (C=KLSQ)                  |
+Prompt |> S OnDisk.DO ASCII file onto the disk  | Syntax of Save
+ 
+Guide  |> C FFFFFF.XX (C=KLSQ)                  |
+Prompt |> Q meansQuit so Teeny session ends     | Syntax of Quit
+ 
+For a command (except for Quit command) where you include a file name,
+you must type the name so it aligns correctly in the file name field.
+Type one or more spaces if needed to pad a name so that the file name
+field is completely filled (type NAME  .DO for a file named NAME.DO).
+ 
+        Command Action
+ 
+Teeny associates a file name with every command - even with the Quit
+command which produces no action except to end the Teeny session.  The
+action by all the other commands is file name dependent, and the two
+restrictions on the names of files are pertinent.
+ 
+There are two places a file can exist: at the disk, or in the memory of
+the laptop.  A file, of a specific name, either exists or does not
+exist.  So there are four cases for you to consider with respect to any
+file name.  For a specific name, a file is found:
+ 
+#1.  nowhere (neither place)
+#2.  one place, at the disk (not in memory)
+#3.  one place, in memory (not at the disk)
+#4.  both places
+ 
+The chart below summarizes the query, Kill, Load, and Save commands for
+all four cases.  Below the chart, there is a paragraph for each command
+that explains its action.  The terms "Identical file name" and
+"NORMALIZED file name" appear in these paragraphs to distinguish
+between different treatments that Teeny applies to file names.  See
+"File Name Treatment" for the distinction.
+ 
+      |  nowhere      |  one place,   |  one place,   |  both places  |
+      |               |  AT THE DISK  |  IN MEMORY    |               |
+       ___ case #1 ___ ___ case #2 ___ ___ case #3 ___ ___ case #4 ___ 
+query |   "FF Err"    |   "SN Err"    |   "FF Err"    |   "SN Err"    |
+      | (at the disk) | Specific Name | (at the disk) | Specific Name |
+Kill  |   "FF Err"    |Possible ERASE |   "FF Err"    |Possible ERASE |
+      | (at the disk) |  AT THE DISK  | (at the disk) |  AT THE DISK  |
+Load  |   "FF Err"    |Possible INSERT|   "FF Err"    |   "AE Err"    |
+      | (at the disk) |   IN MEMORY   | (at the disk) |  (in memory)  |
+Save  |   "FF Err"    |   "AE Err"    |Possible INSERT|   "AE Err"    |
+      |  (in memory)  | (at the disk) |  AT THE DISK  | (at the disk) |
+ 
+The action of the query command merely is to respond with an error.
+The query command ascertains extant of the Identical file name found AT
+THE DISK.  There are two possible responses by the query command.  If
+Teeny fails to find any file name AT THE DISK by the Identical file
+name (which is case #1 and also case #3), then the response "FF Err" is
+given.  Otherwise at least one specific name is extant AT THE DISK that
+is recognized by the Identical file name (which is case #2 and case
+#4), and the response "SN Err" is given.  See "Slave Device Nuance".
+ 
+The action of the Kill command is to erase a file of an Identical file
+name AT THE DISK.  The action is possible for case #2 and case #4.  For
+either of these cases, Teeny will erase the file AT THE DISK unless
+there is some condition (e.g., Write-Protected disk) that prevents the
+action.  If the action is prevented, Teeny issues an error that is
+pertinent.  For case #1 and case #3, Teeny issues "FF Err" because it
+fails to find the Identical file name AT THE DISK.
+ 
+The action of the Load command is to insert IN MEMORY a file, based on
+content found at disk.  The action is possible for case #2 only.  For
+this case, Teeny makes an exact copy of the content and assigns a
+NORMALIZED file name in the memory directory of the laptop unless there
+is some condition (e.g., not enough free memory) that prevents the
+action.  If the action is prevented, Teeny issues an error that is
+pertinent.  For case #1 and case #3, Teeny issues "FF Err" because it
+fails to find the Identical file name at the disk.  For case #4, Teeny
+issues "AE Err" because it finds the NORMALIZED file name already is
+assigned in the memory directory.
+ 
+The action of the Save command is to insert AT DISK a file, based on
+content found in memory.  The action is possible for case #3 only.  For
+this case, Teeny makes an exact copy of the content and assigns an
+Identical name in the disk directory unless there is some condition
+(e.g., Write-Protected disk) that prevents the action.  If the action
+is prevented, Teeny issues an error that is pertinent.  See "Slave
+Device Nuance".  For case #1, Teeny issues "FF Err" because it fails to
+find the NORMALIZED file name in the memory directory of the laptop.
+For case #2 and case #4, Teeny issues "AE Err" because it finds the
+Identical file name already is assigned in the disk directory.
+ 
+        Error Codes
+ 
+Teeny issues a 2-letter error code, such as "NM Err", if it encounters
+some condition or fault that prevents command action.  The chart below
+lists each error code with its meaning, and indicates the relationship,
+if any, to each command: query, Kill, Load, Save, and Quit.  Indicators
+"Disk" and "Memory" identify the place (i.e., at Disk or in Memory)
+where a condition is pertinent.  The "**" indicator is used for error
+codes that have a clear meaning of place (e.g., Out of Memory), or have
+a generalized meaning.
+ 
+|________ Code and Meaning ________|query_|_Kill_|_Load_|_Save_|_Quit_|
+| NM NaMe illegal (e.g. 4SCORE.DO) |  **  |  **  |  **  |  **  |  **  |
+| SN Specific Name found           | Disk |      |      |      |      |
+| FF Fail to Find name             | Disk | Disk | Disk |Memory|      |
+| AE file Already Exists           |      |      |Memory| Disk |      |
+| ND No Disk media in drive        |  **  |  **  |  **  |  **  |      |
+| WP Write-Protected disk media    |      |  **  |      |  **  |      |
+| DF Drive directory Full          |      |      |      |  **  |      |
+| FL FuLL memory directory         |      |      |  **  |      |      |
+| OM Out of Memory (i.e. capacity) |      |      |  **  |      |      | 
+| NR RS-232 Not Ready (e.g. cable) |  **  |  **  |  **  |  **  |      |
+| IO I/O fault (e.g. RS-232)       |  **  |  **  |  **  |  **  |      |
+| CM CoMmunication fault           |  **  |  **  |  **  |  **  |      |
+ 
+The Load command can not overwrite a file in memory.  You must Quit
+Teeny, kill the file in memory, then invoke Teeny again to load the
+file from disk.  The example below shows the "discovery" that the file
+exists in memory, and the Quit of Teeny.
+ 
+> L NAME  .DO
+AE Err  (file Already Exists in memory)
+> Q
+ 
+The 6-command example below shows a comedy of errors that finally
+overwrites a file at the disk.  Only the first command includes a file
+name -- see "File Name Memory".
+ 
+> S NAME  .DO
+NR Err  (plug in cable, power on drive)
+> S
+ND Err  (insert disk)
+> S
+WP Err  (remove disk write-protect)
+> S
+AE Err  (file Already Exists at disk)
+> K
+> S
+ 
+        File Name Memory
+ 
+Teeny remembers the last file name you typed.  All commands need a file
+name and Teeny uses the remembered file name when you don't explicitly
+supply one.  Even the Quit command needs a file name, but the name does
+not have to be legitimate.  The 2-command example below overwrites a
+disk file.
+> K NAME  .DO
+> S
+ 
+        File Name Treatment
+ 
+Teeny treats a file name two ways:
+ 
+o  Identical   -- exactly as typed by you
+o  NORMALIZED  -- so that all letters are upper case
+ 
+Mixed upper and lower case is allowed for file names at the disk
+directory of the slave device.  A file identified by an Identical name
+at the disk directory is erased at disk, as a result of the Kill
+command.  Likewise, a file inserted at disk, as a result of the Save
+command, gets an Identical name at the disk directory.  For DeskLink,
+mixed case is not pertinent because the operating system of the PC
+treats mixed case as if it is all upper case.  For a Disk Drive, mixed
+case is pertinent.
+ 
+All upper case is the norm for file names within the memory directory
+of the laptop.  A file inserted in memory, as a result of the Load
+command, gets a NORMALIZED name in the memory directory of the laptop.
+ 
+The chart below shows the use of file name AnYmIx.Do in the query,
+Kill, Load, and Save commands.  The Identical file name of AnYmIx.Do
+applies at the disk directory of the slave device for each of these
+commands.  The NORMALIZED file name of ANYMIX.DO applies in the memory
+directory of the laptop for only the Load and Save commands.
+ 
+             _______ Directory _______ 
+__Command __| at Disk    | in Memory  |____ Overall action summary ____
+= AnYmIx.Do | Identical  |            | By AnYmIx.Do, query at disk.
+            |            |     --     |
+K AnYmIx.Do | Identical  |            | By AnYmIx.Do, erase at disk.
+            |            |     --     |
+L AnYmIx.Do | Identical  |            | Content of AnYmIx.Do at disk,
+            |            | NORMALIZED | insert for ANYMIX.DO in memory.
+S AnYmIx.Do |            | NORMALIZED | Content of ANYMIX.DO in memory,
+            | Identical  |            | insert for AnYmIx.Do at disk.
+ 
+Where you use Teeny with a Disk Drive, you can use file names that have
+differences of letter case to your advantage.  You can have content in
+memory under a NORMALIZED file name which you actively work with (e.g.,
+TEXT), while you have content at disk which reflects your prior
+activity under one or more Identical names.
+ 
+An example for media back-up purposes uses one Identical name where the
+last character is lower case, such as ACTIVE.Do.  Use the S ACTIVE.DO
+and S ACTIVE.Do commands to save your active content, in duplicate, at
+the disk.  Should the diskette media suffer from erosion (e.g., by some
+physical damage) there's some chance that one disk file is left intact.
+Ordinarily you use the L ACTIVE.DO command to insert the active content
+in memory under the NORMALIZED file name ACTIVE.DO.  But you can resort
+to the L ACTIVE.Do command if the need arises.
+ 
+An example for archival purposes uses a series of Identical names.  A
+series such as Series.do, SEries.do, SERies.do and so on can be used to
+represent some progressive activity.  And a series such as sERIES.DO,
+seRIES.DO, serIES.DO and so on can be used to represent some regressive
+activity.  The query command is very useful for "learning" the limits
+of an archival series after you "forgot" the limits.
+ 
+        Slave Device Nuance
+ 
+For the query command with a PC during a DeskLink session, the ? wild
+card character can be used within the file name extension.  This forms
+a "file spec" which covers a range of specific file names.  Note that
+the name portion is specific, and the extension portion is not
+specific.  The chart below lists eight query commands for a name of WOW
+where each query has a different file spec.  The chart assumes nine
+files of the name WOW are extant, and has a column for each extension
+of the name WOW.  For each query, the indicator "met" identifies every
+file name that meets the file spec and thus contributes toward the
+response "SN Err" for Specific Name.  The file spec with extension ??
+is global, so all of the nine files contribute toward the response.
+ 
+query & name| Files with a name of WOW exist, the Extensions are: |
+____________| .B  | .B4 | .BA | .C  | .C1 | .CO | .D  | .D4 | .DO |
+= WOW   .?? | met | met | met | met | met | met | met | met | met |
+= WOW   .?  | met |     |     | met |     |     | met |     |     |
+= WOW   .B? | met | met | met |     |     |     |     |     |     |
+= WOW   .C? |     |     |     | met | met | met |     |     |     |
+= WOW   .D? |     |     |     |     |     |     | met | met | met |
+= WOW   .?1 |     |     |     |     | met |     |     |     |     |
+= WOW   .?4 |     | met |     |     |     |     |     | met |     |
+= WOW   .?O |     |     |     |     |     | met |     |     | met |
+ 
+For the Save command with a Disk Drive, there must be at least one file
+name slot available at the disk directory, and the directory must
+manifest enough capacity in terms of sectors at the media to insert
+(i.e., hold) the file content.  Otherwise, the response "DF Err" for
+Drive directory Full is given.  The chart below lists the quantity of
+file name slots, and the capacity and quantity of sectors for diskette
+media that is formatted by various Disk Drives.
+ 
+ ________ Disk Drive _________ _ File Name Slots __ _Capacity/Sectors_ 
+| Brother Disk Drive FB100    | 40                 | 101120  /  79    |
+| Purple Computing Disk Drive | 40                 | 101120  /  79    |
+| Tandy Portable Disk Drive   | 40                 | 101120  /  79    |
+| Tandy Portable Disk Drive 2 | 40 bank0, 40 bank1 | 202240  / 158    |
+ 
+        Diskette Formatter Olivett1 M10
+ 
+Teeny does not have a command to format a diskette in a Disk Drive.  If
+it did, the image of Teeny would not be so teeny!  Make your own BASIC
+program and use it on occasions when you want to format some diskettes.
+ 
+Just invoke the BASIC interpreter at the laptop menu and then type four
+entries, the last of which ends the interpretation session.  The four
+entries are illustrated below exactly as they appear on the 40-column
+screen of the laptop as you type them.  Note that the second entry is
+very long and it wraps into six lines on the screen.
+ 
+                 1111111111222222222233333333334
+        1234567890123456789012345678901234567890
+        ________________________________________
+Type   |NEW                                     | and then press ENTER.
+       |Ok                                      |
+Type   |0CLEAR1:IFLEN(INKEY$)THENRUNELSE?"FORMAT|
+       | [Y]es";:IFNOTINPUT$(1)="Y"THENMENUELSE?|
+       |:MAXFILES=1:OPEN"COM:98N1DNN"FOROUTPUTAS|
+       |1:?#1,"ZZ"CHR$(6)CHR$(0)CHR$(249);:CLOSE|
+       |:FORI=0TO0STEP0:IF0XORSGN(INP(179)AND32)|
+       |THENBEEP:RUNELSENEXT                    | and then press ENTER.
+Type   |SAVE"DFOM10                             | and then press ENTER.
+       |Ok                                      |
+Type   |MENU                                    | and then press ENTER.
+ 
+The third entry assigns DFOM10.BA as the file name of this BASIC
+program.  After the fourth entry the laptop menu appears and the name
+DFOM10.BA can be seen.  This BASIC program is specific to the Olivett1
+M10.  Use it to format diskette media placed in the:
+ 
+o  Purple Computing Disk Drive -- with DIP switches set for 19200 Baud
+o  Tandy Portable Disk Drive   -- with DIP switches set for 19200 Baud
+o  Tandy Portable Disk Drive 2
+ 
+        Operational Traits You Can Change
+ 
+There are two operational traits that you can change.  These traits are
+tabulated below.  Within the HIMEM region there are two cell image
+addresses which file TNYO10.CO provides with content you may change.
+ 
++------------------------+-----------------+----------------+---------+
+| TNYO10.CO Manual       | Available Trait | TNYO10.CO Cell | Cell    |
+| Documentation Heading  | Choices         | Image Address  | Content |
++------------------------+-----------------+----------------+---------+
+| Change Working Speed   | 19200 Baud      | 62426          |  57     |
+|                        |  9600 Baud      |                |  56     |
++------------------------+-----------------+----------------+---------+
+| Change DSR Sensitivity | DSR sensitive   | 62444          |  30     |
+|                        | DSR insensitive |                | 201     |
++------------------------+-----------------+----------------+---------+
+ 
+        Change Working Speed
+ 
+Teeny has a working speed of either 19200 Baud or 9600 Baud.  This
+procedure changes the working speed of Teeny.  This procedure may be
+used with laptop command file TNYO10.CO or with a trigger file.
+ 
+1.  Use the arrow keys to navigate the wide cursor bar over the name
+BASIC at the laptop menu.
+ 
+2.  Press the ENTER key.  This invokes the BASIC interpreter.
+ 
+3.  Two entries are illustrated below as they appear on the 40-column
+screen of the laptop: one for laptop command file TNYO10.CO, one for a
+trigger file.  Type the appropriate entry exactly as it is shown.
+ 
+                 1111111111222222222233333333334 (for TNYO10.CO file)
+        1234567890123456789012345678901234567890
+        ________________________________________
+       |Ok                                      |
+Type   |LOADM"TNYO10                            | and then press ENTER.
+ 
+                 1111111111222222222233333333334 (for trigger file)
+        1234567890123456789012345678901234567890
+        ________________________________________
+       |Ok                                      |
+Type   |LOADM"Thmreq                            | and then press ENTER.
+ 
+As a result of the entry above, three lines appear that show the "Top",
+"End", and "Exe" addresses of the file.  The 5-digit value of Top (and
+Exe) appears in column 6 to column 10.  This value is the HIMEM
+requirement, which is illustrated as "hmreq".
+ 
+Look at the line that directly follows the line that shows the "Exe"
+address.  If "?OM Error" is seen at this line, go to step 6.  If "Ok"
+is seen at this line (then "?OM Error" is not seen), go to step 4.
+ 
+4.  Carefully type the long entry shown below.
+ 
+       |Top: hmreq                              | HIMEM requirement
+       |End: endat                              |
+       |Exe: hmreq                              |
+       |Ok                                      | "?OM Error" not seen
+Type   |R=PEEK(64209)*256+PEEK(64208):C=R+213:FO|
+       |RI=0TO0STEP0:S=PEEK(C):?MID$("NormalSLOW|
+       |",82-1.08^S,6)" working speed. [C]hange?|
+       |":IFINSTR("cC",INPUT$(1))THENPOKEC,1XORS|
+       |:NEXTELSESAVEM"TNYO10",R,R+746,R        | and then press ENTER.
+ 
+If the screen shows either the "Normal working speed. [C]hange?" or
+"SLOW working speed. [C]hange?" message, all is well -- go to step 5.
+ 
+If the screen shows only the " working speed. [C]hange?" message, the
+image of Teeny is not in place -- go back to step 3.
+ 
+If the laptop menu appears or if an Error message appears (e.g., FC
+Error), something is wrong.  Likely, the entry was incorrectly typed --
+go back to step 1 (laptop menu) or to step 3 (Error message).
+ 
+5.  The working speed of Teeny is shown at the screen along with the
+"[C]hange?" prompt, as shown below.  Normal speed is 19200 Baud.  SLOW
+speed is 9600 Baud.  Each time you press the C key, the working speed
+changes.
+ 
+When the desired working speed is shown, press ENTER to accept it and
+then type the entry shown below -- the laptop menu appears.  This
+procedure is complete.
+ 
+       |Normal working speed. [C]hange?         | C changes the speed.
+       |SLOW working speed. [C]hange?           | C changes the speed.
+       |Normal working speed. [C]hange?         | C changes the speed.
+       |SLOW working speed. [C]hange?           | ENTER accepts speed.
+       |Ok                                      |
+Type   |MENU                                    | and then press ENTER.
+ 
+6.  Using the "hmreq" value, type the entry shown below and then go
+back to step 3 of this procedure.
+ 
+       |Top: hmreq                              | HIMEM requirement
+       |End: endat                              |
+       |Exe: hmreq                              |
+       |?OM Error                               | Out-of-Memory Error
+       |Ok                                      |
+Type   |CLEARFRE(""),hmreq                      | and then press ENTER.
+       |Ok                                      |
+ 
+        Change DSR Sensitivity
+ 
+Teeny either is sensitive to the DSR control line or is not sensitive
+to the DSR control line.  This procedure changes the DSR usage of
+Teeny.  This procedure may be used with laptop command file TNYO10.CO
+or with a trigger file.
+ 
+1.  Use the arrow keys to navigate the wide cursor bar over the name
+BASIC at the laptop menu.
+ 
+2.  Press the ENTER key.  This invokes the BASIC interpreter.
+ 
+3.  Two entries are illustrated below as they appear on the 40-column
+screen of the laptop: one for laptop command file TNYO10.CO, one for a
+trigger file.  Type the appropriate entry exactly as it is shown.
+ 
+                 1111111111222222222233333333334 (for TNYO10.CO file)
+        1234567890123456789012345678901234567890
+        ________________________________________
+       |Ok                                      |
+Type   |LOADM"TNYO10                            | and then press ENTER.
+ 
+                 1111111111222222222233333333334 (for trigger file)
+        1234567890123456789012345678901234567890
+        ________________________________________
+       |Ok                                      |
+Type   |LOADM"Thmreq                            | and then press ENTER.
+ 
+As a result of the entry above, three lines appear that show the "Top",
+"End", and "Exe" addresses of the file.  The 5-digit value of Top (and
+Exe) appears in column 6 to column 10.  This value is the HIMEM
+requirement, which is illustrated as "hmreq".
+ 
+Look at the line that directly follows the line that shows the "Exe"
+address.  If "?OM Error" is seen at this line, go to step 6.  If "Ok"
+is seen at this line (then "?OM Error" is not seen), go to step 4.
+ 
+4.  Carefully type the long entry shown below.
+ 
+       |Top: hmreq                              | HIMEM requirement
+       |End: endat                              |
+       |Exe: hmreq                              |
+       |Ok                                      | "?OM Error" not seen
+Type   |R=PEEK(64209)*256+PEEK(64208):C=R+231:FO|
+       |RI=0TO0STEP0:S=PEEK(C):?"DSR U"MID$("nu"|
+       |,SAND5)"sed. [C]hange?":IFINSTR("cC",INP|
+       |UT$(1))THENPOKEC,215XORS:NEXTELSESAVEM"T|
+       |NYO10",R,R+746,R                        | and then press ENTER.
+ 
+If the screen shows either the "DSR Used. [C]hange?" or "DSR Unused.
+[C]hange?" message, all is well -- go to step 5.
+ 
+If the laptop menu appears or if an Error message appears (e.g., FC
+Error), something is wrong.  Likely, the entry was incorrectly typed --
+go back to step 1 (laptop menu) or to step 3 (Error message).
+ 
+5.  The sensitivity to the DSR control line by Teeny is shown at the
+screen as DSR usage along with the "[C]hange?" prompt, as shown below.
+DSR Used means Teeny is sensitive to the DSR control line.  DSR Unused
+means Teeny is not sensitive to the DSR control line.  Each time you
+press the C key, the DSR usage changes.
+ 
+When the desired DSR usage is shown, press ENTER to accept it and then
+type the entry shown below -- the laptop menu appears.  This procedure
+is complete.
+ 
+       |DSR Used. [C]hange?                     | C changes DSR usage.
+       |DSR Unused. [C]hange?                   | C changes DSR usage.
+       |DSR Used. [C]hange?                     | C changes DSR usage.
+       |DSR Unused. [C]hange?                   | ENTER accepts usage.
+       |Ok                                      |
+Type   |MENU                                    | and then press ENTER.
+ 
+6.  Using the "hmreq" value, type the entry shown below and then go
+back to step 3 of this procedure.
+ 
+       |Top: hmreq                              | HIMEM requirement
+       |End: endat                              |
+       |Exe: hmreq                              |
+       |?OM Error                               | Out-of-Memory Error
+       |Ok                                      |
+Type   |CLEARFRE(""),hmreq                      | and then press ENTER.
+       |Ok                                      |
+ 
+        Beefs, Tips, Quirks and Humor
+ 
+1.  I keep pressing the Q key but Teeny refuses to Quit.
+ 
+Type Q Q to Quit -- that's the Q key, a space, and another Q key.  Or,
+you could press the reset button.  But, <BREAK> won't Quit Teeny.
+ 
+Do you remember that Teeny "remembers" the previous file name?  What?
+You say you just invoked Teeny, changed your mind and now want to quit
+but you haven't even typed any file name.  Tough!  The first file name
+that Teeny initially "remembers" is not something that you typed but is
+something that Teeny considers garbage as a file name for the Quit
+command.  It may be garbage left by a prior operation or by the way
+Teeny was invoked (from the menu or from BASIC).  Do you think the
+image of Teeny can be so teeny by having great gobs of initialization
+logic?
+ 
+2.  I press a function key and Teeny goes nuts and pukes and scrolls
+the screen.
+ 
+NEWS FLASH -- When running Teeny from BASIC, don't press any function
+key.  If you do, whatever string is assigned ("Files", "Load ", or God
+forbid "K MYFILE.DO") is fed to Teeny for consumption.
+ 
+3.  Everything was going well.  It was cool.  I was a Loadin'/Savin'
+dude with Teeny -- I mean fast man -- really burnin' up the disk.  But
+now, like...  you know...  I mean ...  Teeny just sits there -- stoned
+-- don't do squat.  What it is Bro?
+ 
+The trouble is bad Karma and lack of Cosmic vibes.  Really!  I checked
+with my Guru and she had a vision and saw what went down with you man. 
+Like...  you know...  I mean ...  your disk drive tuned out man.  She
+saw you take a smoke break.  I know it was some good stuff 'cause she
+said you was gone for a quite a while.  Your disk drive took a break
+too!  Went trance-like in low power mode she said.
+ 
+Flip the disk drive power switch off and on.  Now reunite with Teeny,
+live long & prosper.  Later dude!
+ 
+4.  I created file DAMNED.2B but Teeny won't Save it.  What gives?
+ 
+With some devilish application programs, you can make a file name
+extension that's damned to be straight from Hell -- repent.  Actually,
+the disk drive is willing to Save your file but it's Teeny that doesn't
+like the file name extension.  The BASIC interpreter's NAME AS command
+doesn't change file name extensions, so no help there.  Another fine
+pickle you've got into Ollie.
+ 
+To absolve your sin, go to BASIC and kill the file.  Follow the Marine
+Corps motto "Kill 'em all and let God sort 'em out" for any other files
+in memory that have condemned file name extensions.
+ 
+
