@@ -1,5 +1,5 @@
 0'TEENY for Olivetti M10 USA variant laptop (c) 2015 Ron Wiesen Technical Products
-0'Minor installer tweaks b.kenyon.w@gmail.com 2021
+0'Installer tweaks for dlplus - b.kenyon.w@gmail.com 2021
 0CLEAR99:B%=0:I%=0:S!=0:U$="":L$="":H$="0123456789ABCDEF":P%=0:D$="":T%=0:E%=0
 1FORB%=0TO7:S!=S!+PEEK(B%+32496):NEXT:IFS!-624THEN?"Not an Olivetti M-10":END
 2READT%,E%:I%=T%:S!=T%+E%+T%:IFHIMEM-2^16>T%THENCLEAR0,T%:RUN
