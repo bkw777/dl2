@@ -835,7 +835,7 @@ int be_disk(void) {
 	preamble[0]=0;
 	preamble[1]=0;
 	preamble[2]=0;
-	
+
 	for (precnt = 0; precnt < 2; precnt++) {
 		len = readbytes(client_fd, preamble+precnt, 1);
 		if (len == 0) {
