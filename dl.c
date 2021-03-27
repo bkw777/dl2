@@ -146,8 +146,7 @@ void print_usage() {
 	fprintf (stderr, "   -g       Getty mode. Run as daemon\n");
 	fprintf (stderr, "   -p=dir   Path to files to be served, default is \".\"\n");
 	fprintf (stderr, "   -w       WP-2 compatibility mode (8.2 filenames)\n");
-/* not working, displays uppercase to client, fails to find local file */
-/*	fprintf (stderr, "   -u       Uppercase all filenames\n"); */
+	fprintf (stderr, "   -u       Uppercase all filenames\n");
 	fprintf (stderr, "   -z=#     Sleep # milliseconds between each byte while sending bootstrap file (default " STRINGIFY(DEFAULT_BOOTSTRAP_BYTE_MSEC) ")\n");
 #if ENABLE_FLEN_LIMIT
 	fprintf (stderr, "   -xs      Don't limit files to " STRINGIFY(DEFAULT_MAX_FLEN) "bytes\n");
@@ -156,7 +155,7 @@ void print_usage() {
 	fprintf (stderr, "available bootstrap files:\n");
 	// blargh ...
 	//(void)(system ("find " STRINGIFY(APP_LIB_DIR) " -regex \'.*/.+\\.\\(100\\|200\\|NEC\\|M10\\|K85\\)$\' -printf \'\%f\\n\' >&2")+1);
-	// more blargh...
+	// more blargh...  (using system("find...") just to get some filenames)
 	fprintf (stderr,   "   TRS-80 Model 100 / Tandy 102 : ");
 	(void)(system ("find " STRINGIFY(APP_LIB_DIR) " -regex \'.*/.+\\.100$\' -printf \'\%f \' >&2")+1);
 	fprintf (stderr, "\n   Tandy 200                    : ");
@@ -282,7 +281,6 @@ int main(int argc, char **argv) {
 
 	args = argv;
 
-// ugly redundant with default: below...
 	strcpy ((char *)client_tty,STRINGIFY(DEFAULT_CLIENT_TTY));
 	if (client_tty[0]!='/') {
 		strcpy((char *)client_tty,"/dev/");
@@ -423,14 +421,12 @@ int out_dirent (unsigned char *fnamep, unsigned len) {
 	unsigned char *p;
 	unsigned i;
 
-	if (debug)
-		fprintf (stderr, "out_dirent: %s\n", fnamep);
+	if (debug) fprintf (stderr, "out_dirent: %s\n", fnamep);
 
 	/* format the filename */
 	if (fnamep) {
 
-		if (debug)
-			fprintf (stderr, "no fmt: %s\n", fnamep);
+		if (debug) fprintf (stderr, "no fmt: %s\n", fnamep);
 
 		buf[26] = 'F';
 		size = htons (len);
@@ -446,13 +442,17 @@ int out_dirent (unsigned char *fnamep, unsigned len) {
 		dotp = memchr (buf + 2, '.', 24);
 
 		if (dotp != NULL) {
+			//if(debug) fprintf(stderr,"buf: |%s|\n",buf);
 			memmove (buf + dot_offset + 2, dotp, 3);
-			for (p = dotp; p < buf + dot_offset + 2; p++)
+			//if(debug) fprintf(stderr,"buf: |%s|\n",buf);
+			for (p = dotp; p < buf + dot_offset + 2; p++) {
 				*p = ' ';
+				//if(debug) fprintf(stderr,"buf: |%s|\n",buf);
+			}
+
 		}
 
-		if (debug)
-			fprintf (stderr, "str: %24.24s\n", (char *)buf + 2);
+		if (debug) fprintf (stderr, "str   : %24.24s\n", (char *)buf + 2);
 	}
 
 	/* add checksum */
@@ -468,6 +468,8 @@ int send_dirent (unsigned char *buf, struct stat *st) {
 	unsigned char *p;
 	unsigned i;
 
+	//if(debug) fprintf(stderr,"send_dirent()\nbuf: |%s|\n",buf);
+
 	if(dire!=NULL) {
 		buf[26]='F';
 		size=htons(st->st_size);
@@ -475,20 +477,31 @@ int send_dirent (unsigned char *buf, struct stat *st) {
 		memset(buf+2,' ',24);
 
 		if (upcase)
-			for (i = 0; i < strlen (dire->d_name); i++)
-				buf[2+i] = toupper (dire->d_name[i]);
+			for (i = 0; i < strlen((char *)dire->d_name); i++) {
+				buf[2+i] = toupper(dire->d_name[i]);
+				//if(debug) fprintf(stderr,"buf: |%s|\n",buf);
+			}
 		else
 			memcpy(buf+2,dire->d_name,strlen((char *)dire->d_name));
 
-		dot=memchr(buf+2,'.',24);
+		//if(debug) fprintf(stderr,"buf: |%s|\n",buf);
+
+		dot = memchr(buf+2,'.',24);
 
 		if(dot!=NULL) {
-			memcpy(buf + dot_offset + 2, dot, 3);
-			for( p = dot; p < buf + dot_offset + 2; p++)
+			//if(debug) fprintf(stderr,"buf: |%s|\n",buf);
+			memmove (buf + dot_offset + 2, dot, 3);
+			//if(debug) fprintf(stderr,"buf: |%s|\n",buf);
+			for( p = dot; p < buf + dot_offset + 2; p++) {
 				*p=' ';
+				//if(debug) fprintf(stderr,"buf: |%s|\n",buf);
+			}
 		}
+
 	}
+
 	buf[30] = calc_sum (0x11, 0x1C, buf+2);
+	if(debug) fprintf(stderr,"buf: |%s|\n",buf);
 	return (my_write (client_fd, buf, 31) == 31);
 }
 
@@ -546,6 +559,7 @@ int directory(unsigned char length, unsigned char *data) {
 		case 0x00:	/* Pick file for open/delete */
 			strncpy((char *)filename,(char *)data,24);
 			filename[24]=0;
+			//if (debug) fprintf (stderr, "Request: %s\n", filename);
 			/* Remove trailing spaces */
 			for(p = (unsigned char *) strrchr((char *)filename,' '); p >= filename && *p == ' '; p--)
 				*p = 0;
@@ -558,15 +572,17 @@ int directory(unsigned char length, unsigned char *data) {
 			if(dir!=NULL)
 				closedir(dir);
 			dir=opendir(".");
-			if (upcase)
+			//if (debug) fprintf (stderr, "       : %s\n", filename);
+			if (upcase) {
 				for(;read_next_dirent(&st) && dire!=NULL && strcasecmp((char *)dire->d_name, (char *)filename););
-			else
+			} else {
 				for(;read_next_dirent(&st) && dire!=NULL && strcmp((char *)dire->d_name, (char *)filename););
+			}
+			//if (debug) fprintf (stderr, "Found  : %s\n", dire->d_name);
 			send_dirent(buf,&st);
 			break;
 		case 0x01:	/* "first" directory block */
-			if (debug)
-				fprintf (stderr, "get first directory entry command\n");
+			if (debug) fprintf (stderr, "get first directory entry command\n");
 			if(dir!=NULL)
 				closedir(dir);
 			dir=opendir(".");
@@ -575,8 +591,7 @@ int directory(unsigned char length, unsigned char *data) {
 			while (read_next_dirent (&st));
 			/** send the file name */
 			if (get_first_file (filename, &file_len, &cur_id) == 0) {
-				if (debug)
-					fprintf (stderr, "get_first_file -> %s len = %d\n", filename, file_len);
+				if (debug) fprintf (stderr, "get_first_file -> %s len = %d\n", filename, file_len);
 				out_dirent (filename, file_len);
 			}
 			else
@@ -608,8 +623,7 @@ int open_file(unsigned char omode) {
 	struct stat st;
 #endif
 
-	if(debug)
-		fprintf (stderr, "Open Mode: %d\n", omode);
+	//if(debug) fprintf (stderr, "open_file() mode:%d filename:%s dire->d_name:%s\n", omode,filename,dire->d_name);
 
 	switch(omode) {
 		case 0x01:	/* New file for my_write */
@@ -631,13 +645,13 @@ int open_file(unsigned char omode) {
 				file=-1;
 			}
 #if ENABLE_FLEN_LIMIT
-			stat ((char *) filename, &st);
+			stat ((char *) dire->d_name, &st);
 			if(max_flen > 0 && st.st_size > max_flen) {
 				normal_return (0x6E);
 				break;
 			}
 #endif
-			file = open ((char *) filename, O_WRONLY | O_APPEND);
+			file = open ((char *) dire->d_name, O_WRONLY | O_APPEND);
 			if (file < 0)
 				normal_return (0x37);
 			else {
@@ -651,13 +665,14 @@ int open_file(unsigned char omode) {
 				file=-1;
 			}
 #if ENABLE_FLEN_LIMIT
-			stat ((char *)filename, &st);
+			stat ((char *)dire->d_name, &st);
 			if (max_flen > 0 && st.st_size > max_flen) {
 				normal_return (0x6E);
 				break;
 			}
 #endif
-			file = open ((char *)filename, O_RDONLY);
+
+			file = open ((char *)dire->d_name, O_RDONLY);
 			if(file<0)
 				normal_return(0x37);
 			else {
@@ -703,6 +718,7 @@ void respond_mystery2() {
 	my_write (client_fd, buf, sizeof (canned) + 1);
 }
 
+// STUB
 void respond_place_path() {
 	static unsigned char canned[] = {0x12, 0x0b, 0x00, 0x52, 0x4f, 0x4f, 0x54, 0x20, 0x20, 0x2e, 0x3c, 0x3e, 0x20, 0x96};
 
@@ -806,27 +822,42 @@ void out_buf(unsigned char *bufp, unsigned len) {
 }
 
 int be_disk(void) {
-	unsigned char preamble[3];
+	char preamble[3];
 	unsigned char type;
 	unsigned char length;
 	unsigned char data[0x81];
 	unsigned char checksum;
 	unsigned precnt = 0;
 	unsigned len;
+	char TPDD_P[3] = "ZZ";
+	char TDME_P[3] = "M1";
 
+	preamble[0]=0;
+	preamble[1]=0;
 	preamble[2]=0;
-
+	
 	for (precnt = 0; precnt < 2; precnt++) {
-		len = readbytes(client_fd, preamble + precnt, 1);
+		len = readbytes(client_fd, preamble+precnt, 1);
 		if (len == 0) {
-			fprintf (stderr, "Zero Length - 1\n");
-			continue;
+			fprintf (stderr, "zero len - 1\n");
+			return(-1);
 		}
-		if (preamble[precnt] != 'Z') {
-			if (debug)
-				fprintf(stderr, "Bad preamble: '%s' (%02X %02X)\n",preamble,preamble[0],preamble[1]);
-			return (-1); // no error message, TS-DOS doesn't like that
+		if (preamble[precnt] == 0x0D) {
+			if (debug) fprintf (stderr, "CR\n");
+			return(-1);
 		}
+	}
+
+	if(strcmp(preamble,TPDD_P)==0) { // TPDD Command
+		if (debug) fprintf(stderr, "Got TPDD preamble.\n");
+	}
+	else if(strcmp(preamble,TDME_P)==0) { // TS-DOS DME Request
+		if (debug) fprintf(stderr, "Got TS-DOS DME preamble.\n");
+		return (-1);
+	}
+	else {
+		if (debug) fprintf(stderr, "Bad preamble: (%02X %02X)\n",preamble[0],preamble[1]);
+		return (-1);
 	}
 
 	len = readbytes(client_fd,&type,1);
