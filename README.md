@@ -35,7 +35,7 @@ dl -h
 dl -b=TS-DOS.100
 ```
 
-## bootstrap a [http://bitchin100.com/wiki/index.php?title=REXCPM](REXCPM)
+## bootstrap a [REXCPM](http://bitchin100.com/wiki/index.php?title=REXCPM)
 ```
 unzip REXCPMV21_b18.ZIP
 dl -b=./rxcini.DO ;dl -u
