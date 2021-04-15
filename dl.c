@@ -82,13 +82,7 @@ MA 02111, USA.
 
 #define DEFAULT_BOOTSTRAP_BYTE_MSEC 6
 
-/* Enable/disable 64K file size limit and -xs option */
-#define ENABLE_FLEN_LIMIT 0
-#if ENABLE_FLEN_LIMIT
- #ifndef DEFAULT_MAX_FLEN
- #define DEFAULT_MAX_FLEN 65535
- #endif
-#endif
+#define BASIC_EOF 0x1A
 
 #define STRINGIFY2(X) #X
 #define STRINGIFY(X) STRINGIFY2(X)
@@ -113,12 +107,10 @@ bool bootstrap_mode = false;
 int bootstrap_byte_msec = DEFAULT_BOOTSTRAP_BYTE_MSEC;
 bool debug = false;
 bool upcase = false;
+bool rtscts = false;
 unsigned dot_offset = 6; // 6 for 100/102/200/NEC/K85/M10 , 8 for WP-2
 unsigned char buf[131];
 int client_baud = DEFAULT_CLIENT_BAUD;
-#if ENABLE_FLEN_LIMIT
-int max_flen = DEFAULT_MAX_FLEN;
-#endif
 
 int be_disk(void);
 
@@ -147,10 +139,8 @@ void print_usage() {
 	fprintf (stderr, "   -p=dir   Path to files to be served, default is \".\"\n");
 	fprintf (stderr, "   -w       WP-2 compatibility mode (8.2 filenames)\n");
 	fprintf (stderr, "   -u       Uppercase all filenames\n");
+	fprintf (stderr, "   -c       Hardware flow control (RTS/CTS)\n");
 	fprintf (stderr, "   -z=#     Sleep # milliseconds between each byte while sending bootstrap file (default " STRINGIFY(DEFAULT_BOOTSTRAP_BYTE_MSEC) ")\n");
-#if ENABLE_FLEN_LIMIT
-	fprintf (stderr, "   -xs      Don't limit files to " STRINGIFY(DEFAULT_MAX_FLEN) "bytes\n");
-#endif
 	fprintf (stderr, "\n");
 	fprintf (stderr, "available bootstrap files:\n");
 	// blargh ...
@@ -304,6 +294,9 @@ int main(int argc, char **argv) {
 					case 'u':
 						upcase = true;
 						break;
+					case 'c':
+						rtscts = true;
+						break;
 					case 'v':
 						debug = true;
 						break;
@@ -328,12 +321,6 @@ int main(int argc, char **argv) {
 						if (argv[arg][2] == '=')
 							bootstrap_byte_msec = atoi(argv[arg]+3);
 						break;
-#if ENABLE_FLEN_LIMIT
-					case 'x':
-					    if (argv[arg][2] == 's')
-							max_flen = 0;
-						break;
-#endif
 					default:
 						fprintf(stderr, "Unknown option %s\n",argv[arg]);
 						print_usage();
@@ -381,7 +368,12 @@ int main(int argc, char **argv) {
 	if(tcgetattr(client_fd,&ti)==-1)
 		return(1);
 	cfmakeraw(&ti);
-	ti.c_cflag |= CLOCAL|CRTSCTS|CS8;
+	ti.c_cflag |= CLOCAL|CS8;
+	if(rtscts) {
+		ti.c_cflag |= CRTSCTS;
+	} else {
+		ti.c_cflag &= ~CRTSCTS;
+	}
 	if(cfsetspeed(&ti,client_baud)==-1)
 		return(1);
 	if(tcsetattr(client_fd,TCSANOW,&ti)==-1)
@@ -391,16 +383,21 @@ int main(int argc, char **argv) {
 	origt.c_iflag=BRKINT | ICRNL | IMAXBEL | IXON | IXANY | IXOFF;
 	origt.c_oflag=OPOST | ONLCR;
 	origt.c_lflag=ECHO | ICANON | ISIG | IEXTEN | ECHOE | ECHOKE | ECHOCTL;
-	origt.c_cflag=CREAD | CS8 | HUPCL
+	origt.c_cflag=CREAD | CS8 | HUPCL;
+	if(rtscts) {
+		origt.c_cflag |=
 #ifdef CRTS_OFLOW
-		| CRTS_OFLOW
+			CRTS_OFLOW
 #else
-		| CRTSCTS
+			CRTSCTS
 #endif
+			;
 #ifdef CRTS_IFLOW
-		| CRTS_IFLOW
+		origt.c_cflag |= CRTS_IFLOW ;
 #endif
-		;
+	} else {
+		origt.c_cflag &= ~CRTSCTS;
+	}
 
 	cfsetspeed(&origt,client_baud);
 
@@ -525,11 +522,6 @@ int read_next_dirent(struct stat *st) {
 		if (!S_ISREG (st->st_mode))
 			continue;
 
-#if ENABLE_FLEN_LIMIT
-		if(max_flen > 0 && st->st_size > max_flen)
-			continue;
-#endif
-
 		/* add file to list so we can traverse any order */
 		add_file ((unsigned char *) dire->d_name, st->st_size, ++fname_ndx);
 
@@ -619,9 +611,6 @@ int directory(unsigned char length, unsigned char *data) {
 }
 
 int open_file(unsigned char omode) {
-#if ENABLE_FLEN_LIMIT
-	struct stat st;
-#endif
 
 	//if(debug) fprintf (stderr, "open_file() mode:%d filename:%s dire->d_name:%s\n", omode,filename,dire->d_name);
 
@@ -644,13 +633,6 @@ int open_file(unsigned char omode) {
 				close(file);
 				file=-1;
 			}
-#if ENABLE_FLEN_LIMIT
-			stat ((char *) dire->d_name, &st);
-			if(max_flen > 0 && st.st_size > max_flen) {
-				normal_return (0x6E);
-				break;
-			}
-#endif
 			file = open ((char *) dire->d_name, O_WRONLY | O_APPEND);
 			if (file < 0)
 				normal_return (0x37);
@@ -664,14 +646,6 @@ int open_file(unsigned char omode) {
 				close (file);
 				file=-1;
 			}
-#if ENABLE_FLEN_LIMIT
-			stat ((char *)dire->d_name, &st);
-			if (max_flen > 0 && st.st_size > max_flen) {
-				normal_return (0x6E);
-				break;
-			}
-#endif
-
 			file = open ((char *)dire->d_name, O_RDONLY);
 			if(file<0)
 				normal_return(0x37);
@@ -790,7 +764,7 @@ int send_installer(char *f) {
 		fflush(stdout);
 	}
 	fprintf(stderr, "\n");
-	b = 0x1A;
+	b = BASIC_EOF;
 	my_write(client_fd,&b,1);
 	close(fd);
 	close(client_fd);
