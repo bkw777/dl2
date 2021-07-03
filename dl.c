@@ -214,7 +214,14 @@ int bootstrap(char *f) {
 		return(1);
 	}
 
-	cat(pre_install_txt_file);
+	if(access(pre_install_txt_file,F_OK)>=0) {
+		cat(pre_install_txt_file);
+	} else {
+		printf("Prepare the portable. Hints:\n");
+		printf("\tRUN \"COM:98N1ENN\"\t(for TANDY, Kyotronic, Olivetti)\n");
+		printf("\tRUN \"COM:9N81XN\"\t(for NEC)\n");
+		printf("\n");
+	}
 
 	printf("Press [Enter] when ready...");
 	getchar();
