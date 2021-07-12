@@ -121,7 +121,7 @@ int bootstrap(char *f);
 int send_installer(char *f);
 
 void print_usage() {
-	fprintf (stderr, "DeskLink+ usage:\n");
+	fprintf (stderr, "DeskLink+ " STRINGIFY(APP_VERSION) " usage:\n");
 	fprintf (stderr, "\n");
 	fprintf (stderr, "%s [tty_device] [options]\n",args[0]);
 	fprintf (stderr, "\n");
@@ -345,6 +345,7 @@ int main(int argc, char **argv) {
 		debug = 0;
 
 	if (debug) {
+		fprintf (stderr, "DeskLink+ " STRINGIFY(APP_VERSION) "\n");
 		fprintf (stderr, "Using Serial Device: %s\n", client_tty);
 		if(!bootstrap_mode) {
 			fprintf (stderr, "Working In Directory: ");

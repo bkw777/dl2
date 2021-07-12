@@ -4,32 +4,54 @@ OS ?= $(shell uname)
 CC ?= gcc
 CFLAGS += -O2 -Wall
 PREFIX ?= /usr/local
-APP_NAME = dl
-APP_LIB_DIR = $(PREFIX)/lib/$(APP_NAME)
-APP_DOC_DIR = $(PREFIX)/share/doc/$(APP_NAME)
+APP_NAME := dl
+APP_LIB_DIR := $(PREFIX)/lib/$(APP_NAME)
+APP_DOC_DIR := $(PREFIX)/share/doc/$(APP_NAME)
+APP_VERSION := $(shell git describe --long)
 
-DEFAULT_CLIENT_TTY = ttyUSB0
-DEFAULT_CLIENT_MODEL = 100
-DEFAULT_CLIENT_APP = TEENY
+DEFAULT_CLIENT_TTY := ttyUSB0
+DEFAULT_CLIENT_MODEL := 100
+DEFAULT_CLIENT_APP := TEENY
 
-TEENY_INSTALLERS = clients/teeny/TEENY.100 clients/teeny/TEENY.200 clients/teeny/TEENY.NEC clients/teeny/TEENY.M10
-TEENY_DOCS = clients/teeny/teenydoc.txt clients/teeny/hownec.do clients/teeny/TNYO10.TXT
-DSKMGR_INSTALLERS = clients/dskmgr/DSKMGR.100 clients/dskmgr/DSKMGR.200 clients/dskmgr/DSKMGR.K85 clients/dskmgr/DSKMGR.M10
-DSKMGR_DOCS = clients/dskmgr/DSKMGR.DOC
-TS-DOS_INSTALLERS = clients/ts-dos/TS-DOS.100 clients/ts-dos/TS-DOS.200 clients/ts-dos/TS-DOS.NEC
-TS-DOS_DOCS = clients/ts-dos/tsdos.pdf
-TINY_INSTALLERS = clients/tiny/TINY.100
-TINY_DOCS = clients/tiny/tindoc.do
-#POWR-D_INSTALLERS = clients/power-dos/POWR-D.100
-#POWR-D_DOCS = clients/power-dos/powr-d.txt
+TEENY_INSTALLERS := \
+	clients/teeny/TEENY.100 \
+	clients/teeny/TEENY.200 \
+	clients/teeny/TEENY.NEC \
+	clients/teeny/TEENY.M10
+TEENY_DOCS := \
+	clients/teeny/teenydoc.txt \
+	clients/teeny/hownec.do \
+	clients/teeny/TNYO10.TXT
+DSKMGR_INSTALLERS := \
+	clients/dskmgr/DSKMGR.100 \
+	clients/dskmgr/DSKMGR.200 \
+	clients/dskmgr/DSKMGR.K85 \
+	clients/dskmgr/DSKMGR.M10
+DSKMGR_DOCS := \
+	clients/dskmgr/DSKMGR.DOC
+TS-DOS_INSTALLERS := \
+	clients/ts-dos/TS-DOS.100 \
+	clients/ts-dos/TS-DOS.200 \
+	clients/ts-dos/TS-DOS.NEC
+TS-DOS_DOCS := \
+	clients/ts-dos/tsdos.pdf
+TINY_INSTALLERS := \
+	clients/tiny/TINY.100
+TINY_DOCS := \
+	clients/tiny/tindoc.do
+#POWR-D_INSTALLERS := \
+#	clients/power-dos/POWR-D.100
+#POWR-D_DOCS := \
+#	clients/power-dos/powr-d.txt
 
-CLIENT_APP_INSTALLERS = $(TEENY_INSTALLERS) $(TINY_INSTALLERS) $(TS-DOS_INSTALLERS) $(DSKMGR_INSTALLERS)
-CLIENT_APP_DOCS = $(TEENY_DOCS) $(TINY_DOCS) $(TS-DOS_DOCS) $(DSKMGR_DOCS)
+CLIENT_APP_INSTALLERS := $(TEENY_INSTALLERS) $(TINY_INSTALLERS) $(TS-DOS_INSTALLERS) $(DSKMGR_INSTALLERS)
+CLIENT_APP_DOCS := $(TEENY_DOCS) $(TINY_DOCS) $(TS-DOS_DOCS) $(DSKMGR_DOCS)
 
-DOCS = dl.do README.txt README.md LICENSE $(CLIENT_APP_DOCS)
-SOURCES = dl.c dir_list.c
+DOCS := dl.do README.txt README.md LICENSE $(CLIENT_APP_DOCS)
+SOURCES := dl.c dir_list.c
 
-DEFINES = \
+DEFINES := \
+	-DAPP_VERSION=$(APP_VERSION) \
 	-DAPP_LIB_DIR=$(APP_LIB_DIR) \
 	-DDEFAULT_CLIENT_TTY=$(DEFAULT_CLIENT_TTY) \
 	-DDEFAULT_CLIENT_APP=$(DEFAULT_CLIENT_APP) \
