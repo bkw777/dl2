@@ -21,28 +21,27 @@ MA 02111, USA.
 #ifndef DIR_LIST
 #define DIR_LIST
 
+#include <stdint.h>
+
 #define QUANTUM 10
 
 typedef unsigned LocalID;
 typedef unsigned char Char;
 typedef int Err;
-typedef unsigned short UInt16;
-typedef short int Int16;
-typedef unsigned UInt32;
 
 int file_list_init ();
 int file_list_cleanup();
    
-int add_file (Char *namep, UInt32 len, LocalID dbID);
+int add_file (Char *namep, u_int32_t len, LocalID dbID);
 void file_list_clear_all ();
-Char **get_str_table(UInt16 *lenp);
+Char **get_str_table(u_int16_t *lenp);
    
-Err get_first_file (Char *namep, UInt32 *lenp, LocalID *dbIDp);
-Err get_next_file (Char *namep, UInt32 *lenp, LocalID *dbIDp);
-Err get_prev_file (Char *namep, UInt32 *lenp, LocalID *dbIDp);
+Err get_first_file (Char *namep, u_int32_t *lenp, LocalID *dbIDp);
+Err get_next_file (Char *namep, u_int32_t *lenp, LocalID *dbIDp);
+Err get_prev_file (Char *namep, u_int32_t *lenp, LocalID *dbIDp);
 
-Err find_file (Char *find_namep, UInt32 *lenp, LocalID *dbIDp);
-Err addto_file_len (UInt32 len_delta);
+Err find_file (Char *find_namep, u_int32_t *lenp, LocalID *dbIDp);
+Err addto_file_len (u_int32_t len_delta);
 Err delete_file (LocalID dbID);
 Err rename_file (LocalID dbID, Char *namep);
 

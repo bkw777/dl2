@@ -17,7 +17,7 @@ Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 MA 02111, USA.
 */
 
-
+#include <stdint.h>
 #include <stdlib.h>
 #include <strings.h>
 #include <string.h>
@@ -28,18 +28,18 @@ MA 02111, USA.
 typedef struct
 {
    Char     name[12] ;  // file name
-   UInt32   len      ;  // length
+   u_int32_t len      ;  // length
    LocalID  dbID     ;  // database ID
 } FILE_ENTRY;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
-static UInt16 allocated;
-static UInt16 ndx;
-static Int16  cur; // current must be signed (get-prev)
+static u_int16_t allocated;
+static u_int16_t ndx;
+static int16_t  cur; // current must be signed (get-prev)
 static FILE_ENTRY *tblp = 0;
 
-static Err get_current_record (Char *namep, UInt32 *lenp, LocalID *dbIDp);
+static Err get_current_record (Char *namep, u_int32_t *lenp, LocalID *dbIDp);
 
 int file_list_init ()
 {
@@ -73,7 +73,7 @@ void file_list_clear_all ()
 }
    
 
-Err find_file (Char *find_namep, UInt32 *lenp, LocalID *dbIDp)
+Err find_file (Char *find_namep, u_int32_t *lenp, LocalID *dbIDp)
 {
 
    for (cur = 0; cur < ndx; cur++)
@@ -87,7 +87,7 @@ Err find_file (Char *find_namep, UInt32 *lenp, LocalID *dbIDp)
    return (-1);
 }
 
-Err addto_file_len (UInt32 len_delta)
+Err addto_file_len (u_int32_t len_delta)
 {
    tblp[cur].len += len_delta;
 
@@ -96,7 +96,7 @@ Err addto_file_len (UInt32 len_delta)
 
 Err delete_file (LocalID dbID)
 {
-   UInt16 i, j;
+   u_int16_t i, j;
    FILE_ENTRY *ep;
    Char **cpp;
    
@@ -126,7 +126,7 @@ Err delete_file (LocalID dbID)
 
 Err rename_file (LocalID dbID, Char *namep)
 {
-   UInt16 i;
+   u_int16_t i;
    FILE_ENTRY *ep;
 
    /** find the entry */
@@ -142,7 +142,7 @@ Err rename_file (LocalID dbID, Char *namep)
    return (0);
 }
 
-int add_file (Char *namep, UInt32 len, LocalID dbID)
+int add_file (Char *namep, u_int32_t len, LocalID dbID)
 {
    FILE_ENTRY *ep;
    Char **cpp;
@@ -182,7 +182,7 @@ int add_file (Char *namep, UInt32 len, LocalID dbID)
    return (0);
 }
 
-Char **get_str_table(UInt16 *lenp)
+Char **get_str_table(u_int16_t *lenp)
 {
    /** valchk */
    if (!tblp)
@@ -199,7 +199,7 @@ Char **get_str_table(UInt16 *lenp)
 }
 
 
-Err get_first_file (Char *namep, UInt32 *lenp, LocalID *dbIDp)
+Err get_first_file (Char *namep, u_int32_t *lenp, LocalID *dbIDp)
 {
    Err err;
 
@@ -210,7 +210,7 @@ Err get_first_file (Char *namep, UInt32 *lenp, LocalID *dbIDp)
    return (0);
 }
 
-Err get_next_file (Char *namep, UInt32 *lenp, LocalID *dbIDp)
+Err get_next_file (Char *namep, u_int32_t *lenp, LocalID *dbIDp)
 {
    Err err;
 
@@ -225,7 +225,7 @@ Err get_next_file (Char *namep, UInt32 *lenp, LocalID *dbIDp)
    return (0);
 }
    
-Err get_prev_file (Char *namep, UInt32 *lenp, LocalID *dbIDp)
+Err get_prev_file (Char *namep, u_int32_t *lenp, LocalID *dbIDp)
 {
    Err err;
 
@@ -241,7 +241,7 @@ Err get_prev_file (Char *namep, UInt32 *lenp, LocalID *dbIDp)
    return (0);
 }
 
-static Err get_current_record (Char *namep, UInt32 *lenp, LocalID *dbIDp)
+static Err get_current_record (Char *namep, u_int32_t *lenp, LocalID *dbIDp)
 {
     FILE_ENTRY *ep;
    
