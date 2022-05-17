@@ -1,3 +1,6 @@
+20220516
+ Added support for subdirectories
+
 20210222
  Increased default sleep between each byte in bootstrap to 6 ms
  Added -z=# to specify ms to sleep after sending each byte in bootstrap
