@@ -1,13 +1,13 @@
 /*
-DeskLink++
+DeskLink+
 Extensions and enhancements Copyright (C) 2005 John R. Hogerhuis
 Copyright (c) 2022 Gabriele Gorla
 
-DeskLink++ is free software; you can redistribute it and/or modify it
+DeskLink+ is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License version 2 or any
 later as version as published by the Free Software Foundation.  
 
-DeskLink++ is distributed in the hope that it will be useful, but
+DeskLink+ is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 General Public License for more details.
@@ -30,23 +30,21 @@ MA 02111, USA.
 #define DIR_FLAG 0x01
 
 
-//typedef unsigned LocalID;
-//typedef int Err;
-
 typedef struct
 {
-  char     tsname[12];  // ts-dos file name
-  char     ufname[FNAME_MAX];  // unix file name
-  u_int32_t len;        // length
-  u_int8_t  flags;
+	char     tsname[12];         // ts-dos file name
+	char     ufname[FNAME_MAX];  // unix file name
+	u_int32_t len;               // length
+	u_int8_t  flags;
 } FILE_ENTRY;
 
 
 int file_list_init ();
-int file_list_cleanup();
+int file_list_cleanup ();
 
-int add_file (FILE_ENTRY *nfe);
 void file_list_clear_all ();
+int  add_file (FILE_ENTRY *fe);
+
 
 FILE_ENTRY * find_file (char *tsname);
 FILE_ENTRY * get_first_file (void);

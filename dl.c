@@ -13,6 +13,9 @@ Extensions and enhancements Copyright (C) 2005 John R. Hogerhuis
 20191226 Brian K. White - repackaging, reorganizing, bootstrap function
          Kurt McCullum - TS-DOS loaders
 
+Copyright (c) 2022 Gabriele Gorla
+Add support for subdirectories, general cleanup.
+
 DeskLink+ is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License version 2 or any
 later as version as published by the Free Software Foundation.  
@@ -131,15 +134,10 @@ bool bootstrap_mode = false;
 // globals
 bool m1rec = false;
 
-unsigned file_len;
-
 int file = -1;
 int mode = 0;	/* 0=unopened, 1=Write, 3=Read, 2=Append */
 int client_fd = -1; // client tty file handle
-char filename[25];
 
-DIR *dir = NULL;
-char *dirname;
 char **args;
 struct termios origt;
 struct termios ti;
@@ -159,7 +157,7 @@ int send_installer(char *f);
 
 void print_usage()
 {
-	fprintf (stderr, "DeskLink+ " STRINGIFY(APP_VERSION) " usage:\n");
+	fprintf (stderr, "DeskLink++ " STRINGIFY(APP_VERSION) " usage:\n");
 	fprintf (stderr, "\n");
 	fprintf (stderr, "%s [tty_device] [options]\n",args[0]);
 	fprintf (stderr, "\n");
@@ -204,14 +202,13 @@ void print_usage()
 	fprintf (stderr, "   %s\n",args[0]);
 	fprintf (stderr, "   %s ttyUSB1 -p=~/Documents/wp2files -w -v\n",args[0]);
 	fprintf (stderr, "\n");
-
 }
 
 void cat(char *f)
 {
 	int h = -1;
 	char b[4097];
-
+	
 	if((h=open(f,O_RDONLY))<0)
 		return;
 	while(read(h,&b,4096)>0)
@@ -225,35 +222,35 @@ int bootstrap(char *f)
 	char installer_file[PATH_MAX]="";
 	char pre_install_txt_file[PATH_MAX]="";
 	char post_install_txt_file[PATH_MAX]="";
-
+	
 	if (f[0]=='~'&&f[1]=='/') {
 		strcpy(installer_file,getenv("HOME"));
 		strcat(installer_file,f+1);
 	}
-
+	
 	if ((f[0]=='/')||(f[0]=='.'&&f[1]=='/'))
 		strcpy(installer_file,f);
-
+	
 	if(installer_file[0]==0) {
 		strcpy(installer_file,STRINGIFY(APP_LIB_DIR));
 		strcat(installer_file,"/");
 		strcat(installer_file,f);
 	}
-
+	
 	strcpy(pre_install_txt_file,installer_file);
 	strcat(pre_install_txt_file,".pre-install.txt");
-
+	
 	strcpy(post_install_txt_file,installer_file);
 	strcat(post_install_txt_file,".post-install.txt");
-
+	
 	printf("Bootstrap: Installing %s\n", installer_file);
-
+	
 	if(access(installer_file,F_OK)==-1) {
 		if(debug)
 			fprintf(stderr, "Not found.\n");
 		return(1);
 	}
-
+	
 	if(access(pre_install_txt_file,F_OK)>=0) {
 		cat(pre_install_txt_file);
 	} else {
@@ -262,19 +259,19 @@ int bootstrap(char *f)
 		printf("\tRUN \"COM:9N81XN\"\t(for NEC)\n");
 		printf("\n");
 	}
-
+	
 	printf("Press [Enter] when ready...");
 	getchar();
-
+	
 	if ((r=send_installer(installer_file))!=0)
 		return(r);
-
+	
 	cat(post_install_txt_file);
-
+	
 	printf("\n\n\"%s -b\" will now exit.\n",args[0]);
 	printf("Re-run \"%s\" (without -b this time) to run the TPDD server.\n",args[0]);
 	printf("\n");
-
+	
 	return(0);
 }
 
@@ -292,20 +289,8 @@ unsigned char checksum(unsigned char *data)
 	unsigned short sum=0;
 	int len=data[1]+2;
 	int i;
-
+	
 	for(i=0;i<len;i++)
-		sum+=data[i];
-	return((sum & 0xFF) ^ 255);
-}
-
-unsigned char calc_sum(unsigned char type, unsigned char length, unsigned char *data)
-{
-	unsigned short sum=0;
-	int i;
-
-	sum+=type;
-	sum+=length;
-	for(i=0;i<length;i++)
 		sum+=data[i];
 	return((sum & 0xFF) ^ 255);
 }
@@ -338,67 +323,67 @@ int main(int argc, char **argv)
 		strcpy((char *)client_tty,"/dev/");
 		strcat((char *)client_tty,(char *)STRINGIFY(DEFAULT_CLIENT_TTY));
 	}
-
+	
 	for (arg = 1; arg < argc; arg++) {
 		switch (argv[arg][0]) {
-			case '/':
-				strcpy ((char *)client_tty, (char *)(argv[arg]));
+		case '/':
+			strcpy ((char *)client_tty, (char *)(argv[arg]));
+			break;
+		case '-':
+			switch (argv [arg][1]) {
+			case 0:
+				strcpy ((char *)client_tty,"/dev/tty");
+				client_fd = 1;
 				break;
-			case '-':
-				switch (argv [arg][1]) {
-					case 0:
-						strcpy ((char *)client_tty,"/dev/tty");
-						client_fd = 1;
-						break;
-					case 'g':
-						getty_mode = true;
-						break;
-					case 'u':
-						upcase = true;
-						break;
-					case 'c':
-						rtscts = true;
-						break;
-					case 'v':
-						debug = true;
-						break;
-					case 'p':
-						if (argv[arg][2] == '=')
-							(void)(chdir (argv[arg] + 3)+1);
-						break;
-					case 'w':
-						dot_offset = 8;
-						break;
-					case 'h':
-						print_usage();
-						exit(0);
-						break;
-					case 'b':
-						bootstrap_mode = true;
-						strcpy (bootstrap_file,STRINGIFY(DEFAULT_CLIENT_APP) "." STRINGIFY(DEFAULT_CLIENT_MODEL));
-						if (argv[arg][2] == '=')
-							strcpy (bootstrap_file,(char *)(argv[arg]+3));
-						break;
-					case 'z':
-						if (argv[arg][2] == '=')
-							bootstrap_byte_msec = atoi(argv[arg]+3);
-						break;
-					default:
-						fprintf(stderr, "Unknown option %s\n",argv[arg]);
-						print_usage();
-						exit(1);
-						break;
-					}
+			case 'g':
+				getty_mode = true;
+				break;
+			case 'u':
+				upcase = true;
+				break;
+			case 'c':
+				rtscts = true;
+				break;
+			case 'v':
+				debug = true;
+				break;
+			case 'p':
+				if (argv[arg][2] == '=')
+					(void)(chdir (argv[arg] + 3)+1);
+				break;
+			case 'w':
+				dot_offset = 8;
+				break;
+			case 'h':
+				print_usage();
+				exit(0);
+				break;
+			case 'b':
+				bootstrap_mode = true;
+				strcpy (bootstrap_file,STRINGIFY(DEFAULT_CLIENT_APP) "." STRINGIFY(DEFAULT_CLIENT_MODEL));
+				if (argv[arg][2] == '=')
+					strcpy (bootstrap_file,(char *)(argv[arg]+3));
+				break;
+			case 'z':
+				if (argv[arg][2] == '=')
+					bootstrap_byte_msec = atoi(argv[arg]+3);
 				break;
 			default:
-				strcpy((char *)client_tty,"/dev/");
-				strcat((char *)client_tty,(char *)(argv[arg]));
+				fprintf(stderr, "Unknown option %s\n",argv[arg]);
+				print_usage();
+				exit(1);
+				break;
+			}
+			break;
+		default:
+			strcpy((char *)client_tty,"/dev/");
+			strcat((char *)client_tty,(char *)(argv[arg]));
 		}
 	}
-
+	
 	if (getty_mode)
 		debug = 0;
-
+	
 	if (debug) {
 		fprintf (stderr, "DeskLink+ " STRINGIFY(APP_VERSION) "\n");
 		fprintf (stderr, "Using Serial Device: %s\n", client_tty);
@@ -409,14 +394,14 @@ int main(int argc, char **argv)
 			fprintf (stderr, "--------------------------------------------------------------------------------\n");
 		}
 	}
-
+	
 	if(client_fd<0)
 		client_fd=open((char *)client_tty,O_RDWR|O_NONBLOCK);
 	if(client_fd<0) {
 		fprintf (stderr,"Error: open(%s,...)=%d\n",client_tty,client_fd);
 		return(1);
 	}
-
+	
 	if(getty_mode) {
 		if(login_tty(client_fd)==0)
 			client_fd = STDIN_FILENO;
@@ -427,7 +412,7 @@ int main(int argc, char **argv)
 	(void)(tcflush(client_fd, TCIOFLUSH)+1);	/* clear out the crap */
 	ioctl(client_fd, FIONBIO, &off);	/* turn off non-blocking mode */
 	ioctl(client_fd, FIOASYNC, &off);	/* ditto for async mode */
-
+	
 	if(tcgetattr(client_fd,&ti)==-1)
 		return(1);
 	cfmakeraw(&ti);
@@ -461,12 +446,12 @@ int main(int argc, char **argv)
 	} else {
 		origt.c_cflag &= ~CRTSCTS;
 	}
-
+	
 	cfsetspeed(&origt,client_baud);
-
+	
 	if(bootstrap_mode)
 		exit(bootstrap(bootstrap_file));
-
+	
 	while(1)
 		be_disk();
 
@@ -483,225 +468,220 @@ int out_dirent (FILE_ENTRY *ep)
 	bzero(buf,31);
 	buf[0]=0x11;
 	buf[1]=0x1C;
-
-
+	
 	if (debug) fprintf (stderr, "out_dirent: %s\n", ep->tsname);
 	
 	/* format the filename */
 	if (ep && ep->tsname) {
-
+		
 		buf[26] = 'F';
 		size = htons (ep->len);
 		memcpy (buf + 27, &size, 2);
 		memset (buf + 2, ' ', 24);
-
+		
 		for(i=0;i<dot_offset+3;i++)
-		  buf[i+2]=(ep->tsname[i])?ep->tsname[i]:' ';
+			buf[i+2]=(ep->tsname[i])?ep->tsname[i]:' ';
 		//memcpy (buf + 2, ep->tsname, dot_offset+2);
-
+		
 		//		if (debug) fprintf (stderr, "str   : %24.24s\n", (char *)buf + 2);
 	}
-
+	
 	buf[29]=FREE_BLOCKS;
 	/* add checksum */
 	buf[30] = checksum (buf);
-
+	
 	/* write packet */
 	return (my_write (client_fd,buf,31) == 31);
 }
 
 FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 {
-  static FILE_ENTRY f;
-  int i;
-
-     /** fill the entry */
-  strncpy (f.ufname, namep, sizeof (f.ufname) - 1);
-  
-  for(i=0;i<12;i++) f.tsname[i]=' ';
-  
-   f.len = len;
-
-   
-   // fix the filename
-   for(i=strlen(namep);i>0;i--)
-     if(namep[i]=='.') break;
-
-
-   if(flags&DIR_FLAG) {
-       // directory
-       f.tsname[dot_offset+1]='<';
-       f.tsname[dot_offset+2]='>';
-       f.len=0;
-   } else {
-     if(i>0) {
-       // found an extension
-       // for the time being just copy
-       f.tsname[dot_offset+1]=toupper(namep[i+1]);
-       f.tsname[dot_offset+2]=toupper(namep[i+2]);
-     } else {
-       // no extension - default to .DO
-       f.tsname[dot_offset+1]='D';
-       f.tsname[dot_offset+2]='O';
-     }
-   }
-
-   if(f.ufname[0]=='.' && f.ufname[1]=='.') {
-     memcpy (f.tsname, "PARENT", 6);
-   } else {
-     for(i=0;i<dot_offset && i<strlen(namep) && namep[i]; i++) {
-       if(namep[i]=='.') break;
-       f.tsname[i]=namep[i];
-     }
-   }
-
-   f.tsname[dot_offset]='.';
-   f.tsname[dot_offset+3]=0;
-
-   if(upcase) for(i=0;i<12;i++) f.tsname[i]=toupper(f.tsname[i]);
-   
-   f.flags=flags;
-
-   fprintf(stderr,"unix file: %s ts-dos: %s  len:%d\n",f.ufname, f.tsname, f.len);
-
-  return &f;
+	static FILE_ENTRY f;
+	int i;
+	
+	/** fill the entry */
+	strncpy (f.ufname, namep, sizeof (f.ufname) - 1);
+	
+	for(i=0;i<12;i++) f.tsname[i]=' ';
+	
+	f.len = len;
+	
+	// fix the filename
+	for(i=strlen(namep);i>0;i--)
+		if(namep[i]=='.') break;
+	
+	if(flags&DIR_FLAG) {
+		// directory
+		f.tsname[dot_offset+1]='<';
+		f.tsname[dot_offset+2]='>';
+		f.len=0;
+	} else {
+		if(i>0) {
+			// found an extension
+			// for the time being just copy
+			f.tsname[dot_offset+1]=toupper(namep[i+1]);
+			f.tsname[dot_offset+2]=toupper(namep[i+2]);
+		} else {
+			// no extension - default to .DO
+			f.tsname[dot_offset+1]='D';
+			f.tsname[dot_offset+2]='O';
+		}
+	}
+	
+	if(f.ufname[0]=='.' && f.ufname[1]=='.') {
+		memcpy (f.tsname, "PARENT", 6);
+	} else {
+		for(i=0;i<dot_offset && i<strlen(namep) && namep[i]; i++) {
+			if(namep[i]=='.') break;
+			f.tsname[i]=namep[i];
+		}
+	}
+	
+	f.tsname[dot_offset]='.';
+	f.tsname[dot_offset+3]=0;
+	
+	if(upcase) for(i=0;i<12;i++) f.tsname[i]=toupper(f.tsname[i]);
+	
+	f.flags=flags;
+	
+	fprintf(stderr,"unix file: %s ts-dos: %s  len:%d\n",f.ufname, f.tsname, f.len);
+	
+	return &f;
 }
 
-int read_next_dirent(struct stat *st)
+int read_next_dirent(DIR *dir)
 {
-  int flags;
-  struct dirent *dire;
-  
-  if (dir == NULL) {
+	struct stat st;
+	struct dirent *dire;
+	int flags;
+	
+	
+	if (dir == NULL) {
 		printf ("%s:%u\n", __FUNCTION__, __LINE__);
 		dire=NULL;
 		normal_return (0x70);
 		return(0);
 	}
-
+	
 	while((dire=readdir(dir)) != NULL) {
-	  flags=0;
-
-		if(stat(dire->d_name,st)) {
+		flags=0;
+		
+		if(stat(dire->d_name,&st)) {
 			normal_return(0x31);
 			return 0;
 		}
-
-		if (S_ISDIR(st->st_mode)) flags=DIR_FLAG;
-		else if (!S_ISREG (st->st_mode))
+		
+		if (S_ISDIR(st.st_mode)) flags=DIR_FLAG;
+		else if (!S_ISREG (st.st_mode))
 		        continue;
 		
 		if(dire->d_name[0]=='.') continue; // skip "." ".." and hidden files
 		if(dire->d_name[0]=='#') continue; // skip "#"
-
+		
 		if(strlen(dire->d_name)>FNAME_MAX) continue; // skip long filenames
 		
-		//		if(S_ISDIR(st->st_mode)) {
-		//
-		//		}
-		
 		/* add file to list so we can traverse any order */
-		add_file (make_file_entry(dire->d_name, st->st_size, flags));
-
-		//		if (debug)
-		//	fprintf (stderr, "added file %s len %ld\n", dire->d_name, st->st_size);
-
+		add_file (make_file_entry(dire->d_name, st.st_size, flags));
+		
 		break;
 	}
-
+	
 	if (dire == NULL)
 		return 0;
-
+	
 	return 1;
 }
 
 char *ts2unix(char *fname)
 {
-  int i;
-  for(i=dot_offset;i>1;i--)
-    if(fname[i-1]!=' ') break;
-
-  if(fname[dot_offset+1]=='<' && fname[dot_offset+2]=='>') {
-    fname[i]=0;
-  } else {
-    fname[i]=fname[dot_offset];
-    fname[i+1]=fname[dot_offset+1];
-    fname[i+2]=fname[dot_offset+2];
-    fname[i+3]=0;
-  }
-  return fname;
+	int i;
+	for(i=dot_offset;i>1;i--)
+		if(fname[i-1]!=' ') break;
+	
+	if(fname[dot_offset+1]=='<' && fname[dot_offset+2]=='>') {
+		fname[i]=0;
+	} else {
+		fname[i]=fname[dot_offset];
+		fname[i+1]=fname[dot_offset+1];
+		fname[i+2]=fname[dot_offset+2];
+		fname[i+3]=0;
+	}
+	return fname;
 }
 
 
 void list_dir()
 {
-  struct stat st;
-
-  if (dir!=NULL)
-    closedir(dir);
-  
-  dir=opendir(".");
-  /** rebuild the file list */
-  file_list_clear_all();
-  //  fname_ndx = 0;
-  if(dir_depth) add_file (make_file_entry("..", 0, DIR_FLAG));
-  while (read_next_dirent (&st));
+	DIR * dir;
+	
+	//  if (dir!=NULL)
+	//    closedir(dir);
+	
+	dir=opendir(".");
+	/** rebuild the file list */
+	file_list_clear_all();
+	//  fname_ndx = 0;
+	if(dir_depth) add_file (make_file_entry("..", 0, DIR_FLAG));
+	while (read_next_dirent (dir));
+	
+	closedir(dir);
 }
 
 
-int directory(unsigned char *data)
+int ts_dir_ref(unsigned char *data)
 {
 	char *p;
-
+	char filename[25];
+	
 	switch (data[29]) {
-		case 0x00:	/* Pick file for open/delete */
-		  	fprintf (stderr, "Directory req: %02x (pick file)\n", data[29]);
-			strncpy(filename,(char *)data+4,24);
-			filename[24]=0;
-			//if (debug)
-			fprintf (stderr, "Request: %s\n", filename);
-			/* Remove trailing spaces */
-			for(p = strrchr(filename,' '); p >= filename && *p == ' '; p--)
-				*p = 0;
-			cur_file=find_file(filename);
-			if(cur_file) { 
-			  fprintf (stderr, "Found: %s  server: %s  len:%d\n", cur_file->tsname, cur_file->ufname, cur_file->len);
-			  out_dirent(cur_file);
- 
-
-			} else {
-			  //	  strncpy(cur_file->tsname, filename, 12);
-			  fprintf (stderr, "Can't find: %s\n", filename);
-			  out_dirent(NULL);
-			  //			  empty_dirent();
-			  if(filename[dot_offset+1]=='<' && filename[dot_offset+2]=='>') {
-			    cur_file=make_file_entry(ts2unix(filename), 0, DIR_FLAG);
-			  } else {
-			    cur_file=make_file_entry(ts2unix(filename), 0, 0);
-			  }
-			}
+	case 0x00:	/* Pick file for open/delete */
+		fprintf (stderr, "Directory req: %02x (pick file)\n", data[29]);
+		strncpy(filename,(char *)data+4,24);
+		filename[24]=0;
+		//if (debug)
+		fprintf (stderr, "Request: %s\n", filename);
+		/* Remove trailing spaces */
+		for(p = strrchr(filename,' '); p >= filename && *p == ' '; p--)
+			*p = 0;
+		cur_file=find_file(filename);
+		if(cur_file) { 
+			fprintf (stderr, "Found: %s  server: %s  len:%d\n", cur_file->tsname, cur_file->ufname, cur_file->len);
+			out_dirent(cur_file);
 			
-			break;
-		case 0x01:	/* "first" directory block */
-		  fprintf (stderr, "Directory req: %02x (first entry)\n", data[29]);
-		  list_dir();
-			/** send the file name */
-			out_dirent(get_first_file());
-			break;
-		case 0x02:	/* "next" directory block */
-		  		  	fprintf (stderr, "Directory req: %02x (next entry)\n", data[29]);
-		        out_dirent(get_next_file());
-			break;
-		case 0x03:	/* "previous" directory block */
-		  		  	fprintf (stderr, "Directory req: %02x (prev file)\n", data[29]);
-		        out_dirent(get_prev_file());
-			break;
-		case 0x04:	/* end directory reference */
-		  		  	fprintf (stderr, "Directory req: %02x (close dir)\n", data[29]);
-			closedir(dir);
-			//	file_list_clear_all ();
-			dir=NULL;
-			break;
+			
+		} else {
+			//	  strncpy(cur_file->tsname, filename, 12);
+			fprintf (stderr, "Can't find: %s\n", filename);
+			out_dirent(NULL);
+			//			  empty_dirent();
+			if(filename[dot_offset+1]=='<' && filename[dot_offset+2]=='>') {
+				cur_file=make_file_entry(ts2unix(filename), 0, DIR_FLAG);
+			} else {
+				cur_file=make_file_entry(ts2unix(filename), 0, 0);
+			}
+		}
+		
+		break;
+	case 0x01:	/* "first" directory block */
+		fprintf (stderr, "Directory req: %02x (first entry)\n", data[29]);
+		list_dir();
+		/** send the file name */
+		out_dirent(get_first_file());
+		break;
+	case 0x02:	/* "next" directory block */
+		fprintf (stderr, "Directory req: %02x (next entry)\n", data[29]);
+		out_dirent(get_next_file());
+		break;
+	case 0x03:	/* "previous" directory block */
+		fprintf (stderr, "Directory req: %02x (prev file)\n", data[29]);
+		out_dirent(get_prev_file());
+		break;
+	case 0x04:	/* end directory reference */
+		fprintf (stderr, "Directory req: %02x (close dir)\n", data[29]);
+		//	closedir(dir);
+		//	file_list_clear_all ();
+		//			dir=NULL;
+		break;
 	}
 	return 0;
 }
@@ -709,139 +689,138 @@ int directory(unsigned char *data)
 static unsigned char dir_msg[14];
 void update_dirname()
 {
-  if(dir_depth) {
-    char dirbuf[1024];
-    int i,j;
-    
-    if(getcwd(dirbuf, 1024) ) {
-      memset(dir_msg,' ',sizeof(dir_msg));
-
-      //      fprintf(stderr, "update dir = %s\n", dirbuf);
-      for(i=strlen(dirbuf); i>=0 ; i--)
-	if(dirbuf[i]=='/') break;
-
-      //      fprintf(stderr, "update dir = %s\n", dirbuf+i);
-      for(j=0; j<6 && dirbuf[i+j+1] && dirbuf[i+j+1]!='.'; j++)
-	dir_msg[3+j]=dirbuf[i+j+1];
-      
-
-      dir_msg[0]=0x12;
-      dir_msg[1]=0x0b;
-      dir_msg[2]=0x00;
-      dir_msg[9]='.';
-      dir_msg[10]='<';
-      dir_msg[11]='>';
-      //    dir_msg[12]=' ';
-      dir_msg[13]=checksum(dir_msg);
-    }
-  }
-  
+	if(dir_depth) {
+		char dirbuf[1024];
+		int i,j;
+		
+		if(getcwd(dirbuf, 1024) ) {
+			memset(dir_msg,' ',sizeof(dir_msg));
+			
+			//      fprintf(stderr, "update dir = %s\n", dirbuf);
+			for(i=strlen(dirbuf); i>=0 ; i--)
+				if(dirbuf[i]=='/') break;
+			
+			//      fprintf(stderr, "update dir = %s\n", dirbuf+i);
+			for(j=0; j<6 && dirbuf[i+j+1] && dirbuf[i+j+1]!='.'; j++)
+				dir_msg[3+j]=dirbuf[i+j+1];
+			
+			
+			dir_msg[0]=0x12;
+			dir_msg[1]=0x0b;
+			dir_msg[2]=0x00;
+			dir_msg[9]='.';
+			dir_msg[10]='<';
+			dir_msg[11]='>';
+			//    dir_msg[12]=' ';
+			dir_msg[13]=checksum(dir_msg);
+		}
+	}
+	
 }
 
 void send_current_path()
 {
-  static unsigned char root[] = {0x12, 0x0b, 0x00, 0x52, 0x4f, 0x4f, 0x54, 0x20, 0x20, 0x2e, 0x3c, 0x3e, 0x20, 0x96};
-
-  fprintf(stderr, "dir depth = %d\n",dir_depth);
-  if(dir_depth==0) 
-    my_write (client_fd, root, sizeof (root));
-  else
-    my_write (client_fd, dir_msg, sizeof (dir_msg));
+	static unsigned char root[] = {0x12, 0x0b, 0x00, 0x52, 0x4f, 0x4f, 0x54, 0x20, 0x20, 0x2e, 0x3c, 0x3e, 0x20, 0x96};
+	
+	//  fprintf(stderr, "dir depth = %d\n",dir_depth);
+	if(dir_depth==0) 
+		my_write (client_fd, root, sizeof (root));
+	else
+		my_write (client_fd, dir_msg, sizeof (dir_msg));
 }
 
 
 
-int open_file(unsigned char *data)
+int ts_open(unsigned char *data)
 {
 	//if(debug) fprintf (stderr, "open_file() mode:%d filename:%s dire->d_name:%s\n", omode,filename,dire->d_name);
-  unsigned char omode = data[4];
-  
+	unsigned char omode = data[4];
+	
 	switch(omode) {
-		case 0x01:	/* New file for my_write */
-		  fprintf (stderr, "open mode: %02x (write)\n", omode);
-			if (file >= 0) {
-				close(file);
-				file=-1;
-			}
-			//file = open (ts2unix((char *) filename),O_CREAT|O_TRUNC|O_WRONLY|O_EXCL,0666);
-			if(cur_file->flags&DIR_FLAG) {
-			  if(mkdir(cur_file->ufname,0775)==0) {
-			    normal_return(ST_OK);
-			  } else {
-			    normal_return(ST_OPEN_FRMT_MISMATCH);
-			  }
+	case 0x01:	/* New file for my_write */
+		fprintf (stderr, "open mode: %02x (write)\n", omode);
+		if (file >= 0) {
+			close(file);
+			file=-1;
+		}
+		if(cur_file->flags&DIR_FLAG) {
+			if(mkdir(cur_file->ufname,0775)==0) {
+				normal_return(ST_OK);
 			} else {
-			  file = open (cur_file->ufname,O_CREAT|O_TRUNC|O_WRONLY|O_EXCL,0666);
-			  if(file<0)
-			    normal_return(ST_OPEN_FRMT_MISMATCH);
-			  else {
-			    mode=omode;
-			    normal_return(ST_OK);
-			  }
+				normal_return(ST_OPEN_FRMT_MISMATCH);
 			}
-			break;
-		case 0x02:	/* existing file for append */
-		  		  fprintf (stderr, "open mode: %02x (append)\n", omode);
-			if (file >= 0) {
-				close(file);
-				file=-1;
-			}
-			if(cur_file==0) {
-			  normal_return(ST_OPEN_FRMT_MISMATCH);
-			  return -1;
-			}
-			file = open (cur_file->ufname, O_WRONLY | O_APPEND);
-			if (file < 0)
-			  normal_return(ST_OPEN_FRMT_MISMATCH);
+		} else {
+			file = open (cur_file->ufname,O_CREAT|O_TRUNC|O_WRONLY|O_EXCL,0666);
+			if(file<0)
+				normal_return(ST_OPEN_FRMT_MISMATCH);
 			else {
 				mode=omode;
+				normal_return(ST_OK);
+			}
+		}
+		break;
+	case 0x02:	/* existing file for append */
+		fprintf (stderr, "open mode: %02x (append)\n", omode);
+		if (file >= 0) {
+			close(file);
+			file=-1;
+		}
+		if(cur_file==0) {
+			normal_return(ST_OPEN_FRMT_MISMATCH);
+			return -1;
+		}
+		file = open (cur_file->ufname, O_WRONLY | O_APPEND);
+		if (file < 0)
+			normal_return(ST_OPEN_FRMT_MISMATCH);
+		else {
+			mode=omode;
+			normal_return (ST_OK);
+		}
+		break;
+	case 0x03:	/* Existing file for read */
+		fprintf (stderr, "open mode: %02x (read)\n", omode);
+		if (file >= 0) {
+			close (file);
+			file=-1;
+		}
+		if(cur_file==0) {
+			normal_return(ST_FILE_DOES_NOT_EXIST);
+			return -1;
+		}
+		
+		if(cur_file->flags&DIR_FLAG) {
+			int err=0;
+			// directory
+			if(cur_file->ufname[0]=='.' && cur_file->ufname[1]=='.') {
+				// parent dir
+				if(dir_depth>0) {
+					err=chdir(cur_file->ufname);
+					if(!err) dir_depth--;
+				}
+			} else {
+				// enter dir
+				err=chdir(cur_file->ufname);
+				dir_depth++;
+			}
+			update_dirname();
+			if(err) normal_return(0x37);
+			else normal_return (ST_OK);
+		} else {
+			// regular file
+			file = open (cur_file->ufname, O_RDONLY);
+			if(file<0)
+				normal_return(ST_FILE_DOES_NOT_EXIST);
+			else {
+				mode = omode;
 				normal_return (ST_OK);
 			}
-			break;
-		case 0x03:	/* Existing file for read */
-		        fprintf (stderr, "open mode: %02x (read)\n", omode);
-			if (file >= 0) {
-				close (file);
-				file=-1;
-			}
-			if(cur_file==0) {
-			  normal_return(ST_FILE_DOES_NOT_EXIST);
-			  return -1;
-			}
-
-			if(cur_file->flags&DIR_FLAG) {
-			  int err=0;
-			  // directory
-			  if(cur_file->ufname[0]=='.' && cur_file->ufname[1]=='.') {
-			    // parent dir
-			    if(dir_depth>0) {
-			      err=chdir(cur_file->ufname);
-			      if(!err) dir_depth--;
-			    }
-			  } else {
-			    // enter dir
-			    err=chdir(cur_file->ufname);
-			    dir_depth++;
-			  }
-			  update_dirname();
-			  if(err) normal_return(0x37);
-			  else normal_return (ST_OK);
-			} else {
-			  // regular file
-			  file = open (cur_file->ufname, O_RDONLY);
-			  if(file<0)
-			    normal_return(ST_FILE_DOES_NOT_EXIST);
-			  else {
-			    mode = omode;
-			    normal_return (ST_OK);
-			  }
-			}
-			break;
+		}
+		break;
 	}
 	return (file);
 }
 
-void read_file(void)
+void ts_read(void)
 {
 	int in;
 
@@ -880,12 +859,12 @@ void respond_mystery2()
 }
 #endif
 
-void renamefile(unsigned char *data)
+void ts_rename(unsigned char *data)
 {
-  char *new_name = (char *)data + 4;
-
+	char *new_name = (char *)data + 4;
+	
 	new_name[24]=0;
-
+	
 	if(rename (cur_file->ufname, ts2unix(new_name)))
 		normal_return(0x4A);
 	else
@@ -896,15 +875,14 @@ int readbytes(int handle, void *buf, int max)
 {
 	int r = 0;
 	int rval;
-	unsigned i;
-
+	
 	while (r < max) {
 		rval = read (client_fd, buf + r, 1);
 		if (rval < 0)
 			continue;
 		r += rval;
 	}
-
+	
 	return (r);
 }
 
@@ -956,10 +934,10 @@ int send_installer(char *f)
 void out_buf(unsigned char *bufp, unsigned len)
 {
 	unsigned i,j,k;
-
+	
 	if (!debug)
 		return;
-
+	
 	for (i = 0; i < len;) {
 		for (j = 0; j < 2; j++) {
 			for (k = 0; i < len && k < 8; k++, i++)
@@ -972,168 +950,167 @@ void out_buf(unsigned char *bufp, unsigned len)
 
 void process_Z_cmd(unsigned char *data)
 {
-
-  if(checksum(data+2)!=data[data[3]+4]) {
-    if(debug) {
-      fprintf(stderr, "BAD CHECKSUM!\n");
-      fprintf(stderr, "Packet checksum: %02X  My checksum: %02X\n", data[data[3]+4], checksum(data+2));
-    }
-    normal_return(ST_PARAMETER_ERROR); //  should this be CRC error?
-    return;
-  }
-
+	if(checksum(data+2)!=data[data[3]+4]) {
+		if(debug) {
+			fprintf(stderr, "BAD CHECKSUM!\n");
+			fprintf(stderr, "Packet checksum: %02X  My checksum: %02X\n", data[data[3]+4], checksum(data+2));
+		}
+		normal_return(ST_PARAMETER_ERROR); //  should this be CRC error?
+		return;
+	}
+	
 	switch(data[2]) {
-		case 0x00:	/* Directory ref */
-			directory(data);
+	case 0x00:	/* Directory ref */
+		ts_dir_ref(data);
+		break;
+	case 0x01:	/* Open file */
+		fprintf(stderr,"open()\n");
+		ts_open(data);
+		break;
+	case 0x02:	/* Close file */
+		fprintf(stderr,"close()\n");
+		if(file>=0)
+			close(file);
+		file = -1;
+		normal_return(ST_OK);
+		break;
+	case 0x03:	/* Read */
+		fprintf(stderr,"read()\n");
+		ts_read();
+		//			fprintf(stderr,"read_file end\n");
+		break;
+	case 0x04:	/* Write */
+		fprintf(stderr,"write()\n");
+		if(file<0) {
+			normal_return(ST_NO_FILENAME);
 			break;
-		case 0x01:	/* Open file */
-		  fprintf(stderr,"open()\n");
-			open_file(data);
+		}
+		if(mode!=1 && mode !=2) {
+			normal_return(ST_OPEN_FRMT_MISMATCH);
 			break;
-		case 0x02:	/* Close file */
-		  fprintf(stderr,"close()\n");
-		  if(file>=0)
-				close(file);
-		  file = -1;
+		}
+		//				if(my_write(file,data+4,data[3])!=data[3])
+		if(write(file,data+4,data[3])!=data[3])
+			normal_return(0x4a);
+		else
 			normal_return(ST_OK);
-			break;
-		case 0x03:	/* Read */
-		  		  fprintf(stderr,"read()\n");
-			read_file();
-			//			fprintf(stderr,"read_file end\n");
-			break;
-		case 0x04:	/* Write */
-		  		  fprintf(stderr,"write()\n");
-			if(file<0) {
-				normal_return(ST_NO_FILENAME);
-				break;
-			}
-			if(mode!=1 && mode !=2) {
-				normal_return(ST_OPEN_FRMT_MISMATCH);
-				break;
-			}
-			//				if(my_write(file,data+4,data[3])!=data[3])
-			if(write(file,data+4,data[3])!=data[3])
-					normal_return(0x4a);
-				else
-				normal_return(ST_OK);
-				break;
-		case 0x05:	/* Delete */
-		  fprintf(stderr,"delete()\n");
-		  if(cur_file->flags&DIR_FLAG)
-		    rmdir(cur_file->ufname);
-		  else 
-		    unlink (cur_file->ufname);
-		  list_dir();
-		  normal_return(0x00);
-		  break;
-		case 0x06:	/* Format disk */
-			normal_return(ST_OK);
-			break;
-		case 0x07:	/* Drive Status */
-			normal_return(ST_OK);
-			break;
-		case 0x08:	/* TS-DOS DME Request */
-		  		  fprintf(stderr,"DME()\n");
-		  // chage to FDC mode (?)
-			send_current_path();
-			break;
-		case 0x0C:	/* Condition */
-			normal_return(ST_OK);
-			break;
-		case 0x0D:	/* Rename File */
-		  		  fprintf(stderr,"rename()\n");
-		        renamefile(data);
-			list_dir();
-			break;
-			#if 0
-		case 0x23:  /* TS-DOS mystery command 2 */
-			respond_mystery2();
-			break;
-		case 0x31:  /* TS-DOS mystery command 1 */
-			respond_mystery();
-			break;
-			#endif
+		break;
+	case 0x05:	/* Delete */
+		fprintf(stderr,"delete()\n");
+		if(cur_file->flags&DIR_FLAG)
+			rmdir(cur_file->ufname);
+		else 
+			unlink (cur_file->ufname);
+		list_dir();
+		normal_return(0x00);
+		break;
+	case 0x06:	/* Format disk */
+		normal_return(ST_OK);
+		break;
+	case 0x07:	/* Drive Status */
+		normal_return(ST_OK);
+		break;
+	case 0x08:	/* TS-DOS DME Request */
+		fprintf(stderr,"DME()\n");
+		// chage to FDC mode (?)
+		send_current_path();
+		break;
+	case 0x0C:	/* Condition */
+		normal_return(ST_OK);
+		break;
+	case 0x0D:	/* Rename File */
+		fprintf(stderr,"rename()\n");
+		ts_rename(data);
+		list_dir();
+		break;
+#if 0
+	case 0x23:  /* TS-DOS mystery command 2 */
+		respond_mystery2();
+		break;
+	case 0x31:  /* TS-DOS mystery command 1 */
+		respond_mystery();
+		break;
+#endif
 	default:
-			return;
-			break;
+		return;
+		break;
 	}
 	if(data[2]!=0x07 && data[2]!=0x08)
-	  m1rec=0;
-
+		m1rec=0;
+	
 	return;
 }
 
 int be_disk(void)
 {
-       unsigned char read_buf[131];
-       unsigned len;
-       unsigned char recv;
-  
-       unsigned cmd_len;
-       unsigned pos;
-  
-       fprintf(stderr,"be_disk\n");
-       pos=0;
-       cmd_len=0;
-  
-       while(1) {
+	unsigned char read_buf[131];
+	unsigned len;
+	unsigned char recv;
+	
+	unsigned cmd_len;
+	unsigned pos;
+	
+	fprintf(stderr,"be_disk\n");
+	pos=0;
+	cmd_len=0;
+	
+	while(1) {
     
-         do {
-	    len=read (client_fd, &recv, 1);
-	  } while (len!=1);
-	  
-	  //	fprintf(stderr,"pos:%d %02x:%c\n",pos,recv,recv);
-	  
-	  if(pos==0) {
-	    switch(recv) {
-	    case 'Z':
-	      cmd_len=4;
-	      read_buf[pos++]=recv;
-	      break;
-	    case 'R':
-	      cmd_len=7;
-	      read_buf[pos++]=recv;
-	      break;
-	    case 'M':
-	      cmd_len=2;
-	      read_buf[pos++]=recv;
-	      break;
-	    case '\r':
-	      // send feedback?
-	      //	      	normal_return(0x00);
-	      break;
-	    default:
-	      break;
-	    }
-	  } else { // not first char
-	    read_buf[pos++]=recv;
-	    if(pos>=cmd_len) {
-	      if(read_buf[0]=='Z' && cmd_len ==4) {
-		cmd_len=read_buf[3]+5;
-	      } else {
-		if (debug) {
-		  fprintf (stderr, "RECV: ");
-		  out_buf (read_buf, cmd_len);
-		}
+		do {
+			len=read (client_fd, &recv, 1);
+		} while (len!=1);
 		
-		// cmd end
-		switch(read_buf[0]) {
-		case 'Z':
-		  process_Z_cmd(read_buf);
-		  break;
-		case 'M':
-		  m1rec=true;
-		  break;
-		case 'R':
-		  break;
+		//	fprintf(stderr,"pos:%d %02x:%c\n",pos,recv,recv);
+		
+		if(pos==0) {
+			switch(recv) {
+			case 'Z':
+				cmd_len=4;
+				read_buf[pos++]=recv;
+				break;
+			case 'R':
+				cmd_len=7;
+				read_buf[pos++]=recv;
+				break;
+			case 'M':
+				cmd_len=2;
+				read_buf[pos++]=recv;
+				break;
+			case '\r':
+				// send feedback?
+				//	      	normal_return(0x00);
+				break;
+			default:
+				break;
+			}
+		} else { // not first char
+			read_buf[pos++]=recv;
+			if(pos>=cmd_len) {
+				if(read_buf[0]=='Z' && cmd_len ==4) {
+					cmd_len=read_buf[3]+5;
+				} else {
+					if (debug) {
+						fprintf (stderr, "RECV: ");
+						out_buf (read_buf, cmd_len);
+					}
+					
+					// cmd end
+					switch(read_buf[0]) {
+					case 'Z':
+						process_Z_cmd(read_buf);
+						break;
+					case 'M':
+						m1rec=true;
+						break;
+					case 'R':
+						break;
+					}
+					// send response
+					cmd_len = 0;
+					pos = 0;
+				}
+			}
 		}
-		// send response
-		cmd_len = 0;
-		pos = 0;
-	      }
-	    }
-	  }
 	}
 	return 0;
 }
