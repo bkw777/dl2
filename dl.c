@@ -254,7 +254,7 @@ unsigned char calc_sum(unsigned char type, unsigned char length, unsigned char *
 	sum+=length;
 	for(i=0;i<length;i++)
 		sum+=data[i];
-	return((sum & 0xFF) ^ 255);
+	return((sum & 0xFF) ^ 0xFF);
 }
 
 void normal_return(unsigned char type) {
