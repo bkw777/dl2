@@ -157,7 +157,7 @@ int send_installer(char *f);
 
 void print_usage()
 {
-	fprintf (stderr, "DeskLink++ " STRINGIFY(APP_VERSION) " usage:\n");
+	fprintf (stderr, "DeskLink+ " STRINGIFY(APP_VERSION) " usage:\n");
 	fprintf (stderr, "\n");
 	fprintf (stderr, "%s [tty_device] [options]\n",args[0]);
 	fprintf (stderr, "\n");
@@ -610,17 +610,13 @@ char *ts2unix(char *fname)
 }
 
 
-void list_dir()
+void update_file_list()
 {
 	DIR * dir;
-	
-	//  if (dir!=NULL)
-	//    closedir(dir);
 	
 	dir=opendir(".");
 	/** rebuild the file list */
 	file_list_clear_all();
-	//  fname_ndx = 0;
 	if(dir_depth) add_file (make_file_entry("..", 0, DIR_FLAG));
 	while (read_next_dirent (dir));
 	
@@ -663,24 +659,22 @@ int ts_dir_ref(unsigned char *data)
 		
 		break;
 	case 0x01:	/* "first" directory block */
-		fprintf (stderr, "Directory req: %02x (first entry)\n", data[29]);
-		list_dir();
+		// fprintf (stderr, "Directory req: %02x (first entry)\n", data[29]);
+		update_file_list();
 		/** send the file name */
 		out_dirent(get_first_file());
 		break;
 	case 0x02:	/* "next" directory block */
-		fprintf (stderr, "Directory req: %02x (next entry)\n", data[29]);
+		// fprintf (stderr, "Directory req: %02x (next entry)\n", data[29]);
 		out_dirent(get_next_file());
 		break;
 	case 0x03:	/* "previous" directory block */
-		fprintf (stderr, "Directory req: %02x (prev file)\n", data[29]);
+		// fprintf (stderr, "Directory req: %02x (prev file)\n", data[29]);
 		out_dirent(get_prev_file());
 		break;
 	case 0x04:	/* end directory reference */
-		fprintf (stderr, "Directory req: %02x (close dir)\n", data[29]);
-		//	closedir(dir);
+		// fprintf (stderr, "Directory req: %02x (close dir)\n", data[29]);
 		//	file_list_clear_all ();
-		//			dir=NULL;
 		break;
 	}
 	return 0;
@@ -740,7 +734,7 @@ int ts_open(unsigned char *data)
 	case 0x01:	/* New file for my_write */
 		fprintf (stderr, "open mode: %02x (write)\n", omode);
 		if (file >= 0) {
-			close(file);
+			close (file);
 			file=-1;
 		}
 		if(cur_file->flags&DIR_FLAG) {
@@ -784,7 +778,7 @@ int ts_open(unsigned char *data)
 			file=-1;
 		}
 		if(cur_file==0) {
-			normal_return(ST_FILE_DOES_NOT_EXIST);
+			normal_return (ST_FILE_DOES_NOT_EXIST);
 			return -1;
 		}
 		
@@ -794,7 +788,7 @@ int ts_open(unsigned char *data)
 			if(cur_file->ufname[0]=='.' && cur_file->ufname[1]=='.') {
 				// parent dir
 				if(dir_depth>0) {
-					err=chdir(cur_file->ufname);
+					err=chdir (cur_file->ufname);
 					if(!err) dir_depth--;
 				}
 			} else {
@@ -803,13 +797,13 @@ int ts_open(unsigned char *data)
 				dir_depth++;
 			}
 			update_dirname();
-			if(err) normal_return(0x37);
+			if(err) normal_return (0x37);
 			else normal_return (ST_OK);
 		} else {
 			// regular file
 			file = open (cur_file->ufname, O_RDONLY);
 			if(file<0)
-				normal_return(ST_FILE_DOES_NOT_EXIST);
+				normal_return (ST_FILE_DOES_NOT_EXIST);
 			else {
 				mode = omode;
 				normal_return (ST_OK);
@@ -837,6 +831,32 @@ void ts_read(void)
 	buf[1] = (unsigned char) in;
 	buf[2+in] = checksum(buf);
 	my_write (client_fd, buf, 3+in);
+}
+
+void ts_write(unsigned char *data)
+{
+	if(file<0) {
+		normal_return(ST_NO_FILENAME);
+		return;
+	}
+	if(mode!=1 && mode !=2) {
+		normal_return(ST_OPEN_FRMT_MISMATCH);
+		return;
+	}
+	if(write (file,data+4,data[3]) != data[3])
+		normal_return (0x4a);
+	else
+		normal_return (ST_OK);
+}
+
+void ts_delete(void)
+{
+	if(cur_file->flags&DIR_FLAG)
+		rmdir(cur_file->ufname);
+	else 
+		unlink (cur_file->ufname);
+	update_file_list();
+	normal_return (ST_OK);
 }
 
 #if 0
@@ -961,67 +981,41 @@ void process_Z_cmd(unsigned char *data)
 	
 	switch(data[2]) {
 	case 0x00:	/* Directory ref */
-		ts_dir_ref(data);
+		ts_dir_ref (data);
 		break;
 	case 0x01:	/* Open file */
-		fprintf(stderr,"open()\n");
-		ts_open(data);
+		ts_open (data);
 		break;
 	case 0x02:	/* Close file */
-		fprintf(stderr,"close()\n");
 		if(file>=0)
-			close(file);
+			close (file);
 		file = -1;
-		normal_return(ST_OK);
+		normal_return (ST_OK);
 		break;
 	case 0x03:	/* Read */
-		fprintf(stderr,"read()\n");
 		ts_read();
-		//			fprintf(stderr,"read_file end\n");
 		break;
 	case 0x04:	/* Write */
-		fprintf(stderr,"write()\n");
-		if(file<0) {
-			normal_return(ST_NO_FILENAME);
-			break;
-		}
-		if(mode!=1 && mode !=2) {
-			normal_return(ST_OPEN_FRMT_MISMATCH);
-			break;
-		}
-		//				if(my_write(file,data+4,data[3])!=data[3])
-		if(write(file,data+4,data[3])!=data[3])
-			normal_return(0x4a);
-		else
-			normal_return(ST_OK);
+		ts_write (data);
 		break;
 	case 0x05:	/* Delete */
-		fprintf(stderr,"delete()\n");
-		if(cur_file->flags&DIR_FLAG)
-			rmdir(cur_file->ufname);
-		else 
-			unlink (cur_file->ufname);
-		list_dir();
-		normal_return(0x00);
+		ts_delete ();
 		break;
 	case 0x06:	/* Format disk */
-		normal_return(ST_OK);
+		normal_return (ST_OK);
 		break;
 	case 0x07:	/* Drive Status */
-		normal_return(ST_OK);
+		normal_return (ST_OK);
 		break;
-	case 0x08:	/* TS-DOS DME Request */
-		fprintf(stderr,"DME()\n");
-		// chage to FDC mode (?)
-		send_current_path();
+	case 0x08:	/* TS-DOS DME Request / change to FDC mode */
+		send_current_path ();
 		break;
 	case 0x0C:	/* Condition */
-		normal_return(ST_OK);
+		normal_return (ST_OK);
 		break;
 	case 0x0D:	/* Rename File */
-		fprintf(stderr,"rename()\n");
-		ts_rename(data);
-		list_dir();
+		ts_rename (data);
+		update_file_list ();
 		break;
 #if 0
 	case 0x23:  /* TS-DOS mystery command 2 */
@@ -1050,17 +1044,15 @@ int be_disk(void)
 	unsigned cmd_len;
 	unsigned pos;
 	
-	fprintf(stderr,"be_disk\n");
 	pos=0;
 	cmd_len=0;
 	
 	while(1) {
     
 		do {
+			// this takes 100% CPU
 			len=read (client_fd, &recv, 1);
 		} while (len!=1);
-		
-		//	fprintf(stderr,"pos:%d %02x:%c\n",pos,recv,recv);
 		
 		if(pos==0) {
 			switch(recv) {
