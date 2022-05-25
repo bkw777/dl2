@@ -292,7 +292,7 @@ unsigned char checksum(unsigned char *data)
 	
 	for(i=0;i<len;i++)
 		sum+=data[i];
-	return((sum & 0xFF) ^ 255);
+	return((sum & 0xFF) ^ 0xFF);
 }
 
 void normal_return(unsigned char type)
