@@ -1,6 +1,7 @@
 /*
 DeskLink+
 Extensions and enhancements Copyright (C) 2005 John R. Hogerhuis
+Copyright (c) 2022 Gabriele Gorla
 
 DeskLink+ is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License version 2 or any
@@ -21,29 +22,33 @@ MA 02111, USA.
 #ifndef DIR_LIST
 #define DIR_LIST
 
-#define QUANTUM 10
+#include <stdint.h>
 
-typedef unsigned LocalID;
-typedef unsigned char Char;
-typedef int Err;
-typedef unsigned short UInt16;
-typedef short int Int16;
-typedef unsigned UInt32;
+#define QUANTUM 10
+#define FNAME_MAX 32
+
+#define DIR_FLAG 0x01
+
+
+typedef struct
+{
+	char     tsname[12];         // ts-dos file name
+	char     ufname[FNAME_MAX];  // unix file name
+	u_int32_t len;               // length
+	u_int8_t  flags;
+} FILE_ENTRY;
+
 
 int file_list_init ();
-int file_list_cleanup();
-   
-int add_file (Char *namep, UInt32 len, LocalID dbID);
-void file_list_clear_all ();
-Char **get_str_table(UInt16 *lenp);
-   
-Err get_first_file (Char *namep, UInt32 *lenp, LocalID *dbIDp);
-Err get_next_file (Char *namep, UInt32 *lenp, LocalID *dbIDp);
-Err get_prev_file (Char *namep, UInt32 *lenp, LocalID *dbIDp);
+int file_list_cleanup ();
 
-Err find_file (Char *find_namep, UInt32 *lenp, LocalID *dbIDp);
-Err addto_file_len (UInt32 len_delta);
-Err delete_file (LocalID dbID);
-Err rename_file (LocalID dbID, Char *namep);
+void file_list_clear_all ();
+int  add_file (FILE_ENTRY *fe);
+
+
+FILE_ENTRY * find_file (char *tsname);
+FILE_ENTRY * get_first_file (void);
+FILE_ENTRY * get_next_file (void);
+FILE_ENTRY * get_prev_file (void);
 
 #endif

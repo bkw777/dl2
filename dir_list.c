@@ -1,6 +1,7 @@
 /*
 DeskLink+
 Extensions and enhancements Copyright (C) 2005 John R. Hogerhuis
+Copyright (c) 2022 Gabriele Gorla
 
 DeskLink+ is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License version 2 or any
@@ -17,243 +18,115 @@ Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 MA 02111, USA.
 */
 
-
+#include <stdint.h>
 #include <stdlib.h>
 #include <strings.h>
 #include <string.h>
 #include <ctype.h>
 #include "dir_list.h"
 
-
-typedef struct
-{
-   Char     name[12] ;  // file name
-   UInt32   len      ;  // length
-   LocalID  dbID     ;  // database ID
-} FILE_ENTRY;
-
-#define MAX(a,b) ((a)>(b)?(a):(b))
-
-static UInt16 allocated;
-static UInt16 ndx;
-static Int16  cur; // current must be signed (get-prev)
+static u_int16_t  allocated;
+static u_int16_t  ndx;
+static u_int16_t  cur; 
 static FILE_ENTRY *tblp = 0;
 
-static Err get_current_record (Char *namep, UInt32 *lenp, LocalID *dbIDp);
+static FILE_ENTRY * current_record (void);
 
 int file_list_init ()
 {
-   tblp = malloc (sizeof (FILE_ENTRY) * QUANTUM + sizeof (Char *) * QUANTUM);
-   if (!tblp)
-      return (-1);
-   allocated = QUANTUM;
-   ndx = 0;
-   cur = 0;
-
-   return (0);
+	tblp = malloc (sizeof (FILE_ENTRY) * QUANTUM );
+	if (!tblp)
+		return -1;
+	allocated = QUANTUM;
+	ndx = 0;
+	cur = 0;
+	
+	return 0;
 }
 
 int file_list_cleanup()
 {
-
-
-   allocated = 0;
-   ndx = 0;
-   cur = 0;
-   if (tblp)
-      free (tblp);
-   tblp = NULL;
-
-   return (0);
+	allocated = 0;
+	ndx = 0;
+	cur = 0;
+	if (tblp)
+		free (tblp);
+	tblp = NULL;
+	
+	return 0;
 }
 
 void file_list_clear_all ()
 {
-   cur = ndx = 0;
+	cur = ndx = 0;
 }
    
-
-Err find_file (Char *find_namep, UInt32 *lenp, LocalID *dbIDp)
+int add_file (FILE_ENTRY *fe)
 {
-
-   for (cur = 0; cur < ndx; cur++)
-      if (strncasecmp ((char *) find_namep, (char *) tblp[cur].name, sizeof (tblp[cur].name) - 1) == 0)
-      {
-         if (lenp)  *lenp  = tblp[cur].len;
-         if (dbIDp) *dbIDp = tblp[cur].dbID;
-         return (0);
-      }
-
-   return (-1);
+	/** reallocate QUANTUM more records if out of space */
+	if (ndx >= allocated)
+	{	
+		/** resize the array */
+		tblp = realloc (tblp, (allocated + QUANTUM) * sizeof (FILE_ENTRY) );
+		if (!tblp) return -1;
+		allocated += QUANTUM;	
+	}
+	
+	/** reference the entry */
+	if (!tblp) return -1;
+	
+	memcpy (tblp+ndx, fe, sizeof(FILE_ENTRY));
+	/** adjust cur to address this record, ndx to next avail */
+	cur = ndx;
+	ndx++;
+	
+	return 0;
 }
 
-Err addto_file_len (UInt32 len_delta)
+FILE_ENTRY * find_file (char *tsname)
 {
-   tblp[cur].len += len_delta;
-
-   return (0);
+	int i;
+	for(i=0;i<ndx;i++) {
+		if(strcmp(tsname,tblp[i].tsname)==0) return &tblp[i];
+	}
+	return 0;
 }
 
-Err delete_file (LocalID dbID)
+FILE_ENTRY * get_first_file (void)
 {
-   UInt16 i, j;
-   FILE_ENTRY *ep;
-   Char **cpp;
-   
-   /** find the entry */
-   for (i = 0, ep = tblp; i < ndx; i++, ep++)
-      if (ep->dbID == dbID) break;
-
-   /** no matching entry; return error */
-   if (i >= ndx) return (-1);
-
-   /** move up all entries to cover */
-   memmove (ep, ep + 1, (ndx - i - 1) * sizeof (FILE_ENTRY));
-   
-   /** adjust indices */
-   ndx--;
-   if (cur > i) cur--;
-
-   /** correct trailing pointers */
-   cpp = (Char **) (tblp + allocated);
-   for (j = i; j < ndx; j++)
-       cpp[j] = tblp[j].name;
-   cpp[ndx] = NULL;
-  
-   return (0);
-
+	/** reset cur, get, next */
+	cur = 0;
+	return current_record ();
 }
 
-Err rename_file (LocalID dbID, Char *namep)
+FILE_ENTRY * get_next_file (void)
 {
-   UInt16 i;
-   FILE_ENTRY *ep;
-
-   /** find the entry */
-   for (i = 0, ep = tblp; i < ndx; i++, ep++)
-      if (ep->dbID == dbID) break;
-
-   /** no matching entry; return error */
-   if (i >= ndx) return (-1);
-
-   /** update the name */
-   strncpy ((char *) ep->name, (char *) namep, sizeof (ep->name) * sizeof (Char) - 1);
-
-   return (0);
-}
-
-int add_file (Char *namep, UInt32 len, LocalID dbID)
-{
-   FILE_ENTRY *ep;
-   Char **cpp;
-   int i;
-
-   /** reallocate QUANTUM more records if out of space */
-   if (ndx >= allocated)
-   {
-
-      /** resize the array */
-      tblp = realloc (tblp, (allocated + QUANTUM) * (sizeof (FILE_ENTRY) + sizeof (Char *)));
-      if (!tblp) return (-1);
-      allocated += QUANTUM;
-
-      /** update the char *  array */
-      for (i = 0, ep = tblp, cpp = (Char **) (tblp + allocated); i < ndx;
-            i++, ep++, cpp++)
-         *cpp = ep->name;
-   }
-
-   /** reference the entry */
-   if (!tblp) return (-1);
-   ep = tblp + ndx;
-
-   /** fill the entry */
-   strncpy ((char *) ep->name, (char *)namep, sizeof (ep->name) * sizeof (Char) - 1);
-   ep->len = len;
-   ep->dbID = dbID;
-
-   /** set the pointer for use in filling list controls */
-   ((Char **) (tblp + allocated))[ndx] = ep->name;
-
-   /** adjust cur to address this record, ndx to next avail */
-   cur = ndx;
-   ndx += 1;
-
-   return (0);
-}
-
-Char **get_str_table(UInt16 *lenp)
-{
-   /** valchk */
-   if (!tblp)
-   {
-      *lenp = 0;
-      return (NULL);
-   }
-
-   /** return string table */
-   if (lenp) 
-      *lenp = ndx;
-   
-   return ((Char **) (tblp + allocated));
-}
-
-
-Err get_first_file (Char *namep, UInt32 *lenp, LocalID *dbIDp)
-{
-   Err err;
-
-   /** reset cur, get, next */
-   cur = 0;
-   if ((err = get_current_record (namep, lenp, dbIDp))) return (err);
-
-   return (0);
-}
-
-Err get_next_file (Char *namep, UInt32 *lenp, LocalID *dbIDp)
-{
-   Err err;
-
-   /** return error if out-of-range */
-   if (cur + 1 > ndx)
-      return (-1);
-
-   /** get, next */
-   cur++;
-   if ((err = get_current_record (namep, lenp, dbIDp))) return (err);
-
-   return (0);
+	/** return error if out-of-range */
+	if (cur + 1 > ndx)
+		return NULL;
+	
+	cur++;
+	return current_record ();
 }
    
-Err get_prev_file (Char *namep, UInt32 *lenp, LocalID *dbIDp)
+FILE_ENTRY * get_prev_file (void)
 {
-   Err err;
-
-   /** move back by one, but floor at -1 */
-   cur = MAX (cur -1, -1);
-   
-   /** ensure don't go off the shallow end */
-   if (cur < 0) return (-1);
-
-   /** get */
-   if ((err = get_current_record (namep, lenp, dbIDp))) return (err);
-
-   return (0);
+	if(cur==0)
+		return NULL;
+	
+	cur--;
+	return current_record ();
 }
 
-static Err get_current_record (Char *namep, UInt32 *lenp, LocalID *dbIDp)
+static FILE_ENTRY * current_record (void)
 {
-    FILE_ENTRY *ep;
-   
-   /** return error if out-of-range */
-   if (cur >= ndx) return (-1);
-
-   /** reference the record, fill in caller's vars */
-   if (!tblp) return (-1);
-   ep = tblp + cur;
-   if (namep) strcpy ((char *) namep, (char *) ep->name);
-   if (lenp) *lenp = ep->len;
-   if (dbIDp) *dbIDp = ep->dbID;
-   
-   return (0);
+	FILE_ENTRY *ep;
+	
+	/** return error if out-of-range */
+	if (cur >= ndx) return NULL;
+	
+	if (!tblp) return NULL;
+	
+	ep = tblp + cur;
+	return ep;
 }
