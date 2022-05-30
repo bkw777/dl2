@@ -35,12 +35,10 @@ static FILE_ENTRY * current_record (void);
 int file_list_init ()
 {
 	tblp = malloc (sizeof (FILE_ENTRY) * QUANTUM );
-	if (!tblp)
-		return -1;
+	if (!tblp) return -1;
 	allocated = QUANTUM;
 	ndx = 0;
 	cur = 0;
-	
 	return 0;
 }
 
@@ -49,10 +47,8 @@ int file_list_cleanup()
 	allocated = 0;
 	ndx = 0;
 	cur = 0;
-	if (tblp)
-		free (tblp);
+	if (tblp) free (tblp);
 	tblp = NULL;
-	
 	return 0;
 }
 
@@ -65,29 +61,29 @@ int add_file (FILE_ENTRY *fe)
 {
 	/** reallocate QUANTUM more records if out of space */
 	if (ndx >= allocated)
-	{	
+	{
 		/** resize the array */
 		tblp = realloc (tblp, (allocated + QUANTUM) * sizeof (FILE_ENTRY) );
 		if (!tblp) return -1;
 		allocated += QUANTUM;	
 	}
-	
+
 	/** reference the entry */
 	if (!tblp) return -1;
-	
+
 	memcpy (tblp+ndx, fe, sizeof(FILE_ENTRY));
 	/** adjust cur to address this record, ndx to next avail */
 	cur = ndx;
 	ndx++;
-	
+
 	return 0;
 }
 
-FILE_ENTRY * find_file (char *tsname)
+FILE_ENTRY * find_file (char *client_fname)
 {
 	int i;
 	for(i=0;i<ndx;i++) {
-		if(strcmp(tsname,tblp[i].tsname)==0) return &tblp[i];
+		if(strcmp(client_fname,tblp[i].client_fname)==0) return &tblp[i];
 	}
 	return 0;
 }
@@ -104,7 +100,7 @@ FILE_ENTRY * get_next_file (void)
 	/** return error if out-of-range */
 	if (cur + 1 > ndx)
 		return NULL;
-	
+
 	cur++;
 	return current_record ();
 }
@@ -113,7 +109,7 @@ FILE_ENTRY * get_prev_file (void)
 {
 	if(cur==0)
 		return NULL;
-	
+
 	cur--;
 	return current_record ();
 }
@@ -121,12 +117,12 @@ FILE_ENTRY * get_prev_file (void)
 static FILE_ENTRY * current_record (void)
 {
 	FILE_ENTRY *ep;
-	
+
 	/** return error if out-of-range */
 	if (cur >= ndx) return NULL;
-	
+
 	if (!tblp) return NULL;
-	
+
 	ep = tblp + cur;
 	return ep;
 }

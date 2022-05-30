@@ -1,5 +1,5 @@
 20220516
- Added support for subdirectories
+ (GGLabs) Added support for TS-DOS subdirectories
 
 20210222
  Increased default sleep between each byte in bootstrap to 6 ms
