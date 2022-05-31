@@ -30,14 +30,14 @@ dl -h
 dl
 ```
 
-## list all available TPDD client installers, and then bootstrap one of them (TS-DOS for Model 100)
+## list all available TPDD client installers, and then bootstrap one of them.
 ```
-dl -h
-dl -b=TS-DOS.100
+dl -l
+dl -b TS-DOS.100
 ```
 
 ## bootstrap a [REXCPM](http://bitchin100.com/wiki/index.php?title=REXCPM)
 ```
 unzip REXCPMV21_b18.ZIP
-dl -b=./rxcini.DO ;dl -u
+dl -b ./rxcini.DO ;dl -u
 ```

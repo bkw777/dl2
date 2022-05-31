@@ -97,6 +97,9 @@ MA 02111, USA.
 #include <netinet/in.h>
 #endif
 
+#define STRINGIFY2(X) #X
+#define S_(X) STRINGIFY2(X)
+
 /*** config **************************************************/
 
 #ifndef APP_LIB_DIR
@@ -111,18 +114,15 @@ MA 02111, USA.
 #define DEFAULT_CLIENT_BAUD B19200
 #endif
 
-#ifndef DEFAULT_CLIENT_MODEL
-#define DEFAULT_CLIENT_MODEL 100
-#endif
-
-#ifndef DEFAULT_CLIENT_APP
-#define DEFAULT_CLIENT_APP TEENY
-#endif
-
 #define DEFAULT_BASIC_BYTE_MSEC 6
-#define DEFAULT_TPDD_FILE_ATTRIB 'F' // 0x46
-#define DEFAULT_DME_ROOT_LABEL   "ROOT  "
-#define DEFAULT_DME_PARENT_LABEL "PARENT"
+#define DEFAULT_TPDD_FILE_ATTRIB 'F'
+// These are crap, since they are just ordinary words that could
+// easily conflict with user files/dirs, but this is what the original
+// Desk-Link did, and what TS-DOS and possibly other software expects.
+// So these are default, but you can override them either here at compile-time
+// or by environment variables at run-time.
+#define DEFAULT_DME_ROOT_LABEL   "ROOT"   // $ROOT_LABEL
+#define DEFAULT_DME_PARENT_LABEL "PARENT" // $PARENT_LABEL
 
 ////////////////////////////////////////////////////////////////////////
 //
@@ -184,6 +184,12 @@ MA 02111, USA.
 // It can be confusing or annoying for users unfamiliar with
 // serial cabling, but I suggest leaving this false / 0.
 #define IGNORE_DSR 0
+
+// TODO - make O_NOCTTY run-time configurable.
+// O_NO_CTTY was not in the original open() flags,
+// but seems advisable for this kind of usage.
+// But I don't really know so here is a control.
+#define NO_CTTY 1
 
 /*************************************************************/
 
@@ -295,7 +301,7 @@ MA 02111, USA.
 
 // fixed lengths
 #define TPDD_DATA_MAX 0x80
-#define TPDD_FREE_SECTORS 0x50 // max valid 80 sectors
+#define TPDD_FREE_SECTORS 0x50 // max valid value is 80 sectors
 #define LEN_RET_STD 0x01
 #define LEN_RET_DME 0x0B
 #define LEN_RET_DIRENT 0x1C
@@ -310,7 +316,10 @@ bool rtscts = false;
 unsigned dot_offset = 6; // 6 for KC-85 platform, 8 for WP-2
 int client_baud = DEFAULT_CLIENT_BAUD;
 int BASIC_byte_msec = DEFAULT_BASIC_BYTE_MSEC;
-const char dme_root_label[6] = DEFAULT_DME_ROOT_LABEL;
+char dme_root_label[6] = DEFAULT_DME_ROOT_LABEL;
+char dme_parent_label[6] = DEFAULT_DME_PARENT_LABEL;
+char default_attrib = DEFAULT_TPDD_FILE_ATTRIB;
+
 bool getty_mode = false;
 bool bootstrap_mode = false;
 
@@ -321,74 +330,18 @@ int client_tty_fd = -1;
 struct termios client_termios;
 int o_file_h = -1;
 unsigned char buf[TPDD_DATA_MAX+3];
+char cwd[PATH_MAX]={0x00};
 char dme_cwd[6] = DEFAULT_DME_ROOT_LABEL;
-int opr_mode = 1; // 0=FDC-mode 1=Operation-mode
+char client_tty_name[PATH_MAX];
+char bootstrap_file[PATH_MAX] = {0x00}; // S_(DEFAULT_CLIENT_APP) "." S_(DEFAULT_CLIENT_MODEL);
 bool enable_dme = false;
+int opr_mode = 1; // 0=FDC-mode 1=Operation-mode
 
 FILE_ENTRY *cur_file;
 int dir_depth=0;
 
 // blarghamagargle
 void ret_std(unsigned char err);
-
-#define STRINGIFY2(X) #X
-#define STRINGIFY(X) STRINGIFY2(X)
-
-void print_usage()
-{
-	fprintf (stderr,
-		"%1$s - DeskLink+ " STRINGIFY(APP_VERSION) "\nusage:\n\n"
-		"%1$s [tty_device] [options]\n"
-		"\n"
-		"tty_device:\n"
-		"    Serial device the client is connected to\n"
-		"    examples: ttyS0, ttyUSB0, /dev/pts/foo4, etc...\n"
-		"    default = " STRINGIFY(DEFAULT_CLIENT_TTY) "\n"
-		"    \"-\" = stdin/stdout (/dev/tty)\n"
-		"\n"
-		"options:\n"
-		"   -h       Print this help\n"
-		"   -b=file  Bootstrap: Install <file> onto the portable\n"
-		"   -v       Verbose/debug mode (more -v's = more verbose)\n"
-		"   -g       Getty mode. Run as daemon\n"
-		"   -p=dir   Path to files to be served, default is \".\"\n"
-		"   -w       WP-2 compatibility mode (8.2 filenames)\n"
-		"   -u       Uppercase all filenames\n"
-		"   -c       Hardware flow control (RTS/CTS)\n"
-		"   -z=#     Sleep # milliseconds between each byte while sending bootstrap file (default " STRINGIFY(DEFAULT_BASIC_BYTE_MSEC) ")\n"
-		"\n"
-		"available bootstrap files (in "STRINGIFY(APP_LIB_DIR)"):\n"
-	,args[0]);
-
-	// FIXME - This is crap using system(), and relying on an external,
-	// just to get some filenames, but I don't want to write /bin/find. - bkw
-	// works but blargh ...
-	//(void)(system ("find " STRINGIFY(APP_LIB_DIR) " -regex \'.*/.+\\.\\(100\\|200\\|NEC\\|M10\\|K85\\)$\' -printf \'\%f\\n\' >&2")+1);
-	// even more blargh...
-	fprintf (stderr,   "   TRS-80 Model 100 / Tandy 102 : ");
-	(void)(system ("find " STRINGIFY(APP_LIB_DIR) " -regex \'.*/.+\\.100$\' -printf \'\%f \' >&2")+1);
-	fprintf (stderr, "\n   Tandy 200                    : ");
-	(void)(system ("find " STRINGIFY(APP_LIB_DIR) " -regex \'.*/.+\\.200$\' -printf \'\%f \' >&2")+1);
-	fprintf (stderr, "\n   NEC PC-8201/PC-8201a/PC-8300 : ");
-	(void)(system ("find " STRINGIFY(APP_LIB_DIR) " -regex \'.*/.+\\.NEC$\' -printf \'\%f \' >&2")+1);
-	fprintf (stderr, "\n   Kyotronic KC-85              : ");
-	(void)(system ("find " STRINGIFY(APP_LIB_DIR) " -regex \'.*/.+\\.K85$\' -printf \'\%f \' >&2")+1);
-	fprintf (stderr, "\n   Olivetti M-10                : ");
-	(void)(system ("find " STRINGIFY(APP_LIB_DIR) " -regex \'.*/.+\\.M10$\' -printf \'\%f \' >&2")+1);
-
-	fprintf (stderr,
-		"\n\n"
-		"Bootstrap Examples:\n"
-		"   %1$s -b=TS-DOS.100    (no leading / or ./ takes from above)\n"
-		"   %1$s -b=~/Documents/TRS-80/M100SIG/Lib-03-TELCOM/XMDPW5.100\n"
-		"   %1$s -b=./rxcini.DO\n"
-		"\n"
-		"TPDD Server Examples:\n"
-		"   %1$s\n"
-		"   %1$s ttyUSB1 -p=~/Documents/wp2files -w -v\n"
-		"\n"
-	,args[0]);
-}
 
 /* primitives and utilities */
 
@@ -707,7 +660,7 @@ int ret_dirent(FILE_ENTRY *ep)
 		//memcpy (buf + 2, ep->client_fname, dot_offset+2);
 
 		// attrib
-		buf[26] = DEFAULT_TPDD_FILE_ATTRIB;
+		buf[26] = default_attrib;
 
 		// size
 		size = htons (ep->len);
@@ -797,13 +750,12 @@ void update_dme_cwd()
 	dbg(2,"%s()\n",__func__);
 	int i;
 	if(dir_depth) {
-		char dirbuf[1024];
 		int j;
-
-		if(getcwd(dirbuf, 1024) ) {
+		memset(cwd,0x00,PATH_MAX);
+		if(getcwd(cwd,PATH_MAX-1) ) {
 			memset(dme_cwd,0x20,6);
-			for(i=strlen(dirbuf); i>=0 ; i--) if(dirbuf[i]=='/') break;
-			for(j=0; j<6 && dirbuf[i+j+1] && dirbuf[i+j+1]!='.'; j++) dme_cwd[j]=dirbuf[i+j+1];
+			for(i=strlen(cwd); i>=0 ; i--) if(cwd[i]=='/') break;
+			for(j=0; j<6 && cwd[i+j+1] && cwd[i+j+1]!='.'; j++) dme_cwd[j]=cwd[i+j+1];
 		}
 	} else {
 		memcpy(dme_cwd,dme_root_label,6);
@@ -1148,8 +1100,9 @@ int get_opr_cmd(void)
 // This is mostly just a stub still, but one operation works, which is
 // switching back and forth between FDC-mode and Operation-mode
 //
-// You can see it happen by setting opr_mode=0 at the top, then
-// start the server with 2 or 3 -v 's  and connect TS-DOS and load the directory.
+// You can see it happen by running "OPR_MODE=0 dl -vv"
+// See it starts on get_fdc_cmd() instead of get_opr_cmd()
+// Then load the directory from TS-DOS.
 
 // standard 8-character FDC-mode response
 void ret_fdc_std(unsigned char e, unsigned char d, unsigned short l) {
@@ -1247,6 +1200,36 @@ int get_fdc_cmd(void) {
 //
 //  BOOTSTRAP
 
+void show_bootstrap_help() {
+	dbg(0,
+		"%1$s - DeskLink+ " S_(APP_VERSION) " - \"bootstrap\" help\n\n"
+		"Available loader files (in " S_(APP_LIB_DIR) "):\n\n",args[0]);
+	// FIXME - Don't use system() just to get some filenames - bkw
+	// works but blargh ...
+	//(void)(system ("find " S_(APP_LIB_DIR) " -regex \'.*/.+\\.\\(100\\|200\\|NEC\\|M10\\|K85\\)$\' -printf \'\%f\\n\' >&2")+1);
+	// even more blargh...
+	dbg(0,  "TRS-80 Model 100 & 102 : ");
+	(void)(system("find " S_(APP_LIB_DIR) " -regex \'.*/.+\\.100$\' -printf \'\%f \' >&2")+1);
+	dbg(0,"\nTANDY Model 200        : ");
+	(void)(system("find " S_(APP_LIB_DIR) " -regex \'.*/.+\\.200$\' -printf \'\%f \' >&2")+1);
+	dbg(0,"\nNEC PC-8201(a)/PC-8300 : ");
+	(void)(system("find " S_(APP_LIB_DIR) " -regex \'.*/.+\\.NEC$\' -printf \'\%f \' >&2")+1);
+	dbg(0,"\nKyotronic KC-85        : ");
+	(void)(system("find " S_(APP_LIB_DIR) " -regex \'.*/.+\\.K85$\' -printf \'\%f \' >&2")+1);
+	dbg(0,"\nOlivetti M-10          : ");
+	(void)(system("find " S_(APP_LIB_DIR) " -regex \'.*/.+\\.M10$\' -printf \'\%f \' >&2")+1);
+
+	dbg(0,
+		"\n\n"
+		"Filenames given without any leading path are taken from above.\n"
+		"To specify a file in the current directory, include the \"./\"\n"
+		"Examples:\n\n"
+		"   %1$s -b TS-DOS.100\n"
+		"   %1$s -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100\n"
+		"   %1$s -b ./rxcini.DO\n\n"
+	,args[0]);
+}
+
 int send_BASIC(char *f)
 {
 	int w=0;
@@ -1285,9 +1268,9 @@ int send_BASIC(char *f)
 int bootstrap(char *f)
 {
 	int r = 0;
-	char loader_file[PATH_MAX]="";
-	char pre_install_txt_file[PATH_MAX]="";
-	char post_install_txt_file[PATH_MAX]="";
+	char loader_file[PATH_MAX]={0x00};
+	char pre_install_txt_file[PATH_MAX]={0x00};
+	char post_install_txt_file[PATH_MAX]={0x00};
 
 	if (f[0]=='~'&&f[1]=='/') {
 		strcpy(loader_file,getenv("HOME"));
@@ -1298,7 +1281,7 @@ int bootstrap(char *f)
 		strcpy(loader_file,f);
 
 	if(loader_file[0]==0) {
-		strcpy(loader_file,STRINGIFY(APP_LIB_DIR));
+		strcpy(loader_file,S_(APP_LIB_DIR));
 		strcat(loader_file,"/");
 		strcat(loader_file,f);
 	}
@@ -1343,108 +1326,148 @@ int bootstrap(char *f)
 //
 //  MAIN
 
+void show_config () {
+	dbg(0,"getty_mode      : %s\n",getty_mode?"true":"false");
+	dbg(0,"upcase          : %s\n",upcase?"true":"false");
+	dbg(0,"rtscts          : %s\n",rtscts?"true":"false");
+	dbg(0,"verbosity       : %d\n",debug);
+	dbg(0,"dot_offset      : %d\n",dot_offset);
+	dbg(0,"BASIC_byte_msec : %d\n",BASIC_byte_msec);
+	dbg(0,"bootstrap_mode  : %s\n",bootstrap_mode?"true":"false");
+	dbg(0,"bootstrap_file  : \"%s\"\n",bootstrap_file);
+	dbg(0,"client_tty_name : \"%s\"\n",client_tty_name);
+	if (getcwd(cwd,PATH_MAX-1)) dbg(0,
+	      "share_path      : \"%s\"\n",cwd);
+	dbg(2,"opr_mode        : %d\n",opr_mode);
+	dbg(2,"dot_offset      : %d\n",dot_offset);
+	dbg(2,"baud            : %d\n",client_baud==B9600?9600:client_baud==B19200?19200:-1);
+	dbg(2,"dme_root_label  : \"%6.6s\"\n",dme_root_label);
+	dbg(2,"dme_parent_label: \"%6.6s\"\n",dme_parent_label);
+	dbg(2,"default_attrib  : '%c'\n",default_attrib);
+}
+
+void show_main_help() {
+	dbg(0,
+		"%1$s - DeskLink+ " S_(APP_VERSION) " - help\n\n"
+		"usage: %1$s [options] [tty_device] [share_path]\n"
+		"\n"
+		"options:\n"
+		"   -h       Print this help\n"
+		"   -v       Verbose/debug mode - more v's = more verbose\n"
+		"   -d tty   Serial device to client (" S_(DEFAULT_CLIENT_TTY) ")\n"
+		"   -p dir   Share path - directory with files to be served (.)\n"
+		"   -g       Getty mode - run as daemon\n"
+		"   -w       WP-2 mode - 8.2 filenames\n"
+		"   -u       Uppercase all filenames\n"
+		"   -r       RTS/CTS hardware flow control\n"
+		"   -z #     Milliseconds per byte for bootstrap (" S_(DEFAULT_BASIC_BYTE_MSEC) ")\n"
+		"   -b file  Bootstrap: Send loader file to client\n"
+		"   -l       List available loader files and bootstrap help\n"
+		"\n"
+		"Alternative to the -d and -p options,\n"
+		"The 1st non-option argument is another way to specify the tty device.\n"
+		"The 2nd non-option argument is another way to specify the share path.\n"
+		"\n"
+		"   %1$s\n"
+		"   %1$s -vv /dev/ttyS0\n"
+		"   %1$s ttyUSB1 -v -w ~/Documents/wp2files\n\n"
+	,args[0]);
+}
+
 int main(int argc, char **argv)
 {
 	int off=0;
-	unsigned char client_tty_name[PATH_MAX];
-	char bootstrap_file[PATH_MAX];
-	int arg;
-
-	/* create the file list (for reverse order traversal) */
-	file_list_init ();
-
+	int i;
+	bool x = false;
 	args = argv;
 
-	strcpy ((char *)client_tty_name,STRINGIFY(DEFAULT_CLIENT_TTY));
+	// default client tty device
+	strcpy (client_tty_name,S_(DEFAULT_CLIENT_TTY));
 	if (client_tty_name[0]!='/') {
-		strcpy((char *)client_tty_name,"/dev/");
-		strcat((char *)client_tty_name,(char *)STRINGIFY(DEFAULT_CLIENT_TTY));
+		strcpy(client_tty_name,"/dev/");
+		strcat(client_tty_name,S_(DEFAULT_CLIENT_TTY));
 	}
 
-	for (arg = 1; arg < argc; arg++) {
-		switch (argv[arg][0]) {
-		case '/':
-			strcpy ((char *)client_tty_name, (char *)(argv[arg]));
-			break;
-		case '-':
-			switch (argv [arg][1]) {
-			case 0:
-				strcpy ((char *)client_tty_name,"/dev/tty");
-				client_tty_fd = 1;
-				break;
-			case 'g':
-				getty_mode = true;
-				break;
-			case 'u':
-				upcase = true;
-				break;
-			case 'c':
-				rtscts = true;
-				break;
-			case 'v':
-				debug++;
-				break;
-			case 'p':
-				if (argv[arg][2] == '=')
-					(void)(chdir (argv[arg] + 3)+1);
-				break;
-			case 'w':
-				dot_offset = 8;
-				break;
-			case 'h':
-				print_usage();
-				exit(0);
-				break;
-			case 'b':
-				bootstrap_mode = true;
-				strcpy (bootstrap_file,STRINGIFY(DEFAULT_CLIENT_APP) "." STRINGIFY(DEFAULT_CLIENT_MODEL));
-				if (argv[arg][2] == '=') strcpy (bootstrap_file,(char *)(argv[arg]+3));
-				break;
-			case 'z':
-				if (argv[arg][2] == '=') BASIC_byte_msec = atoi(argv[arg]+3);
-				break;
-			default:
-				fprintf(stderr, "Unknown option %s\n",argv[arg]);
-				print_usage();
-				exit(1);
-				break;
-			}
-			break;
-		default:
-			strcpy((char *)client_tty_name,"/dev/");
-			strcat((char *)client_tty_name,(char *)(argv[arg]));
+	// env overrides for some things that don't have switches
+	if (getenv("OPR_MODE")) opr_mode = atoi(getenv("OPR_MODE"));
+	if (getenv("DOT_OFFSET")) dot_offset = atoi(getenv("DOT_OFFSET"));
+	if (getenv("BAUD")) {i=atoi(getenv("BAUD"));client_baud=i==9600?B9600:i==19200?B19200:-1;}
+	if (getenv("ROOT_LABEL")) memcpy(dme_root_label,getenv("ROOT_LABEL"),6);
+	if (getenv("PARENT_LABEL")) memcpy(dme_parent_label,getenv("PARENT_LABEL"),6);
+	if (getenv("ATTRIB")) default_attrib = *getenv("ATTRIB");
+
+	// commandline options
+	while ((i = getopt (argc, argv, ":gurvd:p:wb:z:hl^")) >=0)
+		switch (i) {
+				case 'g': getty_mode = true; debug = 0; break;
+				case 'u': upcase = true; break;
+				case 'r': rtscts = true; break;
+				case 'v': debug++; break;
+				case 'w': dot_offset = 8; break;
+				case 'h': show_main_help(); exit(0); break;
+				case 'l': show_bootstrap_help(); exit(0); break;
+				case 'z': BASIC_byte_msec=atoi(optarg); break;
+				case 'd': strcpy(client_tty_name,optarg); break;
+				case 'p': (void)(chdir(optarg)+1); break;
+				case 'b': bootstrap_mode=true; strcpy(bootstrap_file,optarg); break;
+				case '^': x=true; break; // debugging
+				case ':': dbg(0,"\"-%c\" requires a value\n",optopt); break;
+				case '?':
+					if (isprint(optopt)) dbg(0,"Unknown option `-%c'.\n",optopt);
+					else dbg(0,"Unknown option character `\\x%x'.\n",optopt);
+				default: show_main_help(); return 1;
+		}
+
+	// commandline non-option arguments
+	for (i=0; optind < argc; optind++) {
+		if (x) dbg(1,"non-option arg %u: \"%s\"\n",i,argv[optind]);
+		switch (i++) {
+			case 0: // tty device
+				switch (argv[optind][0]) {
+					case '/':
+						strcpy (client_tty_name,argv[optind]);
+						break;
+					case '-':
+						if (argv[optind][1]==0x00) {
+							strcpy (client_tty_name,"/dev/tty");
+							client_tty_fd = 1;
+							break;
+						}
+					default:
+						strcpy(client_tty_name,"/dev/");
+						strcat(client_tty_name,argv[optind]);
+				} break;
+			case 1: // share path
+				(void)(chdir(argv[optind])+1); break;
+			default: dbg(0,"Unknown argument: \"%s\"\n",argv[optind]);
 		}
 	}
 
-	if (getty_mode)
-		debug = 0;
+	if (x) { show_config(); return 0; }
 
-	if (debug) {
-		fprintf (stderr, "DeskLink+ " STRINGIFY(APP_VERSION) "\n");
-		fprintf (stderr, "Using Serial Device: %s\n", client_tty_name);
-	}
+	dbg(1,"DeskLink+ " S_(APP_VERSION) "\n"
+		  "Using Serial Device: %s\n",client_tty_name);
 
-// Also, what about O_NOCTTY ?
 	if(client_tty_fd<0)
 		client_tty_fd=open((char *)client_tty_name,O_RDWR
+#if (NO_CTTY == 1)
+			,O_NOCTTY
+#endif
 #if (IGNORE_DSR == 1)
 			,O_NONBLOCK
 #endif
 		);
 
 	if(client_tty_fd<0) {
-		fprintf (stderr,"Can't open \"%s\"\n",client_tty_name);
+		dbg(1,"Can't open \"%s\"\n",client_tty_name);
 		return(1);
 	}
 
-
-	if (debug) {
-		if(!bootstrap_mode) {
-			fprintf (stderr, "Working In Directory: ");
-			fprintf (stderr, "--------------------------------------------------------------------------------\n");
-			(void)(system ("pwd >&2;ls -l >&2")+1);
-			fprintf (stderr, "--------------------------------------------------------------------------------\n");
-		}
+	if (debug && !bootstrap_mode) {
+		dbg(1,"Working In Directory: \n"
+			"--------------------------------------------------------------------------------\n");
+		(void)(system ("pwd >&2;ls -l >&2")+1);
+		dbg(1,"--------------------------------------------------------------------------------\n");
 	}
 
 	// getty mode
@@ -1468,6 +1491,9 @@ int main(int argc, char **argv)
 
 	// send loader and exit
 	if(bootstrap_mode) return(bootstrap(bootstrap_file));
+
+	// create the file list (for reverse order traversal)
+	file_list_init ();
 
 	// process commands forever
 	while(1) if(opr_mode) get_opr_cmd(); else get_fdc_cmd();
