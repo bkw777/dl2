@@ -311,8 +311,6 @@ unsigned dot_offset = 6; // 6 for KC-85 platform, 8 for WP-2
 int client_baud = DEFAULT_CLIENT_BAUD;
 int BASIC_byte_msec = DEFAULT_BASIC_BYTE_MSEC;
 const char dme_root_label[6] = DEFAULT_DME_ROOT_LABEL;
-
-// state
 bool getty_mode = false;
 bool bootstrap_mode = false;
 
@@ -321,10 +319,11 @@ char **args;
 int f_open_mode = F_OPEN_NONE;
 int client_tty_fd = -1;
 struct termios client_termios;
-bool m1rec = false;
 int o_file_h = -1;
 unsigned char buf[TPDD_DATA_MAX+3];
 char dme_cwd[6] = DEFAULT_DME_ROOT_LABEL;
+int opr_mode = 1; // 0=FDC-mode 1=Operation-mode
+bool enable_dme = false;
 
 FILE_ENTRY *cur_file;
 int dir_depth=0;
@@ -671,7 +670,9 @@ void update_file_list()
 	closedir(dir);
 }
 
-/* TPDD operations */
+////////////////////////////////////////////////////////////////////////
+//
+//  OPERATION MODE
 
 // standard return - return for: error open close delete status write
 void ret_std(unsigned char err)
@@ -826,6 +827,25 @@ void ret_dme_cwd()
 	dbg(3,"Setting TS-DOS CWD: \"%6.6s\"\n",buf+3);
 	write_client_tty(buf,14);
 }
+
+//////////////////////////////
+void req_dme_cwd() {
+	unsigned i;
+	unsigned char l[6]=DEFAULT_DME_ROOT_LABEL;
+
+	buf[0]=RET_STD;
+	buf[1]=LEN_RET_DME;
+	buf[2]=0x00;
+	for(i=0;i<6;i++) buf[3+i]=l[i];
+	buf[9]='.';
+	buf[10]='<';
+	buf[11]='>';
+	buf[12]=0x20;
+	buf[13]=checksum(buf);
+
+	write_client_tty (buf, buf[1]+3);
+}
+
 
 // b[0] = fmt  0x01
 // b[1] = len  0x01
@@ -1065,8 +1085,14 @@ void dispatch_opr_cmd(unsigned char *data)
 	case REQ_STATUS:
 		ret_std(ERR_SUCCESS);
 		break;
-	case REQ_FDC:	/* switch to FDC-mode - part of TS-DOS DME */
-		ret_dme_cwd();
+	case REQ_FDC: // TPDD1 switch to FDC mode. Also part of TS-DOS<>Desk-Link DME.
+		dbg(2,"REQ_FDC\n");
+		if(!enable_dme) {
+			buf[1] = 0x00;
+			if (read_client_tty(&buf,1)==1 && buf[0]==0x0D) enable_dme=true;
+		}
+		if(enable_dme) req_dme_cwd();
+		else opr_mode=0; // Actual FDC mode request. No response, just switch modes
 		break;
 	case REQ_CONDITION: // TPDD2
 		ret_std(ERR_SUCCESS);
@@ -1085,8 +1111,6 @@ void dispatch_opr_cmd(unsigned char *data)
 		return;
 		break;
 	}
-
-	if(data[0]!=REQ_STATUS && data[0]!=REQ_FDC) m1rec=0;
 
 	return;
 }
@@ -1136,6 +1160,112 @@ int get_opr_cmd(void)
 	return 0;
 }
 
+////////////////////////////////////////////////////////////////////////
+//
+//  FDC MODE
+
+// This is mostly just a stub still, but one operation works, which is
+// switching back and forth between FDC-mode and Operation-mode
+//
+// You can see it happen by setting opr_mode=0 at the top, then
+// start the server with 2 or 3 -v 's  and connect TS-DOS and load the directory.
+
+// standard 8-character FDC-mode response
+void ret_fdc_std(unsigned char e, unsigned char d, unsigned short l) {
+	dbg(1,"ret_fdc_std()\n");
+	char b[9] = { 0x00 };
+	snprintf(b,9,"%02X%02X%04X",e,d,l);
+	dbg(1,"\"%s\"\n",b);
+	write_client_tty(b,8);
+}
+
+/* ref/fdc.txt */
+int get_fdc_cmd(void) {
+	dbg(1,"get_fdc_cmd()\n");
+	unsigned char b[TPDD_DATA_MAX] = { 0x00 };
+	unsigned i = 0;
+	bool eol = false;
+
+	// TODO
+	// FDC-mode commands are plain text and terminated with CR (0x0D).
+	// Theoretically we could set the tty to a modified canonical mode, and
+	// get the command in a single read for free, instead of this byte loop.
+
+	// read command
+	while (i<TPDD_DATA_MAX && !eol) {
+		if(read_client_tty(&b[i],1)==1) {
+			switch(b[i]) {
+				case 0x0D: eol=true;
+				case 0x20: b[i]=0x00; break;
+				default: i++;
+			}
+		}
+	}
+
+	// debug
+	dbg(1,"\"%s\"\n",b);
+
+	// dispatch
+	switch(b[0]) {
+		case FDC_SET_MODE: // mode
+			dbg(1,"FDC_SET_MODE\n");
+			opr_mode=b[1]; // no response, just switch modes
+			break;
+		case FDC_CONDITION: // condition
+			dbg(1,"FDC_CONDITION\n");
+			ret_fdc_std(ERR_FDC_SUCCESS,0,0);
+			break;
+		case FDC_FORMAT: // format
+			dbg(1,"FDC_FORMAT\n");
+			ret_fdc_std(ERR_FDC_COMMAND,0,0);
+			break;
+		case FDC_FORMAT_NV: // format w/o verify
+			dbg(1,"FDC_FORMAT_NV\n");
+			ret_fdc_std(ERR_FDC_COMMAND,0,0);
+			break;
+		case FDC_READ_ID: // read id
+			dbg(1,"FDC_READ_ID\n");
+			ret_fdc_std(ERR_FDC_COMMAND,0,0);
+			break;
+		case FDC_READ_SECTOR: // read sector
+			dbg(1,"FDC_READ_SECTOR\n");
+			ret_fdc_std(ERR_FDC_COMMAND,0,0);
+			break;
+		case FDC_SEARCH_ID: // search id
+			dbg(1,"FDC_SEARCH_ID\n");
+			ret_fdc_std(ERR_FDC_COMMAND,0,0);
+			break;
+		case FDC_WRITE_ID: // write id
+			dbg(1,"FDC_WRITE_ID\n");
+			ret_fdc_std(ERR_FDC_COMMAND,0,0);
+			break;
+		case FDC_WRITE_ID_NV: // write id w/o verify
+			dbg(1,"FDC_WRITE_ID_NV\n");
+			ret_fdc_std(ERR_FDC_COMMAND,0,0);
+			break;
+		case FDC_WRITE_SECTOR: // write sector
+			dbg(1,"FDC_WRITE_SECTOR\n");
+			ret_fdc_std(ERR_FDC_COMMAND,0,0);
+			break;
+		case FDC_WRITE_SECTOR_NV: // write sector w/o verify
+			dbg(1,"FDC_WRITE_SECTOR_NV\n");
+			ret_fdc_std(ERR_FDC_COMMAND,0,0);
+			break;
+		case 0x00: // TS-DOS does this as part of Desk-Link/DME detection
+			if(!i) { // if empty carriage return, i should be 0
+				dbg(1,"EMPTY COMMAND\n");
+				break;
+			} // otherwise, something weird happened, fall through
+		default:
+			dbg(1,"UNRECOGNIZED COMMAND\n");
+	}
+	return(0);
+}
+
+////////////////////////////////////////////////////////////////////////
+//
+//  BOOTSTRAP
+
 int send_BASIC(char *f)
 {
 	int w=0;
@@ -1145,35 +1275,28 @@ int send_BASIC(char *f)
 	unsigned char b;
 
 	if ((fd=open(f,O_RDONLY))<0) {
-		if (debug) fprintf(stderr, "Failed to open %s for read.\n",f);
+		dbg(1,"Failed to open %s for read.\n",f);
 		return(9);
 	}
 
-	if(debug) {
-		fprintf(stderr, "Sending %s\n",f);
-		fflush(stdout);
-	}
+	dbg(1,"Sending %s\n",f);
 
 	while(read(fd,&b,1)==1) {
 		while((i=write_client_tty(&b,1))!=1);
 		w+=i;
 		usleep(byte_usleep);
-		if (debug) fprintf(stderr, "Sent: %d bytes\n",w);
-		else fprintf(stderr, ".");
+		if(debug) dbg(0,"Sent: %d bytes\n",w);
+		else dbg(0,".");
 		fflush(stdout);
 	}
-	fprintf(stderr, "\n");
+	dbg(0,"\n");
 	b = BASIC_EOF;
 	write_client_tty(&b,1);
 	close(fd);
 	close(client_tty_fd);
 
-	if (debug) {
-		fprintf(stderr, "Sent %s\n",f);
-		fflush(stdout);
-	}
-	else
-		fprintf(stderr, "\n");
+	if(debug) dbg(0,"Sent %s",f);
+	else dbg(0,"\n");
 
 	return(0);
 }
@@ -1208,7 +1331,7 @@ int bootstrap(char *f)
 	printf("Bootstrap: Installing %s\n", loader_file);
 
 	if(access(loader_file,F_OK)==-1) {
-		if(debug) fprintf(stderr, "Not found.\n");
+		dbg(1,"Not found.\n");
 		return(1);
 	}
 
@@ -1224,8 +1347,7 @@ int bootstrap(char *f)
 	printf("Press [Enter] when ready...");
 	getchar();
 
-	if ((r=send_BASIC(loader_file))!=0)
-		return(r);
+	if ((r=send_BASIC(loader_file))!=0) return(r);
 
 	cat(post_install_txt_file);
 
@@ -1235,6 +1357,10 @@ int bootstrap(char *f)
 
 	return(0);
 }
+
+////////////////////////////////////////////////////////////////////////
+//
+//  MAIN
 
 int main(int argc, char **argv)
 {
@@ -1363,7 +1489,7 @@ int main(int argc, char **argv)
 	if(bootstrap_mode) return(bootstrap(bootstrap_file));
 
 	// process commands forever
-	while(1) get_opr_cmd();
+	while(1) if(opr_mode) get_opr_cmd(); else get_fdc_cmd();
 
 	return(0);
 }
