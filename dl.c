@@ -537,7 +537,7 @@ FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 	// TODO - make this configurable, allow ".." to show through,
 	// allow ordinary file or directory named "PARENT" etc.
 	if(f.local_fname[0]=='.' && f.local_fname[1]=='.') {
-		memcpy (f.client_fname, DEFAULT_DME_PARENT_LABEL, 6);
+		memcpy (f.client_fname, dme_parent_label, 6);
 	} else {
 		for(i=0;i<dot_offset && i<strlen(namep) && namep[i]; i++) {
 			if(namep[i]=='.') break;
@@ -1392,7 +1392,7 @@ int main(int argc, char **argv)
 	if (getenv("OPR_MODE")) opr_mode = atoi(getenv("OPR_MODE"));
 	if (getenv("DOT_OFFSET")) dot_offset = atoi(getenv("DOT_OFFSET"));
 	if (getenv("BAUD")) {i=atoi(getenv("BAUD"));client_baud=i==9600?B9600:i==19200?B19200:-1;}
-	if (getenv("ROOT_LABEL")) memcpy(dme_root_label,getenv("ROOT_LABEL"),6);
+	if (getenv("ROOT_LABEL")) {memcpy(dme_root_label,getenv("ROOT_LABEL"),6);memcpy(dme_cwd,dme_root_label,6);}
 	if (getenv("PARENT_LABEL")) memcpy(dme_parent_label,getenv("PARENT_LABEL"),6);
 	if (getenv("ATTRIB")) default_attrib = *getenv("ATTRIB");
 
