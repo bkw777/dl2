@@ -1,5 +1,6 @@
 # dlplus
-DeskLink+ is a Tandy Portable Disk Drive emulator or "TPDD Server" implimented in C.
+DeskLink+ is a Tandy Portable Disk Drive emulator or "TPDD Server" implimented in C.  
+2022 [GGLabs](https://gglabs.us/) has added support for TS-DOS subdirectories.
 
 [Original README](README.txt)
 
