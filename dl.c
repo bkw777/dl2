@@ -637,7 +637,7 @@ void ret_std(unsigned char err)
 	buf[3]=checksum(buf);
 	dbg(3,"Response: %02X\n",err);
 	write_client_tty(buf,4);
-	if (buf[2]!=ERR_SUCCESS) dbg(2,"ERROR RESPONSE TO CLIENT");
+	if (buf[2]!=ERR_SUCCESS) dbg(2,"ERROR RESPONSE TO CLIENT\n");
 }
 
 // return for dirent
@@ -1391,9 +1391,12 @@ int main(int argc, char **argv)
 	// env overrides for some things that don't have switches
 	if (getenv("OPR_MODE")) opr_mode = atoi(getenv("OPR_MODE"));
 	if (getenv("DOT_OFFSET")) dot_offset = atoi(getenv("DOT_OFFSET"));
-	if (getenv("BAUD")) {i=atoi(getenv("BAUD"));client_baud=i==9600?B9600:i==19200?B19200:-1;}
-	if (getenv("ROOT_LABEL")) {memcpy(dme_root_label,getenv("ROOT_LABEL"),6);memcpy(dme_cwd,dme_root_label,6);}
-	if (getenv("PARENT_LABEL")) memcpy(dme_parent_label,getenv("PARENT_LABEL"),6);
+	if (getenv("BAUD")) {i=atoi(getenv("BAUD"));
+		client_baud=i==9600?B9600:i==19200?B19200:-1;}
+	if (getenv("ROOT_LABEL")) {char t[7];snprintf(t,7,"%-6.6s",getenv("ROOT_LABEL"));
+		memcpy(dme_root_label,t,6);memcpy(dme_cwd,t,6);}
+	if (getenv("PARENT_LABEL")) {char t[7];snprintf(t,7,"%-6.6s",getenv("PARENT_LABEL"));
+		memcpy(dme_parent_label,t,6);}
 	if (getenv("ATTRIB")) default_attrib = *getenv("ATTRIB");
 
 	// commandline options
