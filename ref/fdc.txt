@@ -1,0 +1,38 @@
+ FDC-mode transaction format
+ Commands & parameters are all printable ascii, terminated by 0x0D
+
+ client sends: C [ ] [P[,P]...] CR
+
+ C = command letter, ascii letter
+ [ ] = optional space between command letter and first parameter
+ P = zero or more parameters, integer decimal values in ascii, comma seperated
+ CR = carriage return (0x0D)
+
+ Values are in plain text ascii. Example, a parameter value of 0 is written as 0,
+ ie 0x30, not a 0x00 byte like in Operation-mode.
+
+ server sends: EEDDAABB
+
+   8 bytes: 4 ascii hex pairs representing 4 byte values
+            or in some cases 2 byte values and a 2-byte value
+
+   the different pairs have different meanings depending on the command
+   being responded to, but generally:
+
+   1st pair EE is always the error status, an 8-bit integer error code
+
+   2nd pair DD is usually result data, an 8-bit integer result data
+   For some commands this byte is actually 8 individual bit flags.
+
+   3rd & 4th pairs AA BB are a single 16-bit integer length value.
+
+ Some fdc commands have one or more send-and-receive after that.
+ For the multi-transaction commands, if the status response to the
+ first part was not error, then the second (3rd,...)part, depending on
+ the type of command:
+
+ client sends: up to 128 bytes data for a sector write
+ server sends: another standard 8-byte response as above
+ or
+ client sends: single carriage-return
+ server sends: up to 128 bytes data from a sector read

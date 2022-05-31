@@ -1,0 +1,196 @@
+The DMEReq sequence works like this:
+ 
+ DMEReq is a mutual-recognition process where both TS-DOS and Desk-Link*
+ have to recognize each other.
+
+ TS-DOS has to detect if it is talking to Desk-Link without confusing
+ a real drive or any other server.
+
+ Desk-Link has to detect if it is talking to TS-DOS without confusing
+ Floppy or any other client.
+ 
+ (*) The original Desk-Link that ran on MS-DOS and was made by the same
+     Travelling Software as TS-DOS.
+
+ The total sequence that TS-DOS sends is:
+ M 1 0D 5A 5A 08 00 F7 0D
+
+ That is 3 things together:
+ 1: 3 bytes "M1\r" is the FDC-mode command to switch to Operation-mode.
+ 2: 5 bytes "ZZ" 08 00 F7 is the Operation-mode command to switch to
+    FDC-mode.
+ 3: 1 byte "\r" is the terminator for FDC-mode commands.
+    Like the opposite of "ZZ" in Operation-mode.
+
+ This sequence makes no sense at first glance, especially considering
+ that the drive is always already in Operation-mode and so the initial
+ FDC-mode command is just unrecognized junk.
+
+ How it works:
+ 
+ Step 1:
+ 
+    The FDC-mode command to switch to Operation-mode.
+    
+    TS-DOS sends 0x4D 0x31 0x0D  ("M1\r")
+    TS-DOS waits 3ms
+    TS-DOS flushes and discards it's RX buffer
+
+    FDC-mode commands have a different format than Operation-mode
+    commands. Operation-mode commands are initiated by "ZZ" and
+    terminated by reading the LEN field and counting that many bytes
+    plus the checksum. FDC-mode commands start with the first
+    byte and are terminated by a carriage-return.
+    
+    A real drive is usually not IN FDC-mode. A real drive is in
+    Operation-mode from power-on, and no normal clients use FDC-mode,
+    and so the drive is almost always in Operation-mode already.
+    But it's *possible* for a drive to be in either mode at any given
+    time. For example, it could be left in FDC-mode by some other
+    software.
+
+    Not counting random mid-command inconsistent states (a possibility
+    that ends up getting handled later), there are 2 main
+    initial conditions possible at the beginning of Step 1:
+
+    If the drive was in Operation-mode, Step 1 is just junk data.
+    A real drive in Operation-mode is just scanning for ZZ,
+    and none of these 3 bytes are ZZ. Anything else is ignored.
+    At the end of step 1:
+    o The drive should not change states. (remains in Operation-mode)
+    o The drive should not emit any error or other response.
+    
+    If the drive was in FDC-mode, this should put it into
+    Operation-mode. This command sends no response.
+    At the end of step 1:
+    o The drive should be in Operation-mode state.
+    o The drive should not emit any error or other response.
+
+    There are some more possible initial states, like if the drive was
+    not waiting for it's next command, but was in the middle of some
+    command like receiving payload bytes for a write or something.
+    In most of those cases the drive will send back nothing or an error.
+    This possibility is caught later. For now, proceed with the
+    assumption that at this point the drive IS in Operation-mode state.
+
+    If the drive did send any kind of response, TS-DOS has discarded it.
+  
+ Step 2:
+
+    The Operation-mode command to switch to FDC-mode.
+
+    TS-DOS sends: 0x5A 0x5A 0x08    0x00  0xF7
+         That is: Z    Z    REQ_FDC LEN:0 checksum
+
+    Because of Step 1, the drive begins Step 2 definitely ready to
+    respond to Operation-mode commands, and this is an Operation-mode
+    command.
+  
+    Because of that, And because this is the Operation-mode command
+    to switch to FDC-mode, Step 2 should now garantee the drive is
+    switched to FDC-mode.
+
+    This command does not emit a return block. And because the drive
+    should be in a known state this time, we can use the presense or
+    absense of any response as meaningful. TS-DOS previously cleared
+    it's RX queue, and since then has only issued a command which
+    produces no response from a real drive or other conforming emulator.
+    
+    At the end of Step 2:
+    o The drive should be in FDC-mode state.
+    o The drive should not emit any error or other response.
+    
+ 3:
+
+    Lastly, a final lone carriage-return.
+
+    TS-DOS sends 0D
+
+    This 0D is what tells the difference between a real drive and
+    Desk-Link.
+
+    At this point, a real drive should be in FDC-mode, and FDC-mode
+    commands are terminated with 0D.
+
+    No command was issued, but the 0D is recognized as "time to process
+    the command I just received".
+    
+    A real drive should emit no response in this state. It should just
+    return to the top of it's main loop and wait for a new command.
+
+    If a real drive did not start out in a normal waiting-for-command
+    state (regardless which mode), then by now it may have issued an
+    error or other response.
+
+    At the end of Step 3:
+    o A real drive should be in FDC-mode state.
+    o A real drive should still not have emitted any error or other
+      response, but may have.
+
+
+    --- now the reaction from Desk-Link vs a real drive ---
+
+    TS-DOS waits 3ms
+    TS-DOS checks it's RX queue
+
+    A real drive or other emulator that's in a normal state will have
+    sent back nothing at this point.
+    
+    A real drive or other emulator that's in some unknown unexpected
+    state may have sent back some error response or even possibly a
+    non-error response.
+
+    But Desk-Link recognizes this sequence of events and sends back the
+    DME response. TS-DOS can always distinguish a DME response from any
+    other normal response from a real drive or other server, because
+    the DME response block is not a valid response that a real drive
+    can ever send. The DME response is essentially a malformed or "illegal"
+    0x12 standard return. The 0x12 standard return is a single byte
+    payload response that just returns the success or error status of
+    a command, no data. It only has this one fixed format and length:
+    0x5A 0x5A 0x12    0x01  0x##      0x##
+    Z    Z    RET_STD LEN=1 errolevel checksum
+    A real drive can never send a 0x12 packet of any other form.
+
+    A DME response is 0x12 but with an 11-byte payload.
+    5A 5A 12 0B payload checksum
+
+    payload 11 bytes:
+    0x00 0x## 0x## 0x## 0x## 0x## 0x## 0x2E 0x3C 0x3E 0x20
+    That is: 0x00 6-bytes ".<> "
+
+    The 6 bytes are a space-padded directory name, or an arbitrary
+    string standing for the root dir.
+    
+    At this point, TS-DOS checks it's RX queue to decide whether the
+    drive is Desk-Link or not.
+
+    If TS-DOS does not have any pending RX data, or has any data is
+    not specifically the above Desk-Link DME response, then it knows
+    it's talking to a real drive or some other server besides Desk-Link,
+    and forgets about DME.
+
+    If it did get the DME response, then it knows it's talking to
+    Desk-Link, and uses it / expects it in responses.
+
+    In either case the next things TS-DOS does is put the drive back
+    into Operation-mode and issue an Operation-mode drive status request.
+
+    TS-DOS flushes and discards it's RX queue
+    TS-DOS sends 0x4D 0x31 0x0D  (put the drive back to Operation-mode)
+    TS-DOS waits 3ms
+    TS-DOS flushes and discards it's RX queue
+    TS-DOS sends 0x5A 0x5A 0x07 0x00 0xF8  (request drive status)
+
+
+ From Desk-Link's point of view:
+
+    Any client could legally just happen to send an FDC-mode command to
+    switch to Operation-mode followed by an Operation-mode command to
+    switch to FDC-mode, as they are both legal commands. But the final
+    carriage-return, essentially an "empty" FDC-mode command, is not
+    something any client would have a reason to do. A client would only
+    ever issue some command, or be silent.
+
+    So Desk-Link can tell from the final 0D that it is talking to
+    TS-DOS, and that's when it sends the DME response.

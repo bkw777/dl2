@@ -1,0 +1,37 @@
+
+File Attribute byte
+
+https://archive.org/details/tandy-service-manual-26-3808-s-software-manual-for-portable-disk-drive/page/23/mode/1up
+
+Always "F" for any KC-85 platform clients.
+
+This "F" is really just a convention of "Floppy", the original client for
+Model 100 & 200 that shipped with the TPDD, and subsequently other KC-85
+platform clients that wanted to be fully compatible with Floppy. (TS-DOS, etc)
+
+The field is just a single letter simple text search field into which a client
+may write any single letter, and later select files by that letter.
+
+The only effect it has is the order that filenames are returned by the drive.
+Matching files, if any, are returned first. That's it. As a client you can ask
+the drive "give me the E files" and stop doing get-next once you get a non-E.
+
+Floppy always writes "F" for every file. And since the other KC-85 platform
+clients wanted to be as compatible as possible, some or all of those do too.
+
+Because of that, when a real drive reads a disk with files created by Floppy
+or TS-DOS etc, every file on the disk will have an F.
+
+And so we basically lie and say that we read an F off the disk for every file.
+
+However there are other clients and other platforms that could possibly use
+this field for real.
+
+The most technically correct, client-agnostic, faithful drive emulating way
+to handle this field would be to save whatever a client supplies when a client
+creates a file, and reproduce that later when a client asks for file listings,
+(And perform the same directory list re-ordering that the drive firmware does.
+ Just make 2 passes through the directory table, once returning the matches,
+ then the rest.), and only fabricate data based on a configurable user setting,
+ and when there is no actual data previously saved from a client.
+ IE, a "tandy compat" config option to supply F (or other) by default.
