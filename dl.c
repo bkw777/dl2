@@ -828,25 +828,6 @@ void ret_dme_cwd()
 	write_client_tty(buf,14);
 }
 
-//////////////////////////////
-void req_dme_cwd() {
-	unsigned i;
-	unsigned char l[6]=DEFAULT_DME_ROOT_LABEL;
-
-	buf[0]=RET_STD;
-	buf[1]=LEN_RET_DME;
-	buf[2]=0x00;
-	for(i=0;i<6;i++) buf[3+i]=l[i];
-	buf[9]='.';
-	buf[10]='<';
-	buf[11]='>';
-	buf[12]=0x20;
-	buf[13]=checksum(buf);
-
-	write_client_tty (buf, buf[1]+3);
-}
-
-
 // b[0] = fmt  0x01
 // b[1] = len  0x01
 // b[2] = mode 0x01 write new
@@ -1091,7 +1072,7 @@ void dispatch_opr_cmd(unsigned char *data)
 			buf[1] = 0x00;
 			if (read_client_tty(&buf,1)==1 && buf[0]==0x0D) enable_dme=true;
 		}
-		if(enable_dme) req_dme_cwd();
+		if(enable_dme) ret_dme_cwd();
 		else opr_mode=0; // Actual FDC mode request. No response, just switch modes
 		break;
 	case REQ_CONDITION: // TPDD2
