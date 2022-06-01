@@ -30,7 +30,7 @@ dl -h
 dl
 ```
 
-## list all available TPDD client installers, and then bootstrap one of them.
+## list all available TPDD client installers, and then bootstrap one of them
 ```
 dl -l
 dl -b TS-DOS.100
