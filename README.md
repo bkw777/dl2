@@ -41,3 +41,6 @@ dl -b TS-DOS.100
 unzip REXCPMV21_b18.ZIP
 dl -b ./rxcini.DO ;dl -u
 ```
+
+## Advanced
+See [](ref/advanced.options.txt)

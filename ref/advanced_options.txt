@@ -1,0 +1,127 @@
+Some special features & controls, and experiments.
+
+Aside from the options displayed by the help options -h and -l,
+there are also some debugging and special options and some environment
+variables.
+
+Commandline switches:
+
+ -^  Config dump. This just displays several config options and exits.
+     If used in cencert with -vv or more, then it shows even more
+     info, including the results of all environment variables.
+
+     This is a way to verify that config options are actually in effect.
+
+Environment variables:
+
+To use these, just put them in the environment. The simples is just type
+them on the same command line , before the executable.
+
+Example:
+
+	$ ROOT_LABEL="/" PARENT_LABEL="^" dl -vvv
+
+
+ ROOT_LABEL    ex: ROOT_LABEL="/"  ROOT_LABEL="dlplus"  ROOT_LABEL="  <>  "
+			ROOT_LABEL="C:\"
+
+	The original Desk-Link, and so, most other emulators also,
+	puts the string "ROOT  " in the top-right corner of the TS-DOS
+	display when the user is in the top level share directory.
+
+	This variable lets you put whatever you want there. The string.
+	If you give it a string shorter than 6 bytes, it will be left
+	justified. If you give a string longer than 6 bytes it will be truncated.
+	If you want a shorter string to be centered, just include all 6 bytes
+	in the value with quotes. You can make it blank with "".
+
+ PARENT_LABEL  ex: PARENT_LABEL="^"  PARENT_LABEL="______"
+
+	Similar to ROOT_LABEL, Dees-Link used the word "PARENT" for the
+	the "go back up one level" directory entry in the top-left file
+	slot in the directory listing screen. This is the Desk-Link
+	equivalent to ".."
+
+	This variable lets you put whatever you want there instead of
+	"PARENT", with limitations. Unfortunately, since this appears
+	in the file list like any other file, TS-DOS is picky about
+	what it considers a "bad" filename, and you can't put just anything
+	here. Most notably, you can't use ".." :/ DAMMIT!
+
+	This is a TS-DOS limitation. You CAN actually use "..", in that,
+	dlplus will send it to TS-DOS, and TS-DOS will even display it
+	properly in the file listing, but if you try to hit enter on
+	it to move back up a directory, TS-DOS just beeps and says bad
+	filename, and never sends a single byte over the wire. The error
+	is coming from TS-DOS, not from the server.
+
+	However a lot of other things do work fine. Generally, for something
+	to work, it has to be left-justified like a real filename would be.
+	It takes some trial & error to figure out what works.
+
+	The examples above work.
+
+	I use ROOT_LABEL="/" PARENT_LABEL="^" myself.
+
+ ATTRIB        ex:  ATTRIB=""  ATTRIB=A   ATTRIB=F
+
+	The TPDD drive has a single-character field with every filename.
+	It's just a text field that the drive can use to return filtered
+	matching files all together before any others during file listings.
+	It's not really used by any software I know of, but the field is
+	there, and Floppy always writes an 'F' there for ever file. It doesn't
+	really matter or do anything. Everything still works if it's blank
+	for instance. But because Floppy always writes an F there, so does
+	every other client and emulator.
+
+	When an emulator is serving files, usually there is no actual attribute
+	byte stored with the file, so all emulators just say F there for every
+	file when they give filenames to clients.
+
+	But a real drive doesn't care, and TS-DOS is not the only client
+	that uses TPDD drives or emulators, so here is a way to modify
+	that if you want.
+
+	All this variable does is, when the client requests a file directory
+	listing and we're giving file name and size to the client, it uses
+	this instead of F for the attribute byte.
+
+	Who/what ever cares? Who knows.
+
+ DOT_OFFSET  ex:   DOT_OFFSET=0  DOT_OFFSET=25
+
+	Just another way to do the same thing as the -w or 0 options.
+
+	Default behavior is dot_offset=6 , which makes 6.2 space-padded filenames
+	the -w option for WP-2 does the same thing but 8.2
+	the -0 option disables all name re-formatting or assumptions
+
+	This variable would let you set some arbitrary value like 0 or 25 or
+	anywhere in between. There is no reason to do that.
+
+	It's possibly useful as just as an alternative way to set 0, 6, or 8 though,
+	which would essentially change the default behavior instead of having to
+	specify all the special options you want every time.
+
+ OPR_MODE    0 or 1, default is 1
+
+	A TPDD1 / FB-100 drive has two main modes of operation called
+	Operation-mode and FDC-mode (actually the software manual calls
+	them Operation mode and FDC Emulation mode)
+
+	These are basically two entire different sets of commands to
+	use the drive.
+
+	The drive is usually in Operation mode, but a few things do use FDC mode.
+	You can switch the starting default state by setting this to 0.
+
+ BAUD       9600 or 19200
+
+	The only valid values are 9600 and 19200, and 19200 is already
+	the default.
+
+	But if for whatever reason you want to force the server to run at 9600
+	instead of 19200, this how you can. Some drives like Purple Computing
+	arre actually hard wired to run at 9600, so, maybe you want to emulate
+	one of those, perhaps for testing software against it.
+

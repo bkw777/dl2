@@ -468,8 +468,7 @@ void cat(char *f) {
 // b[1] = len (how many more bytes to read after this one, 0-128)
 // b[2] to b[1+len] = 0 to 128 bytes of payload
 // contents after b[1+len] are ignored
-unsigned char checksum(unsigned char *b)
-{
+unsigned char checksum(unsigned char *b) {
 	unsigned short s=0;
 	int i;
 
@@ -477,9 +476,10 @@ unsigned char checksum(unsigned char *b)
 	return((s&0xFF)^0xFF);
 }
 
-char *pdd_to_local_fn(char *fname)
-{
+char *pdd_to_local_fn(char *fname) {
 	dbg(3,"%s(\"%s\")\n",__func__,fname);
+	if (!dot_offset) return fname;
+
 	int i;
 	for(i=dot_offset;i>1;i--) if(fname[i-1]!=' ') break;
 
@@ -494,7 +494,6 @@ char *pdd_to_local_fn(char *fname)
 	return fname;
 }
 
-
 // FIXME - don't do half of this stuff if (!dme_enable)
 // FIXME - option not to munge the client filenames at all other than
 //         to truncate to 24 bytes. No dot-offset/extension assumptions,
@@ -507,63 +506,77 @@ FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 
 	/** fill the entry */
 	strncpy (f.local_fname, namep, sizeof (f.local_fname) - 1);
-	dbg_b(3,(unsigned char*)f.client_fname,TPDD_FILENAME_LEN+1);
-	f.len = len;
-
-
-	// construct the client filename
-
-	// 24 spaces
 	memset(f.client_fname,0x20,TPDD_FILENAME_LEN);
+	f.len = len;
+	f.flags = flags;
 
-	// find the last dot in the local filename
-	for(i=strlen(namep);i>0;i--) if(namep[i]=='.') break;
+	if (dot_offset) {
+		// normal mode
 
-	// write client extension
-	if(flags&DIR_FLAG) {
-		// directory - put TS-DOS DME ext on client fname
-		f.client_fname[dot_offset+1]='<';
-		f.client_fname[dot_offset+2]='>';
-		f.len=0;
-	} else {
-		// file - put first 2 bytes of ext on client fname
-		f.client_fname[dot_offset+1]=namep[i+1];
-		f.client_fname[dot_offset+2]=namep[i+2];
-	}
+		// re-format the client filename to KC-85 or WP-2 standards.
+		// KC-85 / Model 100 / NEC-8201 etc require "%-6.6s.%-2.2s" in printf terms,
 
-	dbg(5,"\"%s\"\n",f.client_fname);
+		// In addition to that specifically TS-DOS also uses a fake
+		// filename extension of ".<>" to indicate directories, so we add those
+		// to the "filename" here when we encounter a directory, if enable_dme
+		// is enabled.
 
-	// replace ".." with "PARENT" (or whatever dme root label)
-	// TODO - make this configurable, allow ".." to show through,
-	// allow ordinary file or directory named "PARENT" etc.
-	if(f.local_fname[0]=='.' && f.local_fname[1]=='.') {
-		memcpy (f.client_fname, dme_parent_label, 6);
-	} else {
-		for(i=0;i<dot_offset && i<strlen(namep) && namep[i]; i++) {
-			if(namep[i]=='.') break;
-			f.client_fname[i]=namep[i];
+		// WP-2 requires "%-8.8s.%-2.2s"
+
+		// find the last dot in the local filename
+		for(i=strlen(namep);i>0;i--) if(namep[i]=='.') break;
+
+		// write client extension
+		if (flags&DIR_FLAG) {
+			// directory - put TS-DOS DME ext on client fname
+			f.client_fname[dot_offset+1]='<';
+			f.client_fname[dot_offset+2]='>';
+			f.len=0;
+		} else {
+			// file - put first 2 bytes of ext on client fname
+			f.client_fname[dot_offset+1]=namep[i+1];
+			f.client_fname[dot_offset+2]=namep[i+2];
 		}
+
+		dbg(5,"\"%s\"\n",f.client_fname);
+
+		// replace ".." with "PARENT" (or whatever is in dme_parent_label)
+		if (f.local_fname[0]=='.' && f.local_fname[1]=='.') {
+			memcpy (f.client_fname, dme_parent_label, 6);
+		} else {
+			for(i=0;i<dot_offset && i<strlen(namep) && namep[i]; i++) {
+				if(namep[i]=='.') break;
+				f.client_fname[i]=namep[i];
+			}
+		}
+
+		dbg(5,"\"%s\"\n",f.client_fname);
+
+		f.client_fname[dot_offset]='.';
+
+		dbg(5,"\"%s\"\n",f.client_fname);
+
+		f.client_fname[dot_offset+3]=0;
+
+		dbg(5,"\"%s\"\n",f.client_fname);
+
+		if(upcase) for(i=0;i<TPDD_FILENAME_LEN;i++) f.client_fname[i]=toupper(f.client_fname[i]);
+
+		dbg(5,"\"%s\"\n",f.client_fname);
+
+	} else {
+		// raw mode
+
+		// If dot_offset is 0 - then don't do any name reformatting
+		// just take the first 24 bytes of the real filename.
+		// Perhaps fill the rest of the 24 bytes with spaces instead of nulls.
+		snprintf(f.client_fname,25,"%-24.24s",namep);
 	}
-
-	dbg(5,"\"%s\"\n",f.client_fname);
-
-	f.client_fname[dot_offset]='.';
-
-	dbg(5,"\"%s\"\n",f.client_fname);
-
-	f.client_fname[dot_offset+3]=0;
-
-	dbg(5,"\"%s\"\n",f.client_fname);
-
-	if(upcase) for(i=0;i<TPDD_FILENAME_LEN;i++) f.client_fname[i]=toupper(f.client_fname[i]);
-
-	dbg(5,"\"%s\"\n",f.client_fname);
-
-	f.flags=flags;
 
 	dbg(4," local: \"%s\"\n",f.local_fname);
 	dbg(4,"client: \"%s\"\n",f.local_fname);
 	dbg(4,"   len: %d\n",f.len);
+	dbg(4," flags: %d\n",f.flags);
 
 	return &f;
 }
@@ -593,14 +606,16 @@ int read_next_dirent(DIR *dir)
 		if (S_ISDIR(st.st_mode)) flags=DIR_FLAG;
 		else if (!S_ISREG (st.st_mode)) continue;
 
-		if (dire->d_name[0]=='.') continue; // skip "." ".." and hidden files
-		//if (dire->d_name[0]=='#') continue; // skip "#"
+		// don't do these in raw mode
+		if (dot_offset) {
+			if (dire->d_name[0]=='.') continue; // skip "." ".." and hidden files
+			//if (dire->d_name[0]=='#') continue; // skip "#"
 
-		if (strlen(dire->d_name)>LOCAL_FILENAME_MAX) continue; // skip long filenames
+			if (strlen(dire->d_name)>LOCAL_FILENAME_MAX) continue; // skip long filenames
+		}
 
 		/* add file to list so we can traverse any order */
 		add_file (make_file_entry(dire->d_name, st.st_size, flags));
-
 		break;
 	}
 
@@ -655,8 +670,9 @@ int ret_dirent(FILE_ENTRY *ep)
 
 		// name
 		memset (buf + 2, ' ', TPDD_FILENAME_LEN);
-		for(i=0;i<dot_offset+3;i++)
+		if (dot_offset) for(i=0;i<dot_offset+3;i++)
 			buf[i+2]=(ep->client_fname[i])?ep->client_fname[i]:' ';
+		else memcpy (buf+2,ep->client_fname,TPDD_FILENAME_LEN);
 		//memcpy (buf + 2, ep->client_fname, dot_offset+2);
 
 		// attrib
@@ -845,28 +861,28 @@ int req_open(unsigned char *data)
 			ret_std (ERR_NO_FILE);
 			return -1;
 		}
-		
+
 		if(cur_file->flags&DIR_FLAG) {
 			int err=0;
 			// directory
-			if(cur_file->local_fname[0]=='.' && cur_file->local_fname[1]=='.') {
+			if (cur_file->local_fname[0]=='.' && cur_file->local_fname[1]=='.') {
 				// parent dir
-				if(dir_depth>0) {
+				if (dir_depth>0) {
 					err=chdir (cur_file->local_fname);
-					if(!err) dir_depth--;
+					if (!err) dir_depth--;
 				}
 			} else {
 				// enter dir
 				err=chdir(cur_file->local_fname);
-				dir_depth++;
+				if (!err) dir_depth++;
 			}
 			update_dme_cwd();
-			if(err) ret_std (ERR_FMT_MISMATCH);
+			if (err) ret_std (ERR_FMT_MISMATCH);
 			else ret_std (ERR_SUCCESS);
 		} else {
 			// regular file
 			o_file_h = open (cur_file->local_fname, O_RDONLY);
-			if(o_file_h<0)
+			if (o_file_h<0)
 				ret_std (ERR_NO_FILE);
 			else {
 				f_open_mode = omode;
@@ -1361,6 +1377,11 @@ void show_main_help() {
 		"   -u       Uppercase all filenames\n"
 		"   -r       RTS/CTS hardware flow control\n"
 		"   -z #     Milliseconds per byte for bootstrap (" S_(DEFAULT_BASIC_BYTE_MSEC) ")\n"
+		"   -0       Raw mode. Do not munge filenames in any way.\n"
+		"            Disables 6.2 or 8.2 filename trucating & padding\n"
+		"            Changes the attribute byte to ' ' instead of 'F'\n"
+		"            Disables adding the TS-DOS \".<>\" extension for directories\n"
+		"            The entire 24 bytes of the filename field on a real drive is used.\n"
 		"   -b file  Bootstrap: Send loader file to client\n"
 		"   -l       List available loader files and bootstrap help\n"
 		"\n"
@@ -1400,8 +1421,9 @@ int main(int argc, char **argv)
 	if (getenv("ATTRIB")) default_attrib = *getenv("ATTRIB");
 
 	// commandline options
-	while ((i = getopt (argc, argv, ":gurvd:p:wb:z:hl^")) >=0)
+	while ((i = getopt (argc, argv, ":0gurvd:p:wb:z:hl^")) >=0)
 		switch (i) {
+				case '0': dot_offset=0; upcase=false; default_attrib=0x20; break;
 				case 'g': getty_mode = true; debug = 0; break;
 				case 'u': upcase = true; break;
 				case 'r': rtscts = true; break;
