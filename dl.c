@@ -407,16 +407,15 @@ void client_tty_vmin(int n) {
 }
 
 int write_client_tty(void *b, size_t n) {
-	dbg(3,"%s()\n",__func__);
+	dbg(4,"%s(%u)\n",__func__,n);
 	dbg(2,"SEND: "); dbg_b(2,b,n);
 	return (write(client_tty_fd,b,n));
 }
 
 // TODO - retry sanity check counter - don't rety forever
 int read_client_tty(void *b, const unsigned int n) {
+	dbg(4,"%s(%u)\n",__func__,n);
 	unsigned t = 0;
-
-	dbg(4,"read_client_tty(%u): ",n);
 
 #if (READ_TTY_METHOD == 2)
 	// try to force read() to block until n bytes, but also retry
@@ -445,7 +444,7 @@ int read_client_tty(void *b, const unsigned int n) {
 	while (t<n) if ((i = read(client_tty_fd, b+t, n-t))) t+=i;
 #endif
 
-	dbg_b(4,b,t);
+	dbg(2,"RECV: "); dbg_b(2,b,n);
 
 	if (t!=n) {
 		dbg(0,"\aread error, expected %u bytes, got %u\n",n,t);
@@ -476,7 +475,7 @@ unsigned char checksum(unsigned char *b) {
 	return((s&0xFF)^0xFF);
 }
 
-char *pdd_to_local_fn(char *fname) {
+char *collapse_padded_name(char *fname) {
 	dbg(3,"%s(\"%s\")\n",__func__,fname);
 	if (!dot_offset) return fname;
 
@@ -523,8 +522,12 @@ FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 
 		// WP-2 requires "%-8.8s.%-2.2s"
 
+		dbg(5,"\"%s\"\n",f.client_fname);
+
 		// find the last dot in the local filename
 		for(i=strlen(namep);i>0;i--) if(namep[i]=='.') break;
+
+		dbg(5,"i:%d|%s|%s\n",i,f.client_fname,namep);
 
 		// write client extension
 		if (flags&DIR_FLAG) {
@@ -532,8 +535,9 @@ FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 			f.client_fname[dot_offset+1]='<';
 			f.client_fname[dot_offset+2]='>';
 			f.len=0;
-		} else {
-			// file - put first 2 bytes of ext on client fname
+		} else if (i>0) {
+			// file - put first 2 bytes of ext on client fname, if any
+			// only if name has a dot and at least 1 byte before the dot
 			f.client_fname[dot_offset+1]=namep[i+1];
 			f.client_fname[dot_offset+2]=namep[i+2];
 		}
@@ -573,8 +577,9 @@ FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 		snprintf(f.client_fname,25,"%-24.24s",namep);
 	}
 
+	dbg(5,"actual: \"%s\"\n",namep);
 	dbg(4," local: \"%s\"\n",f.local_fname);
-	dbg(4,"client: \"%s\"\n",f.local_fname);
+	dbg(4,"client: \"%s\"\n",f.client_fname);
 	dbg(4,"   len: %d\n",f.len);
 	dbg(4," flags: %d\n",f.flags);
 
@@ -714,7 +719,7 @@ int req_dirent(unsigned char *data)
 	case DIRENT_SET_NAME:	/* set filename for subsequent actions */
 		dbg(3,"DIRENT_SET_NAME\n");
 		if (data[2]) {
-			dbg(3,"filename: \"%24.24s\"\n",data+2);
+			dbg(3,"filename: \"%-24.24s\"\n",data+2);
 			dbg(3,"  attrib: \"%c\" (%1$02X)\n",data[26]);
 		}
 		strncpy(filename,(char *)data+2,TPDD_FILENAME_LEN);
@@ -723,24 +728,24 @@ int req_dirent(unsigned char *data)
 		for (p = strrchr(filename,' '); p >= filename && *p == ' '; p--) *p = 0;
 		cur_file=find_file(filename);
 		if (cur_file) { 
-			fprintf (stderr, "Found: \"%s\"  %u\n", cur_file->local_fname, cur_file->len);
+			dbg(3,"Found: \"%s\"  %u\n", cur_file->local_fname, cur_file->len);
 			ret_dirent(cur_file);
 
 		} else {
 			//	  strncpy(cur_file->client_fname, filename, TPDD_FILENAME_LEN);
-			fprintf (stderr, "Not found\n");
+			dbg(3,"Not found\n");
 			ret_dirent(NULL);
 			//			  empty_dirent();
 			if (filename[dot_offset+1]=='<' && filename[dot_offset+2]=='>') {
-				cur_file=make_file_entry(pdd_to_local_fn(filename), 0, DIR_FLAG);
+				cur_file=make_file_entry(collapse_padded_name(filename), 0, DIR_FLAG);
 			} else {
-				cur_file=make_file_entry(pdd_to_local_fn(filename), 0, 0);
+				cur_file=make_file_entry(collapse_padded_name(filename), 0, 0);
 			}
 		}
 		break;
 	case DIRENT_GET_FIRST:
 		dbg(3,"DIRENT_GET_FIRST\n");
-		if(debug==1) dbg(1,"directory listing\n");
+		if(debug==1) dbg(2,"Directory Listing\n");
 		update_file_list();
 		ret_dirent(get_first_file());
 		break;
@@ -765,14 +770,13 @@ void update_dme_cwd()
 {
 	dbg(2,"%s()\n",__func__);
 	int i;
+	memset(cwd,0x00,PATH_MAX);
+	(void)(getcwd(cwd,PATH_MAX-1)+1);
+	dbg(0,"Changed Dir: %s\n",cwd);
 	if(dir_depth) {
 		int j;
-		memset(cwd,0x00,PATH_MAX);
-		if(getcwd(cwd,PATH_MAX-1) ) {
-			memset(dme_cwd,0x20,6);
-			for(i=strlen(cwd); i>=0 ; i--) if(cwd[i]=='/') break;
-			for(j=0; j<6 && cwd[i+j+1] && cwd[i+j+1]!='.'; j++) dme_cwd[j]=cwd[i+j+1];
-		}
+		for(i=strlen(cwd); i>=0 ; i--) if(cwd[i]=='/') break;
+		for(j=0; j<6 && cwd[i+j+1] && cwd[i+j+1]!='.'; j++) dme_cwd[j]=cwd[i+j+1];
 	} else {
 		memcpy(dme_cwd,dme_root_label,6);
 	}
@@ -829,6 +833,7 @@ int req_open(unsigned char *data)
 				ret_std(ERR_FMT_MISMATCH);
 			else {
 				f_open_mode=omode;
+				dbg(1,"Open for write: %s\n",cur_file->local_fname);
 				ret_std(ERR_SUCCESS);
 			}
 		}
@@ -848,6 +853,7 @@ int req_open(unsigned char *data)
 			ret_std(ERR_FMT_MISMATCH);
 		else {
 			f_open_mode=omode;
+			dbg(1,"Open for appen: %s\n",cur_file->local_fname);
 			ret_std (ERR_SUCCESS);
 		}
 		break;
@@ -886,6 +892,7 @@ int req_open(unsigned char *data)
 				ret_std (ERR_NO_FILE);
 			else {
 				f_open_mode = omode;
+				dbg(1,"Open for read: %s\n",cur_file->local_fname);
 				ret_std (ERR_SUCCESS);
 			}
 		}
@@ -958,6 +965,7 @@ void req_delete(void)
 		rmdir(cur_file->local_fname);
 	else 
 		unlink (cur_file->local_fname);
+	dbg(1,"Deleted: %s\n",cur_file->local_fname);
 	update_file_list();
 	ret_std (ERR_SUCCESS);
 }
@@ -990,15 +998,17 @@ void ret_tsdos_mystery() {
 
 void req_rename(unsigned char *data)
 {
-	dbg(3,"%s()\n",__func__);
-	char *new_name = (char *)data + 4;
-
-	new_name[TPDD_FILENAME_LEN]=0;
-
-	if (rename (cur_file->local_fname, pdd_to_local_fn(new_name)))
+	dbg(3,"%s(%-24.24s)\n",__func__,data+2);
+	char *t = (char *)data + 2;
+	//new_name[TPDD_FILENAME_LEN]={0x00};
+	//char t[TPDD_FILENAME_LEN+1]={0x00};
+	memcpy(t,collapse_padded_name(t),TPDD_FILENAME_LEN);
+	if (rename (cur_file->local_fname,t))
 		ret_std(ERR_SECTOR_NUM);
-	else
+	else {
+		dbg(1,"Renamed: %s -> %s\n",cur_file->local_fname,t);
 		ret_std(ERR_SUCCESS);
+	}
 }
 
 void dispatch_opr_cmd(unsigned char *data)
@@ -1352,8 +1362,7 @@ void show_config () {
 	dbg(0,"bootstrap_mode  : %s\n",bootstrap_mode?"true":"false");
 	dbg(0,"bootstrap_file  : \"%s\"\n",bootstrap_file);
 	dbg(0,"client_tty_name : \"%s\"\n",client_tty_name);
-	if (getcwd(cwd,PATH_MAX-1)) dbg(0,
-	      "share_path      : \"%s\"\n",cwd);
+	dbg(0,"share_path      : \"%s\"\n",cwd);
 	dbg(2,"opr_mode        : %d\n",opr_mode);
 	dbg(2,"dot_offset      : %d\n",dot_offset);
 	dbg(2,"baud            : %d\n",client_baud==B9600?9600:client_baud==B19200?19200:-1);
@@ -1409,7 +1418,7 @@ int main(int argc, char **argv)
 		strcat(client_tty_name,S_(DEFAULT_CLIENT_TTY));
 	}
 
-	// env overrides for some things that don't have switches
+	// environment variable overrides for some things that don't have switches
 	if (getenv("OPR_MODE")) opr_mode = atoi(getenv("OPR_MODE"));
 	if (getenv("DOT_OFFSET")) dot_offset = atoi(getenv("DOT_OFFSET"));
 	if (getenv("BAUD")) {i=atoi(getenv("BAUD"));
@@ -1468,10 +1477,13 @@ int main(int argc, char **argv)
 		}
 	}
 
+	(void)(getcwd(cwd,PATH_MAX-1)+1);
+
 	if (x) { show_config(); return 0; }
 
-	dbg(1,"DeskLink+ " S_(APP_VERSION) "\n"
-		  "Using Serial Device: %s\n",client_tty_name);
+	dbg(0,"DeskLink+ " S_(APP_VERSION) "\n"
+		  "Serial Device: %s\n"
+		  "Working Dir: %s\n",client_tty_name,cwd);
 
 	if(client_tty_fd<0)
 		client_tty_fd=open((char *)client_tty_name,O_RDWR
@@ -1488,11 +1500,10 @@ int main(int argc, char **argv)
 		return(1);
 	}
 
-	if (debug && !bootstrap_mode) {
-		dbg(1,"Working In Directory: \n"
-			"--------------------------------------------------------------------------------\n");
-		(void)(system ("pwd >&2;ls -l >&2")+1);
-		dbg(1,"--------------------------------------------------------------------------------\n");
+	if (!bootstrap_mode) {
+		dbg(0,"--------------------------------------------------------------------------------\n");
+		(void)(system ("ls >&2")+1);
+		dbg(0,"--------------------------------------------------------------------------------\n");
 	}
 
 	// getty mode
