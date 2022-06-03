@@ -49,15 +49,15 @@ MA 02111, USA.
  * and the +3 is 3 extra bytes for type, length, and checksum.
  * 
  * Similarly, most functions include frequent references to these
- * byte offsets foo[0], foo[1], foo[2], foo+2, foo[foo[1]+2], etc.
+ * byte offsets buf[0], buf[1], buf[2], buf+2, buf[buf[1]+2].
  * 
  * functions named req_*() receive a command in this format
  * functions named ret_*() generate a response in this format
  * 
  * There is also an FDC-mode that TPDD1/FB-100 drives have, which has
- * a completely different format, but to date this program only
- * implements Operation-mode. TPDD2 drives do not have FDC-mode, but
- * they do have extra Operation-mode commands that TPDD1 does not have,
+ * a completely different format. This program only implements
+ * Operation-mode. TPDD2 drives do not have FDC-mode, but they do have
+ * extra Operation-mode commands that TPDD1 does not have,
  * some of which this program does implement.
  * 
  * See the ref/ directory for more details, including a copy of the
@@ -115,81 +115,24 @@ MA 02111, USA.
 #endif
 
 #define DEFAULT_BASIC_BYTE_MSEC 6
-#define DEFAULT_TPDD_FILE_ATTRIB 'F'
-// These are crap, since they are just ordinary words that could
-// easily conflict with user files/dirs, but this is what the original
-// Desk-Link did, and what TS-DOS and possibly other software expects.
-// So these are default, but you can override them either here at compile-time
-// or by environment variables at run-time.
-#define DEFAULT_DME_ROOT_LABEL   "ROOT"   // $ROOT_LABEL
-#define DEFAULT_DME_PARENT_LABEL "PARENT" // $PARENT_LABEL
+#define DEFAULT_TPDD_FILE_ATTRIB 0x46 // F
+
+// These defaults are the same as what the original Desk-Link does.
+// But you can change them to pretty much anything. The parent label is
+// picky because whatever you use has to look like a valid filename
+// to ts-dos. ".." doesn't work, but "^" does for instance.
+#define DEFAULT_DME_ROOT_LABEL   " ROOT " // ROOT_LABEL="/"
+#define DEFAULT_DME_PARENT_LABEL "PARENT" // PARENT_LABEL"^"
+
+// termios VMIN & VTIME
+#define C_CC_VMIN 1
+#define C_CC_VTIME 5
 
 ////////////////////////////////////////////////////////////////////////
 //
 //  Experimental feature selections
-
-// serial tty read() behavior
-// VMIN blocking method not working. The idea was to set VTIME=0 VMIN=nbytes
-// just before each read(), to make read() block until n bytes have been
-// received, instead of polling. Seems to be only partially working. It
-// does seem to produce larger contiguous reads, but still not full.
-//
-// Go into TS-DOS and select a large file and try to save it.
-// F1-Save -> req_write() -> read_client_tty() -> "expected 129 bytes, got 64"
-// Very consistent and repeatable, every single time not intermittent.
-//
-// And yet perror() says Success, and read() returnd 64 not 0 or -1.
-// So read() is not blocking like every web page claims this combination
-// of settings will do.
-//
-// However, adding retry around that works fine. See read_client_tty().
-//
-// 0 Is the safest fallback in case of problems. It's still better now 
-//   than it used to be thanks to changing the loop to read in as big of
-//   chunks as read() will deliver, instead of one byte per read(), and
-//   because of the VTIME/VMIN defaults below, now even though it doesn't
-//   block for the whole read like I want, it does at least block until at least
-//   the first byte, which is enough to free the cpu 99%. No race.
-//
-// 1 Is described above, and exhibits the incomplete reads problem.
-//
-// 2 ... is "1" with retries instead of bailing. Best of both worlds?
-//   64 out of 129 bytes is still 64x better than 1. I'm not sure if it's
-//   expensive or abusive or otherwise not recommended to be calling
-//   tcsetattr() so frequently. It may be that 0 is best.
-#define READ_TTY_METHOD 2 // 0 normal, 1 VMIN blocking, 2 VMIN blocking plus retries.
-
-// Two different forms of the ZZ scanner at the top of get_opr_cmd()
-// Both seem solid.
-#define ZZ_SCAN_METHOD 1
-
-// These values are set to a dynamic value just before every read()
-// and restored immediately after if TTY_READ_METHOD>0 .
-// These are the all-the-time defaults for TTY_READ_METHOD=0,
-// and in between reads in all cases. These are reasonable defaults.
-// In particulare they make the read() loop block at least until the
-// first/next byte is available, which is enough to free the cpu
-// even without the full 128-byte blocking I was hoping for.
-#define C_CC_VMIN 1
-#define C_CC_VTIME 5
-
-// This controls if the tty open() includes O_NONBLOCK. Man pages
-// and web guides suggest this just sets if the tty will honor
-// or ignore the DSR/DTR/DCD lines. Others say that VTIME/VMIN
-// will *not* block if O_NONBLOCK and/or O_NDELAY or non-canonical
-// mode in general are set.
-// The original code had O_NONBLOCK in the open() call. (Same as
-// 1 here). TS-DOS does use DSR/DTR to detect drive readiness
-// with a real drive, and has no other form of flow conytrol.
-// It can be confusing or annoying for users unfamiliar with
-// serial cabling, but I suggest leaving this false / 0.
+#define READ_TTY_METHOD 1
 #define IGNORE_DSR 0
-
-// TODO - make O_NOCTTY run-time configurable.
-// O_NO_CTTY was not in the original open() flags,
-// but seems advisable for this kind of usage.
-// But I don't really know so here is a control.
-#define NO_CTTY 1
 
 /*************************************************************/
 
@@ -286,25 +229,25 @@ MA 02111, USA.
 // There is no documentation for FDC error codes.
 // These are guesses from experimenting.
 // These appear in the first hex pair of an 8-byte FDC-mode response.
-#define ERR_FDC_SUCCESS 0         // 'OK'
-#define ERR_FDC_LSN_LO 17         // 'Logical Sector Number Below Range'
-#define ERR_FDC_LSN_HI 18         // 'Logical Sector Number Above Range'
-#define ERR_FDC_PSN HI 19         // 'Physical Sector Number Above Range'
-#define ERR_FDC_PARAM 33          // 'Parameter Invalid, Wrong Type'
-#define ERR_FDC_LSSC_LO 50        // 'Invalid Logical Sector Size Code'
-#define ERR_FDC_LSSC_HI 51        // 'Logical Sector Size Code Above Range'
+#define ERR_FDC_SUCCESS         0 // 'OK'
+#define ERR_FDC_LSN_LO         17 // 'Logical Sector Number Below Range'
+#define ERR_FDC_LSN_HI         18 // 'Logical Sector Number Above Range'
+#define ERR_FDC_PSN HI         19 // 'Physical Sector Number Above Range'
+#define ERR_FDC_PARAM          33 // 'Parameter Invalid, Wrong Type'
+#define ERR_FDC_LSSC_LO        50 // 'Invalid Logical Sector Size Code'
+#define ERR_FDC_LSSC_HI        51 // 'Logical Sector Size Code Above Range'
 #define ERR_FDC_NOT_FORMATTED 160 // 'Disk Not Formatted'
-#define ERR_FDC_READ 161          // 'Read Error'
+#define ERR_FDC_READ          161 // 'Read Error'
 #define ERR_FDC_WRITE_PROTECT 176 // 'Write-Protected Disk'
-#define ERR_FDC_COMMAND 193       // 'Invalid Command'
-#define ERR_FDC_NO_DISK 209       // 'Disk Not Inserted'
+#define ERR_FDC_COMMAND       193 // 'Invalid Command'
+#define ERR_FDC_NO_DISK       209 // 'Disk Not Inserted'
 
 // fixed lengths
-#define TPDD_DATA_MAX 0x80
-#define TPDD_FREE_SECTORS 0x50 // max valid value is 80 sectors
-#define LEN_RET_STD 0x01
-#define LEN_RET_DME 0x0B
-#define LEN_RET_DIRENT 0x1C
+#define TPDD_DATA_MAX      0x80
+#define TPDD_FREE_SECTORS  0x50 // max valid value is 80 sectors
+#define LEN_RET_STD        0x01
+#define LEN_RET_DME        0x0B
+#define LEN_RET_DIRENT     0x1C
 
 // KC-85 platform BASIC interpreter EOF byte for bootstrap()
 #define BASIC_EOF 0x1A
@@ -330,12 +273,14 @@ int client_tty_fd = -1;
 struct termios client_termios;
 int o_file_h = -1;
 unsigned char buf[TPDD_DATA_MAX+3];
-char cwd[PATH_MAX]={0x00};
+char cwd[PATH_MAX] = {0x00};
 char dme_cwd[6] = DEFAULT_DME_ROOT_LABEL;
 char client_tty_name[PATH_MAX];
-char bootstrap_file[PATH_MAX] = {0x00}; // S_(DEFAULT_CLIENT_APP) "." S_(DEFAULT_CLIENT_MODEL);
-bool enable_dme = false;
+char bootstrap_file[PATH_MAX] = {0x00};
 int opr_mode = 1; // 0=FDC-mode 1=Operation-mode
+bool dme_detected = false;
+bool dme_fdc = false;
+bool dme_disabled = false;
 
 FILE_ENTRY *cur_file;
 int dir_depth=0;
@@ -377,79 +322,30 @@ void dbg_p(const int v, unsigned char *b) {
 	dbg_b(v,b+2,b[1]);
 }
 
-void bz (void) {
-	//dbg(6,"%s()\n",__func__);
-	memset(buf,0x00,TPDD_DATA_MAX+3);
-}
-
-// make read(client_tty_fd,,) block until n bytes received
-// >-1 = set new values if not already
-// <0 = set default values if not already
-// <-1 = refresh tcgetattr() to be more certain, then set default values if not already
-void client_tty_vmin(int n) {
-	if (n<-1) tcgetattr(client_tty_fd,&client_termios);
-	if (n<0) {
-		if (client_termios.c_cc[VTIME] == C_CC_VTIME && client_termios.c_cc[VMIN] == C_CC_VMIN) return;
-		//dbg(4,"setting default vtime vmin\n");
-		client_termios.c_cc[VTIME] = C_CC_VTIME;
-		client_termios.c_cc[VMIN] = C_CC_VMIN;
-	} else {
-		if (client_termios.c_cc[VTIME] == 0 && client_termios.c_cc[VMIN] == n) return;
-		//dbg(4,"setting blocking vtime vmin\n");
-		client_termios.c_cc[VTIME] = 0;
-		client_termios.c_cc[VMIN] = n;
-	}
+// set termios VMIN & VTIME
+void client_tty_vmt(int m,int t) {
+	if (m<-1 || t<-1) tcgetattr(client_tty_fd,&client_termios);
+	if (m<0) m = C_CC_VMIN;
+	if (t<0) t = C_CC_VTIME;
+	if (client_termios.c_cc[VMIN] == m && client_termios.c_cc[VTIME] == t) return;
+	client_termios.c_cc[VMIN] = m;
+	client_termios.c_cc[VTIME] = t;
 	tcsetattr(client_tty_fd,TCSANOW,&client_termios);
-	//if (debug>3) {
-	//	tcgetattr(client_tty_fd,&client_termios);
-	//	dbg(4,"client_termios.c_cc[VTIME]=%u\nclient_termios.c_cc[VMIN]=%u\n",client_termios.c_cc[VTIME],client_termios.c_cc[VMIN]);
-	//}
 }
 
 int write_client_tty(void *b, size_t n) {
 	dbg(4,"%s(%u)\n",__func__,n);
-	dbg(2,"SEND: "); dbg_b(2,b,n);
+	dbg(3,"SEND: "); dbg_b(3,b,n);
 	return (write(client_tty_fd,b,n));
 }
 
-// TODO - retry sanity check counter - don't rety forever
+// TODO - retry sanity check counter - don't retry forever
 int read_client_tty(void *b, const unsigned int n) {
 	dbg(4,"%s(%u)\n",__func__,n);
 	unsigned t = 0;
-
-#if (READ_TTY_METHOD == 2)
-	// try to force read() to block until n bytes, but also retry
-	// "expected 129, got 64" still better than before.
-	//dbg(3,"new method\n");
-	int i;
-	client_tty_vmin(n);
+	int i = 0;
 	while (t<n) if ((i = read(client_tty_fd, b+t, n-t))) t+=i;
-	client_tty_vmin(-1);
-#elif (READ_TTY_METHOD == 1)
-	// force read() to block until n bytes, single read(), no polling.
-	// NOT WORKING - it doesn't block completely. "expected 129, got 64"
-	// perror() says "Success" :/
-	//dbg(3,"new method\n");
-	client_tty_vmin(n);
-	if ((t = read(client_tty_fd, b, n)) != n) perror("read()");
-	client_tty_vmin(-1);
-#else
-	// Poll, but at least read as many bytes as available each time and
-	// subtract from total, instead of one byte at a time.
-	// This is the reliable fallback "old" method, but even this
-	// is better than it used to be thanks to the default VTIME & VMIN
-	// that now makes it at least block until the first byte, so no cpu.
-	//dbg(3,"old method\n");
-	int i;
-	while (t<n) if ((i = read(client_tty_fd, b+t, n-t))) t+=i;
-#endif
-
-	dbg(2,"RECV: "); dbg_b(2,b,n);
-
-	if (t!=n) {
-		dbg(0,"\aread error, expected %u bytes, got %u\n",n,t);
-		exit(1);
-	}
+	dbg(3,"RECV: "); dbg_b(3,b,n);
 	return (t);
 }
 
@@ -493,10 +389,6 @@ char *collapse_padded_name(char *fname) {
 	return fname;
 }
 
-// FIXME - don't do half of this stuff if (!dme_enable)
-// FIXME - option not to munge the client filenames at all other than
-//         to truncate to 24 bytes. No dot-offset/extension assumptions,
-//         no toupper, no hiding dot-files, etc.
 FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 {
 	dbg(3,"%s(\"%s\")\n",__func__,namep);
@@ -513,12 +405,13 @@ FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 		// normal mode
 
 		// re-format the client filename to KC-85 or WP-2 standards.
-		// KC-85 / Model 100 / NEC-8201 etc require "%-6.6s.%-2.2s" in printf terms,
+		// KC-85 / Model 100 / NEC-8201 etc require "%-6.6s.%-2.2s"
 
 		// In addition to that specifically TS-DOS also uses a fake
 		// filename extension of ".<>" to indicate directories, so we add those
-		// to the "filename" here when we encounter a directory, if enable_dme
-		// is enabled.
+		// to the "filename" here when we encounter a directory.
+
+		// Directories are filtered before calling us if dme is disabled
 
 		// WP-2 requires "%-8.8s.%-2.2s"
 
@@ -537,14 +430,14 @@ FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 			f.len=0;
 		} else if (i>0) {
 			// file - put first 2 bytes of ext on client fname, if any
-			// only if name has a dot and at least 1 byte before the dot
+			// only if name has a dot and at least 1 other byte before the dot
 			f.client_fname[dot_offset+1]=namep[i+1];
 			f.client_fname[dot_offset+2]=namep[i+2];
 		}
 
 		dbg(5,"\"%s\"\n",f.client_fname);
 
-		// replace ".." with "PARENT" (or whatever is in dme_parent_label)
+		// replace ".." with dme_parent_label
 		if (f.local_fname[0]=='.' && f.local_fname[1]=='.') {
 			memcpy (f.client_fname, dme_parent_label, 6);
 		} else {
@@ -586,17 +479,16 @@ FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 	return &f;
 }
 
-int read_next_dirent(DIR *dir)
-{
+int read_next_dirent(DIR *dir) {
 	dbg(3,"%s()\n",__func__);
 	struct stat st;
 	struct dirent *dire;
 	int flags;
 
 	if (dir == NULL) {
-		printf ("%s:%u\n", __FUNCTION__, __LINE__);
 		dire=NULL;
-		ret_std (ERR_NO_DISK);
+		dbg(0,"%s(NULL) ???\n",__func__);
+		ret_std(ERR_NO_DISK);
 		return(0);
 	}
 
@@ -611,16 +503,16 @@ int read_next_dirent(DIR *dir)
 		if (S_ISDIR(st.st_mode)) flags=DIR_FLAG;
 		else if (!S_ISREG (st.st_mode)) continue;
 
+		if (flags==DIR_FLAG && !dme_detected) continue;
+
 		// don't do these in raw mode
 		if (dot_offset) {
 			if (dire->d_name[0]=='.') continue; // skip "." ".." and hidden files
-			//if (dire->d_name[0]=='#') continue; // skip "#"
-
 			if (strlen(dire->d_name)>LOCAL_FILENAME_MAX) continue; // skip long filenames
 		}
 
 		/* add file to list so we can traverse any order */
-		add_file (make_file_entry(dire->d_name, st.st_size, flags));
+		add_file(make_file_entry(dire->d_name, st.st_size, flags));
 		break;
 	}
 
@@ -629,16 +521,15 @@ int read_next_dirent(DIR *dir)
 	return 1;
 }
 
-void update_file_list()
-{
+void update_file_list() {
 	dbg(3,"%s()\n",__func__);
 	DIR * dir;
 
 	dir=opendir(".");
 	/** rebuild the file list */
 	file_list_clear_all();
-	if(dir_depth) add_file (make_file_entry("..", 0, DIR_FLAG));
-	while (read_next_dirent (dir));
+	if(dir_depth) add_file(make_file_entry("..", 0, DIR_FLAG));
+	while (read_next_dirent(dir));
 
 	closedir(dir);
 }
@@ -667,7 +558,7 @@ int ret_dirent(FILE_ENTRY *ep)
 	unsigned short size;
 	int i;
 
-	bz();
+	memset(buf,0x00,TPDD_DATA_MAX+3);
 	buf[0]=RET_DIRENT;
 	buf[1]=LEN_RET_DIRENT;
 
@@ -704,7 +595,7 @@ int ret_dirent(FILE_ENTRY *ep)
  * heads-up
  * TS-DOS sometimes submits request with junk in the filename & attrib fields
  * in some cases where a real drive would ignore them (get-first/get-next).
- * So only look at those fields for the set-name case.
+ * So only look at those fields for the set-name.
 */ 
 int req_dirent(unsigned char *data)
 {
@@ -714,6 +605,7 @@ int req_dirent(unsigned char *data)
 
 	char *p;
 	char filename[TPDD_FILENAME_LEN+1] = { 0x00 };
+	int f = 0;
 
 	switch (data[27]) {
 	case DIRENT_SET_NAME:	/* set filename for subsequent actions */
@@ -722,32 +614,35 @@ int req_dirent(unsigned char *data)
 			dbg(3,"filename: \"%-24.24s\"\n",data+2);
 			dbg(3,"  attrib: \"%c\" (%1$02X)\n",data[26]);
 		}
+		// we must update before every set-name for at least 2 reasons:
+		// 1 - get-first is not required before set-name
+		//     TEENY for instance never does get-first or get-next
+		// 2 - Files may be changed by other processes than ourself
+		// set-name however is required for, and before, any other action
+		update_file_list();
 		strncpy(filename,(char *)data+2,TPDD_FILENAME_LEN);
 		filename[TPDD_FILENAME_LEN]=0;
-		/* Remove trailing spaces */
-		for (p = strrchr(filename,' '); p >= filename && *p == ' '; p--) *p = 0;
+		// Remove trailing spaces
+		for (p = strrchr(filename,' '); p >= filename && *p == ' '; p--) *p = 0x00;
 		cur_file=find_file(filename);
 		if (cur_file) { 
-			dbg(3,"Found: \"%s\"  %u\n", cur_file->local_fname, cur_file->len);
+			dbg(3,"Exists: \"%s\"  %u\n", cur_file->local_fname, cur_file->len);
 			ret_dirent(cur_file);
-
 		} else {
-			//	  strncpy(cur_file->client_fname, filename, TPDD_FILENAME_LEN);
-			dbg(3,"Not found\n");
+			if (filename[dot_offset+1]=='<' && filename[dot_offset+2]=='>') f = DIR_FLAG;
+			cur_file=make_file_entry(collapse_padded_name(filename), 0, f);
+			dbg(3,"New %s: \"%s\"\n",f==DIR_FLAG?"Directory":"File",cur_file->local_fname);
 			ret_dirent(NULL);
-			//			  empty_dirent();
-			if (filename[dot_offset+1]=='<' && filename[dot_offset+2]=='>') {
-				cur_file=make_file_entry(collapse_padded_name(filename), 0, DIR_FLAG);
-			} else {
-				cur_file=make_file_entry(collapse_padded_name(filename), 0, 0);
-			}
 		}
 		break;
 	case DIRENT_GET_FIRST:
 		dbg(3,"DIRENT_GET_FIRST\n");
 		if(debug==1) dbg(2,"Directory Listing\n");
+		// we must update every time before get-first,
+		// because set-name is not required before get-first
 		update_file_list();
 		ret_dirent(get_first_file());
+		dme_fdc = 0; // see ref/fdc.txt
 		break;
 	case DIRENT_GET_NEXT:
 		dbg(3,"DIRENT_GET_NEXT\n");
@@ -765,9 +660,8 @@ int req_dirent(unsigned char *data)
 	return 0;
 }
 
-// update dme_cwd with a 6-byte truncated / space-padded working dir
-void update_dme_cwd()
-{
+// update dme_cwd with a 6-byte truncated working dir
+void update_dme_cwd() {
 	dbg(2,"%s()\n",__func__);
 	int i;
 	memset(cwd,0x00,PATH_MAX);
@@ -776,7 +670,7 @@ void update_dme_cwd()
 	if(dir_depth) {
 		int j;
 		for(i=strlen(cwd); i>=0 ; i--) if(cwd[i]=='/') break;
-		for(j=0; j<6 && cwd[i+j+1] && cwd[i+j+1]!='.'; j++) dme_cwd[j]=cwd[i+j+1];
+		for(j=0; j<6 && cwd[i+j+1]; j++) dme_cwd[j]=cwd[i+j+1];
 	} else {
 		memcpy(dme_cwd,dme_root_label,6);
 	}
@@ -784,8 +678,7 @@ void update_dme_cwd()
 
 // TS-DOS DME return
 // Construct a DME packet around dme_cwd and send it to the client
-void ret_dme_cwd()
-{
+void ret_dme_cwd() {
 	dbg(2,"%s(\"%s\")\n",__func__,dme_cwd);
 	buf[0]=RET_STD;
 	buf[1]=LEN_RET_DME;
@@ -796,8 +689,36 @@ void ret_dme_cwd()
 	buf[11]='>';
 	buf[12]=0x20;
 	buf[13]=checksum(buf);
-	dbg(3,"Setting TS-DOS CWD: \"%6.6s\"\n",buf+3);
 	write_client_tty(buf,14);
+}
+
+
+// Any FDC request might actually be a DME request
+// See ref/dme.txt for the full explaination because it's a lot.
+// dme_fdc is only retained for the duration of one directory listing
+// dme_detected is retained forever
+void req_fdc() {
+	dbg(2,"%s()\n",__func__);
+
+	dbg(3,"dme detection %s\n",dme_disabled?"disabled":"allowed");
+	dbg(3,"dme %spreviously detected\n",dme_fdc?"":"not ");
+
+	if (!dme_fdc && !dme_disabled) {
+		dbg(3,"testing for dme\n");
+		buf[0] = 0x00;
+		client_tty_vmt(0,1);   // allow this read to time out
+		(void)(read(client_tty_fd,buf,1)+1);
+		client_tty_vmt(-1,-1); // restore normal VMIN/VTIME
+		if (buf[0]==0x0D) dme_fdc = true;
+	}
+	if (dme_fdc) {
+		dme_detected=true;
+		dbg(3,"dme detected\n");
+		ret_dme_cwd();
+	} else {
+		opr_mode = 0;
+		dbg(1,"Switching to \"FDC\" mode\n");
+	}
 }
 
 // b[0] = fmt  0x01
@@ -805,7 +726,7 @@ void ret_dme_cwd()
 // b[2] = mode 0x01 write new
 //             0x02 write append
 //             0x03 read
-// b[3] = ck
+// b[3] = chk
 int req_open(unsigned char *data)
 {
 	dbg(2,"%s(\"%s\")\n",__func__,cur_file->local_fname);
@@ -853,7 +774,7 @@ int req_open(unsigned char *data)
 			ret_std(ERR_FMT_MISMATCH);
 		else {
 			f_open_mode=omode;
-			dbg(1,"Open for appen: %s\n",cur_file->local_fname);
+			dbg(1,"Open for append: %s\n",cur_file->local_fname);
 			ret_std (ERR_SUCCESS);
 		}
 		break;
@@ -903,9 +824,8 @@ int req_open(unsigned char *data)
 
 // b[0] = 0x03
 // b[1] = 0x00
-// b[2] = ck
-void req_read(void)
-{
+// b[2] = chk
+void req_read(void) {
 	dbg(2,"%s()\n",__func__);
 	int i;
 
@@ -924,10 +844,10 @@ void req_read(void)
 	buf[1] = (unsigned char) i;
 	buf[2+i] = checksum(buf);
 
-	dbg(4,"...OUT going packet TO client...\n");
+	dbg(4,"...outgoing packet...\n");
 	dbg(5,"buf[]\n"); dbg_b(5,buf,-1);
 	dbg_p(4,buf);
-	dbg(4,"................................\n");
+	dbg(4,".....................\n");
 
 	write_client_tty(buf, 3+i);
 }
@@ -935,38 +855,30 @@ void req_read(void)
 // b[0] = 0x04
 // b[1] = 0x01 - 0x80
 // b[2] = b[1] bytes
-// b[2+len] = ck
-void req_write(unsigned char *data)
-{
+// b[2+len] = chk
+void req_write(unsigned char *data) {
 	dbg(2,"%s()\n",__func__);
-	dbg(4,"...IN coming packet FROM client...\n");
+	dbg(4,"...incoming packet...\n");
 	dbg(5,"data[]\n"); dbg_b(5,data,-1);
 	dbg_p(4,data);
-	dbg(4,"..................................\n");
+	dbg(4,".....................\n");
 
-	if(o_file_h<0) {
-		ret_std(ERR_CMDSEQ);
-		return;
-	}
-	if(f_open_mode!=F_OPEN_WRITE && f_open_mode !=F_OPEN_APPEND) {
+	if (o_file_h<0) {ret_std(ERR_CMDSEQ); return;}
+
+	if (f_open_mode!=F_OPEN_WRITE && f_open_mode !=F_OPEN_APPEND) {
 		ret_std(ERR_FMT_MISMATCH);
 		return;
 	}
-	if(write (o_file_h,data+2,data[1]) != data[1])
-		ret_std (ERR_SECTOR_NUM);
-	else
-		ret_std (ERR_SUCCESS);
+
+	if (write (o_file_h,data+2,data[1]) != data[1]) ret_std (ERR_SECTOR_NUM);
+	else ret_std (ERR_SUCCESS);
 }
 
-void req_delete(void)
-{
+void req_delete(void) {
 	dbg(2,"%s()\n",__func__);
-	if(cur_file->flags&DIR_FLAG)
-		rmdir(cur_file->local_fname);
-	else 
-		unlink (cur_file->local_fname);
+	if(cur_file->flags&DIR_FLAG) rmdir(cur_file->local_fname);
+	else unlink (cur_file->local_fname);
 	dbg(1,"Deleted: %s\n",cur_file->local_fname);
-	update_file_list();
 	ret_std (ERR_SUCCESS);
 }
 
@@ -996,12 +908,9 @@ void ret_tsdos_mystery() {
 	write_client_tty(buf, buf[1]+3);
 }
 
-void req_rename(unsigned char *data)
-{
+void req_rename(unsigned char *data) {
 	dbg(3,"%s(%-24.24s)\n",__func__,data+2);
 	char *t = (char *)data + 2;
-	//new_name[TPDD_FILENAME_LEN]={0x00};
-	//char t[TPDD_FILENAME_LEN+1]={0x00};
 	memcpy(t,collapse_padded_name(t),TPDD_FILENAME_LEN);
 	if (rename (cur_file->local_fname,t))
 		ret_std(ERR_SECTOR_NUM);
@@ -1011,64 +920,47 @@ void req_rename(unsigned char *data)
 	}
 }
 
-void dispatch_opr_cmd(unsigned char *data)
-{
-	dbg(3,"%s()\n",__func__);
-	dbg_p(3,data);
+void req_close() {
+	if(o_file_h>=0) close(o_file_h);
+	o_file_h = -1;
+	dbg(1,"Closed: %s\n",cur_file->local_fname);
+	ret_std(ERR_SUCCESS);
+}
+
+void req_status() {
+	dbg(2,"%s()\n",__func__);
+	ret_std(ERR_SUCCESS);
+}
+
+void req_condition() {
+	dbg(2,"%s()\n",__func__);
+	ret_std(ERR_SUCCESS);
+}
+
+void req_format() {
+	dbg(2,"%s()\n",__func__);
+	ret_std(ERR_SUCCESS);
+}
+
+void dispatch_opr_cmd(unsigned char *data) {
+	dbg(3,"%s(%02X)\n",__func__,data[0]);
+	//dbg_p(3,data);
 	dbg(5,"data[]\n"); dbg_b(5,data,-1);
 
 	switch(data[0]) {
-	case REQ_DIRENT:
-		req_dirent(data);
-		break;
-	case REQ_OPEN:
-		req_open(data);
-		break;
-	case REQ_CLOSE:
-		if(o_file_h>=0) close(o_file_h);
-		o_file_h = -1;
-		ret_std(ERR_SUCCESS);
-		break;
-	case REQ_READ:
-		req_read();
-		break;
-	case REQ_WRITE:
-		req_write(data);
-		break;
-	case REQ_DELETE:
-		req_delete();
-		break;
-	case REQ_FORMAT:
-		ret_std(ERR_SUCCESS);
-		break;
-	case REQ_STATUS:
-		ret_std(ERR_SUCCESS);
-		break;
-	case REQ_FDC: // TPDD1 switch to FDC mode. Also part of TS-DOS<>Desk-Link DME.
-		dbg(2,"REQ_FDC\n");
-		if(!enable_dme) {
-			buf[1] = 0x00;
-			if (read_client_tty(&buf,1)==1 && buf[0]==0x0D) enable_dme=true;
-		}
-		if(enable_dme) ret_dme_cwd();
-		else opr_mode=0; // Actual FDC mode request. No response, just switch modes
-		break;
-	case REQ_CONDITION: // TPDD2
-		ret_std(ERR_SUCCESS);
-		break;
-	case REQ_RENAME: // TPDD2
-		req_rename(data);
-		update_file_list ();
-		break;
-	case REQ_TSDOS_MYSTERY:  /* TS-DOS mystery command 2 */
-		ret_tsdos_mystery(); /* part of TS-DOS drive/server detection */
-		break;
-	case REQ_CACHE_WRITE:  /* formerly TS-DOS "mystery command 1" */
-		ret_cache_write(); /* part of TS-DOS detection of TPDD2 */
-		break;
-	default:
-		return;
-		break;
+		case REQ_DIRENT:        req_dirent(data);     break;
+		case REQ_OPEN:          req_open(data);       break;
+		case REQ_CLOSE:         req_close();          break;
+		case REQ_READ:          req_read();           break;
+		case REQ_WRITE:         req_write(data);      break;
+		case REQ_DELETE:        req_delete();         break;
+		case REQ_FORMAT:        req_format();         break;
+		case REQ_STATUS:        req_status();         break;
+		case REQ_FDC:           req_fdc();            break;
+		case REQ_CONDITION:     req_condition();      break;
+		case REQ_RENAME:        req_rename(data);     break;
+		case REQ_TSDOS_MYSTERY: ret_tsdos_mystery();  break;
+		case REQ_CACHE_WRITE:   ret_cache_write();    break;
 	}
 
 	return;
@@ -1079,34 +971,17 @@ int get_opr_cmd(void)
 	dbg(3,"%s()\n",__func__);
 	unsigned char b[TPDD_DATA_MAX+3] = { 0x00 };
 	unsigned i = 0;
-	bz();
+	memset(buf,0x00,TPDD_DATA_MAX+3);
 
-// both of these work
-#if (ZZ_SCAN_METHOD == 1)
-	// collect command
 	while (read_client_tty(&b,1) == 1) {
 		if (b[0]==0x5A) i++; else { i=0; b[0]=0x00; continue; }
 		if (i<2) { b[0]=0x00; continue; }
 		if ((read_client_tty(&b,2) == 2) && (read_client_tty(&b[2],b[1]+1) == b[1]+1)) break;
 		i=0; memset(b,0x00,TPDD_DATA_MAX+3);
 	}
-#else
-	// collect command
-	while (read_client_tty(&b,1) == 1) {
-		if (i==2) { // have 2 Z's else skip
-			i=0; // ensure if any of the following fail, start over
-			if (read_client_tty(&b[1],1) != 1) continue; // read len
-			if (b[1]>TPDD_DATA_MAX) continue; // len is sane
-			if (read_client_tty(&b[2],b[1]+1) == b[1]+1) break; // read payload+checksum & done
-		}
-		if (b[0]==0x5A) i++; else i=0; // current byte is Z else start over
-	}
-#endif
 
-	// debug
-	dbg_p(3,b);
+	dbg_p(2,b);
 
-	// checksum else abort
 	i = checksum(b);
 	if (b[b[1]+2]!=i) {
 		dbg(0,"Failed checksum: received: %02X  calculated: %02X\n",b[b[1]+2],i);
@@ -1114,7 +989,6 @@ int get_opr_cmd(void)
 		return(7);
 	}
 
-	// dispatch
 	dispatch_opr_cmd(b);
 	return 0;
 }
@@ -1123,34 +997,81 @@ int get_opr_cmd(void)
 //
 //  FDC MODE
 
-// This is mostly just a stub still, but one operation works, which is
-// switching back and forth between FDC-mode and Operation-mode
+// Just a stub yet, but one operation works, which is switching back
+// and forth between FDC-mode and Operation-mode.
 //
 // You can see it happen by running "OPR_MODE=0 dl -vv"
 // See it starts on get_fdc_cmd() instead of get_opr_cmd()
 // Then load the directory from TS-DOS.
-
 // standard 8-character FDC-mode response
+
 void ret_fdc_std(unsigned char e, unsigned char d, unsigned short l) {
-	dbg(1,"ret_fdc_std()\n");
+	dbg(2,"%s()\n",__func__);
 	char b[9] = { 0x00 };
 	snprintf(b,9,"%02X%02X%04X",e,d,l);
-	dbg(1,"\"%s\"\n",b);
+	dbg(1,"FDC: response: \"%s\"\n",b);
 	write_client_tty(b,8);
+}
+
+void req_fdc_set_mode(char *b) {
+	dbg(2,"%s(%s)\n",__func__,b+1);
+	int m = atoi(&b[1]);
+	dbg(1,"FDC: Switching to \"%s\" mode\n",m==0?"FDC":m==1?"Operation":"-invalid-");
+	opr_mode=m; // no response, just switch modes
+}
+
+void req_fdc_condition(char *b) {
+	dbg(2,"%s(%s)\n",__func__,b+1);
+	ret_fdc_std(ERR_FDC_SUCCESS,0,0);
+}
+void req_fdc_format(char *b) {
+	dbg(2,"%s(%s)\n",__func__,b+1);
+	ret_fdc_std(ERR_FDC_SUCCESS,0,0);
+}
+void req_fdc_format_nv(char *b) {
+	dbg(2,"%s(%s)\n",__func__,b+1);
+	ret_fdc_std(ERR_FDC_SUCCESS,0,0);
+}
+void req_fdc_read_id(char *b) {
+	dbg(2,"%s(%s)\n",__func__,b+1);
+	ret_fdc_std(ERR_FDC_COMMAND,0,0);
+}
+void req_fdc_read_sector(char *b) {
+	dbg(2,"%s(%s)\n",__func__,b+1);
+	ret_fdc_std(ERR_FDC_COMMAND,0,0);
+}
+void req_fdc_search_id(char *b) {
+	dbg(2,"%s(%s)\n",__func__,b+1);
+	ret_fdc_std(ERR_FDC_COMMAND,0,0);
+}
+void req_fdc_write_id(char *b) {
+	dbg(2,"%s(%s)\n",__func__,b+1);
+	ret_fdc_std(ERR_FDC_COMMAND,0,0);
+}
+void req_fdc_write_id_nv(char *b) {
+	dbg(2,"%s(%s)\n",__func__,b+1);
+	ret_fdc_std(ERR_FDC_COMMAND,0,0);
+}
+void req_fdc_write_sector(char *b) {
+	dbg(2,"%s(%s)\n",__func__,b+1);
+	ret_fdc_std(ERR_FDC_COMMAND,0,0);
+}
+void req_fdc_write_sector_nv(char *b) {
+	dbg(2,"%s(%s)\n",__func__,b+1);
+	ret_fdc_std(ERR_FDC_COMMAND,0,0);
 }
 
 /* ref/fdc.txt */
 int get_fdc_cmd(void) {
-	dbg(1,"get_fdc_cmd()\n");
-	unsigned char b[TPDD_DATA_MAX] = { 0x00 };
+	dbg(3,"%s()\n",__func__);
+	char b[TPDD_DATA_MAX] = { 0x00 };
 	unsigned i = 0;
 	bool eol = false;
 
-	// TODO
-	// FDC-mode commands are plain text and terminated with CR (0x0D).
-	// Theoretically we could set the tty to a modified canonical mode, and
-	// get the command in a single read for free, instead of this byte loop.
+	// see if the command byte was collected already by req_fdc()
+	if (buf[0]>0x00 && buf[0]!=0x0D && buf[1]==0x00) {b[0]=buf[0];i=1;}
 
+	// TODO canonical mode
 	// read command
 	while (i<TPDD_DATA_MAX && !eol) {
 		if(read_client_tty(&b[i],1)==1) {
@@ -1163,61 +1084,23 @@ int get_fdc_cmd(void) {
 	}
 
 	// debug
-	dbg(1,"\"%s\"\n",b);
+	dbg(3,"\"%s\"\n",b);
 
 	// dispatch
 	switch(b[0]) {
-		case FDC_SET_MODE: // mode
-			dbg(1,"FDC_SET_MODE\n");
-			opr_mode=b[1]; // no response, just switch modes
-			break;
-		case FDC_CONDITION: // condition
-			dbg(1,"FDC_CONDITION\n");
-			ret_fdc_std(ERR_FDC_SUCCESS,0,0);
-			break;
-		case FDC_FORMAT: // format
-			dbg(1,"FDC_FORMAT\n");
-			ret_fdc_std(ERR_FDC_COMMAND,0,0);
-			break;
-		case FDC_FORMAT_NV: // format w/o verify
-			dbg(1,"FDC_FORMAT_NV\n");
-			ret_fdc_std(ERR_FDC_COMMAND,0,0);
-			break;
-		case FDC_READ_ID: // read id
-			dbg(1,"FDC_READ_ID\n");
-			ret_fdc_std(ERR_FDC_COMMAND,0,0);
-			break;
-		case FDC_READ_SECTOR: // read sector
-			dbg(1,"FDC_READ_SECTOR\n");
-			ret_fdc_std(ERR_FDC_COMMAND,0,0);
-			break;
-		case FDC_SEARCH_ID: // search id
-			dbg(1,"FDC_SEARCH_ID\n");
-			ret_fdc_std(ERR_FDC_COMMAND,0,0);
-			break;
-		case FDC_WRITE_ID: // write id
-			dbg(1,"FDC_WRITE_ID\n");
-			ret_fdc_std(ERR_FDC_COMMAND,0,0);
-			break;
-		case FDC_WRITE_ID_NV: // write id w/o verify
-			dbg(1,"FDC_WRITE_ID_NV\n");
-			ret_fdc_std(ERR_FDC_COMMAND,0,0);
-			break;
-		case FDC_WRITE_SECTOR: // write sector
-			dbg(1,"FDC_WRITE_SECTOR\n");
-			ret_fdc_std(ERR_FDC_COMMAND,0,0);
-			break;
-		case FDC_WRITE_SECTOR_NV: // write sector w/o verify
-			dbg(1,"FDC_WRITE_SECTOR_NV\n");
-			ret_fdc_std(ERR_FDC_COMMAND,0,0);
-			break;
-		case 0x00: // TS-DOS does this as part of Desk-Link/DME detection
-			if(!i) { // if empty carriage return, i should be 0
-				dbg(1,"EMPTY COMMAND\n");
-				break;
-			} // otherwise, something weird happened, fall through
-		default:
-			dbg(1,"UNRECOGNIZED COMMAND\n");
+		case FDC_SET_MODE:        req_fdc_set_mode(b);        break;
+		case FDC_CONDITION:       req_fdc_condition(b);       break;
+		case FDC_FORMAT:          req_fdc_format(b);          break;
+		case FDC_FORMAT_NV:       req_fdc_format_nv(b);       break;
+		case FDC_READ_ID:         req_fdc_read_id(b);         break;
+		case FDC_READ_SECTOR:     req_fdc_read_sector(b);     break;
+		case FDC_SEARCH_ID:       req_fdc_search_id(b);       break;
+		case FDC_WRITE_ID:        req_fdc_write_id(b);        break;
+		case FDC_WRITE_ID_NV:     req_fdc_write_id_nv(b);     break;
+		case FDC_WRITE_SECTOR:    req_fdc_write_sector(b);    break;
+		case FDC_WRITE_SECTOR_NV: req_fdc_write_sector_nv(b); break;
+		case 0x00: if(!i) {dbg(1,"FDC: empty command\n"); break;}
+		default: dbg(1,"FDC: unknown command\n");
 	}
 	return(0);
 }
@@ -1259,7 +1142,6 @@ void show_bootstrap_help() {
 int send_BASIC(char *f)
 {
 	int w=0;
-	int i=0;
 	int fd;
 	int byte_usleep = BASIC_byte_msec*1000;
 	unsigned char b;
@@ -1272,10 +1154,9 @@ int send_BASIC(char *f)
 	dbg(1,"Sending %s\n",f);
 
 	while(read(fd,&b,1)==1) {
-		while((i=write_client_tty(&b,1))!=1);
-		w+=i;
+		write_client_tty(&b,1);
 		usleep(byte_usleep);
-		if(debug) dbg(0,"Sent: %d bytes\n",w);
+		if(debug) dbg(0,"Sent: %d bytes\n",++w);
 		else dbg(0,".");
 		fflush(stdout);
 	}
@@ -1286,7 +1167,7 @@ int send_BASIC(char *f)
 	close(client_tty_fd);
 
 	if(debug) dbg(0,"Sent %s",f);
-	else dbg(0,"\n");
+	dbg(0,"\n");
 
 	return(0);
 }
@@ -1298,12 +1179,12 @@ int bootstrap(char *f)
 	char pre_install_txt_file[PATH_MAX]={0x00};
 	char post_install_txt_file[PATH_MAX]={0x00};
 
-	if (f[0]=='~'&&f[1]=='/') {
+	if (f[0]=='~' && f[1]=='/') {
 		strcpy(loader_file,getenv("HOME"));
 		strcat(loader_file,f+1);
 	}
 
-	if ((f[0]=='/')||(f[0]=='.'&&f[1]=='/'))
+	if ((f[0]=='/') || (f[0]=='.' && f[1]=='/'))
 		strcpy(loader_file,f);
 
 	if(loader_file[0]==0) {
@@ -1366,6 +1247,7 @@ void show_config () {
 	dbg(2,"opr_mode        : %d\n",opr_mode);
 	dbg(2,"dot_offset      : %d\n",dot_offset);
 	dbg(2,"baud            : %d\n",client_baud==B9600?9600:client_baud==B19200?19200:-1);
+	dbg(0,"dme_disabled    : %s\n",dme_disabled?"true":"false");
 	dbg(2,"dme_root_label  : \"%6.6s\"\n",dme_root_label);
 	dbg(2,"dme_parent_label: \"%6.6s\"\n",dme_parent_label);
 	dbg(2,"default_attrib  : '%c'\n",default_attrib);
@@ -1420,6 +1302,7 @@ int main(int argc, char **argv)
 
 	// environment variable overrides for some things that don't have switches
 	if (getenv("OPR_MODE")) opr_mode = atoi(getenv("OPR_MODE"));
+	if (getenv("DISABLE_DME")) dme_disabled = true;
 	if (getenv("DOT_OFFSET")) dot_offset = atoi(getenv("DOT_OFFSET"));
 	if (getenv("BAUD")) {i=atoi(getenv("BAUD"));
 		client_baud=i==9600?B9600:i==19200?B19200:-1;}
@@ -1486,10 +1369,7 @@ int main(int argc, char **argv)
 		  "Working Dir: %s\n",client_tty_name,cwd);
 
 	if(client_tty_fd<0)
-		client_tty_fd=open((char *)client_tty_name,O_RDWR
-#if (NO_CTTY == 1)
-			,O_NOCTTY
-#endif
+		client_tty_fd=open((char *)client_tty_name,O_RDWR,O_NOCTTY
 #if (IGNORE_DSR == 1)
 			,O_NONBLOCK
 #endif
@@ -1523,13 +1403,13 @@ int main(int argc, char **argv)
 	else client_termios.c_cflag &= ~CRTSCTS;
 	if(cfsetspeed(&client_termios,client_baud)==-1) return(22);
 	if(tcsetattr(client_tty_fd,TCSANOW,&client_termios)==-1) return(23);
-	client_tty_vmin(-2);
+	client_tty_vmt(-2,-2);
 
 	// send loader and exit
 	if(bootstrap_mode) return(bootstrap(bootstrap_file));
 
 	// create the file list (for reverse order traversal)
-	file_list_init ();
+	file_list_init();
 
 	// process commands forever
 	while(1) if(opr_mode) get_opr_cmd(); else get_fdc_cmd();
