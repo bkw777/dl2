@@ -386,6 +386,21 @@ char *collapse_padded_name(char *fname) {
 	return fname;
 }
 
+void lsx (char *path,char *match) {
+	struct dirent *files;
+	DIR *dir = opendir(path);
+	int i;
+	if (dir == NULL){dbg(0,"Cannot open \"%s\"",path); return;}
+
+	while ((files = readdir(dir)) != NULL) {
+		for (i=strlen(files->d_name);files->d_name[i]!='.';i--);
+		if (files->d_name[i+1]==match[0] && files->d_name[i+2]==match[1] && files->d_name[i+3]==match[2])
+			dbg(0," %s",files->d_name);
+	}
+
+	closedir(dir);
+}
+
 FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 {
 	dbg(3,"%s(\"%s\")\n",__func__,namep);
@@ -427,18 +442,24 @@ FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 		}
 
 		f.client_fname[dot_offset]='.';
-		f.client_fname[dot_offset+3]=0;
+		f.client_fname[dot_offset+3]=0x00;
 		if (upcase) for(i=0;i<TPDD_FILENAME_LEN;i++) f.client_fname[i]=toupper(f.client_fname[i]);
+
+		// lame...
+		if (f.client_fname[dot_offset+1]==0x00) f.client_fname[dot_offset+1]=0x20;
+		if (f.client_fname[dot_offset+2]==0x00) f.client_fname[dot_offset+2]=0x20;
 
 	} else {
 		// raw mode (-0) - don't reformat anything
 		snprintf(f.client_fname,25,"%-24.24s",namep);
 	}
 
-	dbg(4," local: \"%s\"\n",f.local_fname);
-	dbg(4,"client: \"%s\"\n",f.client_fname);
-	dbg(4,"   len: %d\n",f.len);
-	dbg(4," flags: %s\n",f.flags==0?"":f.flags==DIR_FLAG?"dir":"other");
+	dbg(1,"\"%s\"\t%s%s\n",f.client_fname,f.local_fname,f.flags==DIR_FLAG?"/":"");
+
+//	dbg(4," local: \"%s\"\n",f.local_fname);
+//	dbg(4,"client: \"%s\"\n",f.client_fname);
+//	dbg(4,"   len: %d\n",f.len);
+//	dbg(4," flags: %s\n",f.flags==0?"":f.flags==DIR_FLAG?"dir":"other");
 
 	return &f;
 }
@@ -489,11 +510,11 @@ void update_file_list() {
 	DIR * dir;
 
 	dir=opendir(".");
-	/** rebuild the file list */
 	file_list_clear_all();
+	dbg(1,"-------------------------------------------------------------------------------\n");
 	if (dir_depth) add_file(make_file_entry("..", 0, DIR_FLAG));
 	while (read_next_dirent(dir));
-
+	dbg(1,"-------------------------------------------------------------------------------\n");
 	closedir(dir);
 }
 
@@ -884,7 +905,7 @@ void req_rename(unsigned char *data) {
 void req_close() {
 	if (o_file_h>=0) close(o_file_h);
 	o_file_h = -1;
-	dbg(1,"Closed: %s\n",cur_file->local_fname);
+	dbg(2,"Closed: %s\n",cur_file->local_fname);
 	ret_std(ERR_SUCCESS);
 }
 
@@ -936,7 +957,7 @@ int get_opr_cmd(void)
 		i=0; memset(b,0x00,TPDD_DATA_MAX+3);
 	}
 
-	dbg_p(2,b);
+	dbg_p(3,b);
 
 	i = checksum(b);
 	if (b[b[1]+2]!=i) {
@@ -1070,16 +1091,11 @@ void show_bootstrap_help() {
 		"%1$s - DeskLink+ " S_(APP_VERSION) " - \"bootstrap\" help\n\n"
 		"Available loader files (in " S_(APP_LIB_DIR) "):\n\n",args[0]);
 
-	dbg(0,  "TRS-80 Model 100 & 102 : ");
-	(void)(system("find " S_(APP_LIB_DIR) " -regex \'.*/.+\\.100$\' -printf \'\%f \' >&2")+1);
-	dbg(0,"\nTANDY Model 200        : ");
-	(void)(system("find " S_(APP_LIB_DIR) " -regex \'.*/.+\\.200$\' -printf \'\%f \' >&2")+1);
-	dbg(0,"\nNEC PC-8201(a)/PC-8300 : ");
-	(void)(system("find " S_(APP_LIB_DIR) " -regex \'.*/.+\\.NEC$\' -printf \'\%f \' >&2")+1);
-	dbg(0,"\nKyotronic KC-85        : ");
-	(void)(system("find " S_(APP_LIB_DIR) " -regex \'.*/.+\\.K85$\' -printf \'\%f \' >&2")+1);
-	dbg(0,"\nOlivetti M-10          : ");
-	(void)(system("find " S_(APP_LIB_DIR) " -regex \'.*/.+\\.M10$\' -printf \'\%f \' >&2")+1);
+	dbg(0,  "TRS-80 Model 100 & 102 :"); lsx(S_(APP_LIB_DIR),"100");
+	dbg(0,"\nTANDY Model 200        :"); lsx(S_(APP_LIB_DIR),"200");
+	dbg(0,"\nNEC PC-8201(a)/PC-8300 :"); lsx(S_(APP_LIB_DIR),"NEC");
+	dbg(0,"\nKyotronic KC-85        :"); lsx(S_(APP_LIB_DIR),"K85");
+	dbg(0,"\nOlivetti M-10          :"); lsx(S_(APP_LIB_DIR),"M10");
 
 	dbg(0,
 		"\n\n"
@@ -1330,12 +1346,6 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (!bootstrap_mode) {
-		dbg(0,"--------------------------------------------------------------------------------\n");
-		(void)(system ("ls >&2")+1);
-		dbg(0,"--------------------------------------------------------------------------------\n");
-	}
-
 	// getty mode
 	if (getty_mode) {
 		if (login_tty(client_tty_fd)==0) client_tty_fd = STDIN_FILENO;
@@ -1360,6 +1370,7 @@ int main(int argc, char **argv)
 
 	// create the file list (for reverse order traversal)
 	file_list_init();
+	if (debug) update_file_list();
 
 	// process commands forever
 	while (1) if (opr_mode) get_opr_cmd(); else get_fdc_cmd();
