@@ -121,19 +121,14 @@ MA 02111, USA.
 // But you can change them to pretty much anything. The parent label is
 // picky because whatever you use has to look like a valid filename
 // to ts-dos. ".." doesn't work, but "^" does for instance.
-#define DEFAULT_DME_ROOT_LABEL   " ROOT " // ROOT_LABEL='0:'
-#define DEFAULT_DME_PARENT_LABEL "PARENT" // PARENT_LABEL'^'
+#define DEFAULT_DME_ROOT_LABEL   " ROOT " // ROOT_LABEL='0:'  '-root-'
+#define DEFAULT_DME_PARENT_LABEL "PARENT" // PARENT_LABEL'^:' '-back-'
+// this you can't change unless you also hack ts-dos
 #define DEFAULT_DME_DIR_LABEL    "<>"     // DIR_LABEL='/'
 
 // termios VMIN & VTIME
 #define C_CC_VMIN 1
 #define C_CC_VTIME 5
-
-////////////////////////////////////////////////////////////////////////
-//
-//  Experimental feature selections
-#define READ_TTY_METHOD 1
-#define IGNORE_DSR 0
 
 /*************************************************************/
 
@@ -257,7 +252,7 @@ MA 02111, USA.
 int debug = 0;
 bool upcase = false;
 bool rtscts = false;
-unsigned dot_offset = 6; // 6 for KC-85 platform, 8 for WP-2
+unsigned dot_offset = 6; // 0 for raw, 6 for KC-85, 8 for WP-2
 int client_baud = DEFAULT_CLIENT_BAUD;
 int BASIC_byte_msec = DEFAULT_BASIC_BYTE_MSEC;
 char dme_root_label[7] = DEFAULT_DME_ROOT_LABEL;
@@ -348,7 +343,7 @@ int read_client_tty(void *b, const unsigned int n) {
 	int i = 0;
 	while (t<n) if ((i = read(client_tty_fd, b+t, n-t))) t+=i;
 	dbg(3,"RECV: "); dbg_b(3,b,n);
-	return (t);
+	return t;
 }
 
 // cat a file to terminal, for bootstrap directions
@@ -369,8 +364,8 @@ unsigned char checksum(unsigned char *b) {
 	unsigned short s=0;
 	int i;
 
-	for(i=0;i<2+b[1];i++) s+=b[i];
-	return((s&0xFF)^0xFF);
+	for (i=0;i<2+b[1];i++) s+=b[i];
+	return ((s&0xFF)^0xFF);
 }
 
 char *collapse_padded_name(char *fname) {
@@ -378,9 +373,9 @@ char *collapse_padded_name(char *fname) {
 	if (!dot_offset) return fname;
 
 	int i;
-	for(i=dot_offset;i>1;i--) if(fname[i-1]!=' ') break;
+	for (i=dot_offset;i>1;i--) if (fname[i-1]!=' ') break;
 
-	if(fname[dot_offset+1]==dme_dir_label[0] && fname[dot_offset+2]==dme_dir_label[1]) {
+	if (fname[dot_offset+1]==dme_dir_label[0] && fname[dot_offset+2]==dme_dir_label[1]) {
 		fname[i]=0x00;
 	} else {
 		fname[i]=fname[dot_offset];
@@ -404,25 +399,10 @@ FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 	f.flags = flags;
 
 	if (dot_offset) {
-		// normal mode
-
-		// re-format the client filename to KC-85 or WP-2 standards.
-		// KC-85 / Model 100 / NEC-8201 etc require "%-6.6s.%-2.2s"
-
-		// In addition to that specifically TS-DOS also uses a fake
-		// filename extension of ".<>" to indicate directories, so we add those
-		// to the "filename" here when we encounter a directory.
-
-		// Directories are filtered before calling us if dme is disabled
-
-		// WP-2 requires "%-8.8s.%-2.2s"
-
-		dbg(5,"\"%s\"\n",f.client_fname);
+		// if not in raw mode, reformat the client filename
 
 		// find the last dot in the local filename
-		for(i=strlen(namep);i>0;i--) if(namep[i]=='.') break;
-
-		dbg(5,"i:%d|%s|%s\n",i,f.client_fname,namep);
+		for(i=strlen(namep);i>0;i--) if (namep[i]=='.') break;
 
 		// write client extension
 		if (flags&DIR_FLAG) {
@@ -431,52 +411,34 @@ FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 			f.client_fname[dot_offset+2]=dme_dir_label[1];
 			f.len=0;
 		} else if (i>0) {
-			// file - put first 2 bytes of ext on client fname, if any
-			// only if name has a dot and at least 1 other byte before the dot
+			// file - put first 2 bytes of ext on client fname
 			f.client_fname[dot_offset+1]=namep[i+1];
 			f.client_fname[dot_offset+2]=namep[i+2];
 		}
-
-		dbg(5,"\"%s\"\n",f.client_fname);
 
 		// replace ".." with dme_parent_label
 		if (f.local_fname[0]=='.' && f.local_fname[1]=='.') {
 			memcpy (f.client_fname, dme_parent_label, 6);
 		} else {
 			for(i=0;i<dot_offset && i<strlen(namep) && namep[i]; i++) {
-				if(namep[i]=='.') break;
+				if (namep[i]=='.') break;
 				f.client_fname[i]=namep[i];
 			}
 		}
 
-		dbg(5,"\"%s\"\n",f.client_fname);
-
 		f.client_fname[dot_offset]='.';
-
-		dbg(5,"\"%s\"\n",f.client_fname);
-
 		f.client_fname[dot_offset+3]=0;
-
-		dbg(5,"\"%s\"\n",f.client_fname);
-
-		if(upcase) for(i=0;i<TPDD_FILENAME_LEN;i++) f.client_fname[i]=toupper(f.client_fname[i]);
-
-		dbg(5,"\"%s\"\n",f.client_fname);
+		if (upcase) for(i=0;i<TPDD_FILENAME_LEN;i++) f.client_fname[i]=toupper(f.client_fname[i]);
 
 	} else {
-		// raw mode
-
-		// If dot_offset is 0 - then don't do any name reformatting
-		// just take the first 24 bytes of the real filename.
-		// Perhaps fill the rest of the 24 bytes with spaces instead of nulls.
+		// raw mode (-0) - don't reformat anything
 		snprintf(f.client_fname,25,"%-24.24s",namep);
 	}
 
-	dbg(5,"actual: \"%s\"\n",namep);
 	dbg(4," local: \"%s\"\n",f.local_fname);
 	dbg(4,"client: \"%s\"\n",f.client_fname);
 	dbg(4,"   len: %d\n",f.len);
-	dbg(4," flags: %d\n",f.flags);
+	dbg(4," flags: %s\n",f.flags==0?"":f.flags==DIR_FLAG?"dir":"other");
 
 	return &f;
 }
@@ -491,7 +453,7 @@ int read_next_dirent(DIR *dir) {
 		dire=NULL;
 		dbg(0,"%s(NULL) ???\n",__func__);
 		ret_std(ERR_NO_DISK);
-		return(0);
+		return 0;
 	}
 
 	while ((dire=readdir(dir)) != NULL) {
@@ -507,7 +469,6 @@ int read_next_dirent(DIR *dir) {
 
 		if (flags==DIR_FLAG && !dme_detected) continue;
 
-		// don't do these in raw mode
 		if (dot_offset) {
 			if (dire->d_name[0]=='.') continue; // skip "." ".." and hidden files
 			if (strlen(dire->d_name)>LOCAL_FILENAME_MAX) continue; // skip long filenames
@@ -530,7 +491,7 @@ void update_file_list() {
 	dir=opendir(".");
 	/** rebuild the file list */
 	file_list_clear_all();
-	if(dir_depth) add_file(make_file_entry("..", 0, DIR_FLAG));
+	if (dir_depth) add_file(make_file_entry("..", 0, DIR_FLAG));
 	while (read_next_dirent(dir));
 
 	closedir(dir);
@@ -568,10 +529,9 @@ int ret_dirent(FILE_ENTRY *ep)
 
 		// name
 		memset (buf + 2, ' ', TPDD_FILENAME_LEN);
-		if (dot_offset) for(i=0;i<dot_offset+3;i++)
+		if (dot_offset) for (i=0;i<dot_offset+3;i++)
 			buf[i+2]=(ep->client_fname[i])?ep->client_fname[i]:' ';
 		else memcpy (buf+2,ep->client_fname,TPDD_FILENAME_LEN);
-		//memcpy (buf + 2, ep->client_fname, dot_offset+2);
 
 		// attrib
 		buf[26] = default_attrib;
@@ -616,7 +576,7 @@ int req_dirent(unsigned char *data)
 			dbg(3,"filename: \"%-24.24s\"\n",data+2);
 			dbg(3,"  attrib: \"%c\" (%1$02X)\n",data[26]);
 		}
-		// we must update before every set-name for at least 2 reasons:
+		// we must update before every set-name for at least 2 reasons
 		// 1 - get-first is not required before set-name
 		//     TEENY for instance never does get-first or get-next
 		// 2 - Files may be changed by other processes than ourself
@@ -639,7 +599,7 @@ int req_dirent(unsigned char *data)
 		break;
 	case DIRENT_GET_FIRST:
 		dbg(3,"DIRENT_GET_FIRST\n");
-		if(debug==1) dbg(2,"Directory Listing\n");
+		if (debug==1) dbg(2,"Directory Listing\n");
 		// we must update every time before get-first,
 		// because set-name is not required before get-first
 		update_file_list();
@@ -656,7 +616,7 @@ int req_dirent(unsigned char *data)
 		break;
 	case DIRENT_CLOSE:
 		dbg(3,"DIRENT_CLOSE\n");
-		// file_list_clear_all ();
+		// does it expect a return?
 		break;
 	}
 	return 0;
@@ -670,8 +630,8 @@ void update_dme_cwd() {
 	memset(cwd,0x00,PATH_MAX);
 	(void)(getcwd(cwd,PATH_MAX-1)+1);
 	dbg(0,"Changed Dir: %s\n",cwd);
-	if(dir_depth) {
-		for(i=strlen(cwd); i>=0 ; i--) if(cwd[i]=='/') break;
+	if (dir_depth) {
+		for (i=strlen(cwd); i>=0 ; i--) if (cwd[i]=='/') break;
 		snprintf(dme_cwd,7,"%-6.6s",cwd+i+1);
 	} else {
 		memcpy(dme_cwd,dme_root_label,6);
@@ -743,7 +703,7 @@ int req_open(unsigned char *data)
 			close (o_file_h);
 			o_file_h=-1;
 		}
-		if(cur_file->flags&DIR_FLAG) {
+		if (cur_file->flags&DIR_FLAG) {
 			if(mkdir(cur_file->local_fname,0775)==0) {
 				ret_std(ERR_SUCCESS);
 			} else {
@@ -751,7 +711,7 @@ int req_open(unsigned char *data)
 			}
 		} else {
 			o_file_h = open (cur_file->local_fname,O_CREAT|O_TRUNC|O_WRONLY|O_EXCL,0666);
-			if(o_file_h<0)
+			if (o_file_h<0)
 				ret_std(ERR_FMT_MISMATCH);
 			else {
 				f_open_mode=omode;
@@ -766,7 +726,7 @@ int req_open(unsigned char *data)
 			close(o_file_h);
 			o_file_h=-1;
 		}
-		if(cur_file==0) {
+		if (cur_file==0) {
 			ret_std(ERR_FMT_MISMATCH);
 			return -1;
 		}
@@ -785,12 +745,12 @@ int req_open(unsigned char *data)
 			close (o_file_h);
 			o_file_h=-1;
 		}
-		if(cur_file==0) {
+		if (cur_file==0) {
 			ret_std (ERR_NO_FILE);
 			return -1;
 		}
 
-		if(cur_file->flags&DIR_FLAG) {
+		if (cur_file->flags&DIR_FLAG) {
 			int err=0;
 			// directory
 			if (cur_file->local_fname[0]=='.' && cur_file->local_fname[1]=='.') {
@@ -820,7 +780,7 @@ int req_open(unsigned char *data)
 		}
 		break;
 	}
-	return (o_file_h);
+	return o_file_h;
 }
 
 // b[0] = 0x03
@@ -831,11 +791,11 @@ void req_read(void) {
 	int i;
 
 	buf[0]=RET_READ;
-	if(o_file_h<0) {
+	if (o_file_h<0) {
 		ret_std(ERR_CMDSEQ);
 		return;
 	}
-	if(f_open_mode!=F_OPEN_READ) {
+	if (f_open_mode!=F_OPEN_READ) {
 		ret_std(ERR_FMT_MISMATCH);
 		return;
 	}
@@ -877,7 +837,7 @@ void req_write(unsigned char *data) {
 
 void req_delete(void) {
 	dbg(2,"%s()\n",__func__);
-	if(cur_file->flags&DIR_FLAG) rmdir(cur_file->local_fname);
+	if (cur_file->flags&DIR_FLAG) rmdir(cur_file->local_fname);
 	else unlink (cur_file->local_fname);
 	dbg(1,"Deleted: %s\n",cur_file->local_fname);
 	ret_std (ERR_SUCCESS);
@@ -922,7 +882,7 @@ void req_rename(unsigned char *data) {
 }
 
 void req_close() {
-	if(o_file_h>=0) close(o_file_h);
+	if (o_file_h>=0) close(o_file_h);
 	o_file_h = -1;
 	dbg(1,"Closed: %s\n",cur_file->local_fname);
 	ret_std(ERR_SUCCESS);
@@ -945,9 +905,6 @@ void req_format() {
 
 void dispatch_opr_cmd(unsigned char *data) {
 	dbg(3,"%s(%02X)\n",__func__,data[0]);
-	//dbg_p(3,data);
-	dbg(5,"data[]\n"); dbg_b(5,data,-1);
-
 	switch(data[0]) {
 		case REQ_DIRENT:        req_dirent(data);     break;
 		case REQ_OPEN:          req_open(data);       break;
@@ -963,8 +920,6 @@ void dispatch_opr_cmd(unsigned char *data) {
 		case REQ_TSDOS_MYSTERY: ret_tsdos_mystery();  break;
 		case REQ_CACHE_WRITE:   ret_cache_write();    break;
 	}
-
-	return;
 }
 
 int get_opr_cmd(void)
@@ -987,7 +942,7 @@ int get_opr_cmd(void)
 	if (b[b[1]+2]!=i) {
 		dbg(0,"Failed checksum: received: %02X  calculated: %02X\n",b[b[1]+2],i);
 		ret_std(ERR_PARAM);
-		return(7);
+		return 7;
 	}
 
 	dispatch_opr_cmd(b);
@@ -1075,8 +1030,8 @@ int get_fdc_cmd(void) {
 	// TODO canonical mode
 	// read command
 	while (i<TPDD_DATA_MAX && !eol) {
-		if(read_client_tty(&b[i],1)==1) {
-			switch(b[i]) {
+		if (read_client_tty(&b[i],1)==1) {
+			switch (b[i]) {
 				case 0x0D: eol=true;
 				case 0x20: b[i]=0x00; break;
 				default: i++;
@@ -1088,7 +1043,7 @@ int get_fdc_cmd(void) {
 	dbg(3,"\"%s\"\n",b);
 
 	// dispatch
-	switch(b[0]) {
+	switch (b[0]) {
 		case FDC_SET_MODE:        req_fdc_set_mode(b);        break;
 		case FDC_CONDITION:       req_fdc_condition(b);       break;
 		case FDC_FORMAT:          req_fdc_format(b);          break;
@@ -1100,10 +1055,10 @@ int get_fdc_cmd(void) {
 		case FDC_WRITE_ID_NV:     req_fdc_write_id_nv(b);     break;
 		case FDC_WRITE_SECTOR:    req_fdc_write_sector(b);    break;
 		case FDC_WRITE_SECTOR_NV: req_fdc_write_sector_nv(b); break;
-		case 0x00: if(!i) {dbg(1,"FDC: empty command\n"); break;}
+		case 0x00: if (!i) {dbg(1,"FDC: empty command\n"); break;}
 		default: dbg(1,"FDC: unknown command\n");
 	}
-	return(0);
+	return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1114,10 +1069,7 @@ void show_bootstrap_help() {
 	dbg(0,
 		"%1$s - DeskLink+ " S_(APP_VERSION) " - \"bootstrap\" help\n\n"
 		"Available loader files (in " S_(APP_LIB_DIR) "):\n\n",args[0]);
-	// FIXME - Don't use system() just to get some filenames - bkw
-	// works but blargh ...
-	//(void)(system ("find " S_(APP_LIB_DIR) " -regex \'.*/.+\\.\\(100\\|200\\|NEC\\|M10\\|K85\\)$\' -printf \'\%f\\n\' >&2")+1);
-	// even more blargh...
+
 	dbg(0,  "TRS-80 Model 100 & 102 : ");
 	(void)(system("find " S_(APP_LIB_DIR) " -regex \'.*/.+\\.100$\' -printf \'\%f \' >&2")+1);
 	dbg(0,"\nTANDY Model 200        : ");
@@ -1149,7 +1101,7 @@ int send_BASIC(char *f)
 
 	if ((fd=open(f,O_RDONLY))<0) {
 		dbg(1,"Failed to open %s for read.\n",f);
-		return(9);
+		return 9;
 	}
 
 	dbg(1,"Sending %s\n",f);
@@ -1157,7 +1109,7 @@ int send_BASIC(char *f)
 	while(read(fd,&b,1)==1) {
 		write_client_tty(&b,1);
 		usleep(byte_usleep);
-		if(debug) dbg(0,"Sent: %d bytes\n",++w);
+		if (debug) dbg(0,"Sent: %d bytes\n",++w);
 		else dbg(0,".");
 		fflush(stdout);
 	}
@@ -1167,10 +1119,10 @@ int send_BASIC(char *f)
 	close(fd);
 	close(client_tty_fd);
 
-	if(debug) dbg(0,"Sent %s",f);
+	if (debug) dbg(0,"Sent %s",f);
 	dbg(0,"\n");
 
-	return(0);
+	return 0;
 }
 
 int bootstrap(char *f)
@@ -1188,7 +1140,7 @@ int bootstrap(char *f)
 	if ((f[0]=='/') || (f[0]=='.' && f[1]=='/'))
 		strcpy(loader_file,f);
 
-	if(loader_file[0]==0) {
+	if (loader_file[0]==0) {
 		strcpy(loader_file,S_(APP_LIB_DIR));
 		strcat(loader_file,"/");
 		strcat(loader_file,f);
@@ -1202,12 +1154,12 @@ int bootstrap(char *f)
 
 	printf("Bootstrap: Installing %s\n", loader_file);
 
-	if(access(loader_file,F_OK)==-1) {
+	if (access(loader_file,F_OK)==-1) {
 		dbg(1,"Not found.\n");
-		return(1);
+		return 1;
 	}
 
-	if(access(pre_install_txt_file,F_OK)>=0) {
+	if (access(pre_install_txt_file,F_OK)>=0) {
 		cat(pre_install_txt_file);
 	} else {
 		printf("Prepare the portable to receive. Hints:\n");
@@ -1219,7 +1171,7 @@ int bootstrap(char *f)
 	printf("Press [Enter] when ready...");
 	getchar();
 
-	if ((r=send_BASIC(loader_file))!=0) return(r);
+	if ((r=send_BASIC(loader_file))!=0) return r;
 
 	cat(post_install_txt_file);
 
@@ -1227,7 +1179,7 @@ int bootstrap(char *f)
 	printf("Re-run \"%s\" (without -b this time) to run the TPDD server.\n",args[0]);
 	printf("\n");
 
-	return(0);
+	return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1370,16 +1322,12 @@ int main(int argc, char **argv)
 		  "Serial Device: %s\n"
 		  "Working Dir: %s\n",client_tty_name,cwd);
 
-	if(client_tty_fd<0)
-		client_tty_fd=open((char *)client_tty_name,O_RDWR,O_NOCTTY
-#if (IGNORE_DSR == 1)
-			,O_NONBLOCK
-#endif
-		);
+	if (client_tty_fd<0)
+		client_tty_fd=open((char *)client_tty_name,O_RDWR,O_NOCTTY);
 
-	if(client_tty_fd<0) {
+	if (client_tty_fd<0) {
 		dbg(1,"Can't open \"%s\"\n",client_tty_name);
-		return(1);
+		return 1;
 	}
 
 	if (!bootstrap_mode) {
@@ -1389,8 +1337,8 @@ int main(int argc, char **argv)
 	}
 
 	// getty mode
-	if(getty_mode) {
-		if(login_tty(client_tty_fd)==0) client_tty_fd = STDIN_FILENO;
+	if (getty_mode) {
+		if (login_tty(client_tty_fd)==0) client_tty_fd = STDIN_FILENO;
 		else (void)(daemon(1,1)+1);
 	}
 
@@ -1398,23 +1346,23 @@ int main(int argc, char **argv)
 	(void)(tcflush(client_tty_fd, TCIOFLUSH)+1);
 	ioctl(client_tty_fd, FIONBIO, &off);
 	ioctl(client_tty_fd, FIOASYNC, &off);
-	if(tcgetattr(client_tty_fd,&client_termios)==-1) return(21);
+	if (tcgetattr(client_tty_fd,&client_termios)==-1) return 21;
 	cfmakeraw(&client_termios);
 	client_termios.c_cflag |= CLOCAL|CS8;
-	if(rtscts) client_termios.c_cflag |= CRTSCTS;
+	if (rtscts) client_termios.c_cflag |= CRTSCTS;
 	else client_termios.c_cflag &= ~CRTSCTS;
-	if(cfsetspeed(&client_termios,client_baud)==-1) return(22);
-	if(tcsetattr(client_tty_fd,TCSANOW,&client_termios)==-1) return(23);
+	if (cfsetspeed(&client_termios,client_baud)==-1) return 22;
+	if (tcsetattr(client_tty_fd,TCSANOW,&client_termios)==-1) return 23;
 	client_tty_vmt(-2,-2);
 
 	// send loader and exit
-	if(bootstrap_mode) return(bootstrap(bootstrap_file));
+	if (bootstrap_mode) return (bootstrap(bootstrap_file));
 
 	// create the file list (for reverse order traversal)
 	file_list_init();
 
 	// process commands forever
-	while(1) if(opr_mode) get_opr_cmd(); else get_fdc_cmd();
+	while (1) if (opr_mode) get_opr_cmd(); else get_fdc_cmd();
 
-	return(0);
+	return 0;
 }
