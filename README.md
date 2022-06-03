@@ -44,8 +44,8 @@ dl -b ./rxcini.DO ;dl -u
 The "ROOT  " and "PARENT" labels are not hard coded in TS-DOS. You can set them to other things. Sadly, this does not extend as far as being able to use ".." for "PARENT". TS-DOS thinks it's an invalid filename (even though it DISPLAYS it in the file list just fine. If it would just go ahead and send the command to "open" it, it would work.) However, plenty of other things that are all better than "ROOT  " and "PARENT" do work.
 ```
 ROOT_LABEL=/ PARENT_LABEL=^ dl
-```
+ROOT_LABEL='-root-' PARENT_LABEL='-back-' dl
+ROOT_LABEL='0:' PARENT_LABEL='^:' dl
 or you can confuse someone...  
-```
-ROOT_LABEL='C:\' PARENT_LABEL='' dl -u
+ROOT_LABEL='C:\' PARENT_LABEL='UP:' dl
 ```
