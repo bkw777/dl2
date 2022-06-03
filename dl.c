@@ -121,8 +121,9 @@ MA 02111, USA.
 // But you can change them to pretty much anything. The parent label is
 // picky because whatever you use has to look like a valid filename
 // to ts-dos. ".." doesn't work, but "^" does for instance.
-#define DEFAULT_DME_ROOT_LABEL   " ROOT " // ROOT_LABEL="/"
-#define DEFAULT_DME_PARENT_LABEL "PARENT" // PARENT_LABEL"^"
+#define DEFAULT_DME_ROOT_LABEL   " ROOT " // ROOT_LABEL='0:'
+#define DEFAULT_DME_PARENT_LABEL "PARENT" // PARENT_LABEL'^'
+#define DEFAULT_DME_DIR_LABEL    "<>"     // DIR_LABEL='/'
 
 // termios VMIN & VTIME
 #define C_CC_VMIN 1
@@ -259,8 +260,9 @@ bool rtscts = false;
 unsigned dot_offset = 6; // 6 for KC-85 platform, 8 for WP-2
 int client_baud = DEFAULT_CLIENT_BAUD;
 int BASIC_byte_msec = DEFAULT_BASIC_BYTE_MSEC;
-char dme_root_label[6] = DEFAULT_DME_ROOT_LABEL;
-char dme_parent_label[6] = DEFAULT_DME_PARENT_LABEL;
+char dme_root_label[7] = DEFAULT_DME_ROOT_LABEL;
+char dme_parent_label[7] = DEFAULT_DME_PARENT_LABEL;
+char dme_dir_label[3] = DEFAULT_DME_DIR_LABEL;
 char default_attrib = DEFAULT_TPDD_FILE_ATTRIB;
 
 bool getty_mode = false;
@@ -274,7 +276,7 @@ struct termios client_termios;
 int o_file_h = -1;
 unsigned char buf[TPDD_DATA_MAX+3];
 char cwd[PATH_MAX] = {0x00};
-char dme_cwd[6] = DEFAULT_DME_ROOT_LABEL;
+char dme_cwd[7] = DEFAULT_DME_ROOT_LABEL;
 char client_tty_name[PATH_MAX];
 char bootstrap_file[PATH_MAX] = {0x00};
 int opr_mode = 1; // 0=FDC-mode 1=Operation-mode
@@ -378,7 +380,7 @@ char *collapse_padded_name(char *fname) {
 	int i;
 	for(i=dot_offset;i>1;i--) if(fname[i-1]!=' ') break;
 
-	if(fname[dot_offset+1]=='<' && fname[dot_offset+2]=='>') {
+	if(fname[dot_offset+1]==dme_dir_label[0] && fname[dot_offset+2]==dme_dir_label[1]) {
 		fname[i]=0x00;
 	} else {
 		fname[i]=fname[dot_offset];
@@ -425,8 +427,8 @@ FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 		// write client extension
 		if (flags&DIR_FLAG) {
 			// directory - put TS-DOS DME ext on client fname
-			f.client_fname[dot_offset+1]='<';
-			f.client_fname[dot_offset+2]='>';
+			f.client_fname[dot_offset+1]=dme_dir_label[0];
+			f.client_fname[dot_offset+2]=dme_dir_label[1];
 			f.len=0;
 		} else if (i>0) {
 			// file - put first 2 bytes of ext on client fname, if any
@@ -629,7 +631,7 @@ int req_dirent(unsigned char *data)
 			dbg(3,"Exists: \"%s\"  %u\n", cur_file->local_fname, cur_file->len);
 			ret_dirent(cur_file);
 		} else {
-			if (filename[dot_offset+1]=='<' && filename[dot_offset+2]=='>') f = DIR_FLAG;
+			if (filename[dot_offset+1]==dme_dir_label[0] && filename[dot_offset+2]==dme_dir_label[1]) f = DIR_FLAG;
 			cur_file=make_file_entry(collapse_padded_name(filename), 0, f);
 			dbg(3,"New %s: \"%s\"\n",f==DIR_FLAG?"Directory":"File",cur_file->local_fname);
 			ret_dirent(NULL);
@@ -660,7 +662,8 @@ int req_dirent(unsigned char *data)
 	return 0;
 }
 
-// update dme_cwd with a 6-byte truncated working dir
+// update dme_cwd with current dir, truncated & padded both required
+// TS-DOS doesn't blank all 6 chars if you don't send all 6
 void update_dme_cwd() {
 	dbg(2,"%s()\n",__func__);
 	int i;
@@ -668,9 +671,8 @@ void update_dme_cwd() {
 	(void)(getcwd(cwd,PATH_MAX-1)+1);
 	dbg(0,"Changed Dir: %s\n",cwd);
 	if(dir_depth) {
-		int j;
 		for(i=strlen(cwd); i>=0 ; i--) if(cwd[i]=='/') break;
-		for(j=0; j<6 && cwd[i+j+1]; j++) dme_cwd[j]=cwd[i+j+1];
+		snprintf(dme_cwd,7,"%-6.6s",cwd+i+1);
 	} else {
 		memcpy(dme_cwd,dme_root_label,6);
 	}
@@ -684,14 +686,13 @@ void ret_dme_cwd() {
 	buf[1]=LEN_RET_DME;
 	buf[2]=0x00;
 	memcpy(buf+3,dme_cwd,6);
-	buf[9]='.';
-	buf[10]='<';
-	buf[11]='>';
-	buf[12]=0x20;
+	buf[9]=0x00;   // buf[9]='.'; // contents don't matter but length does
+	buf[10]=0x00;  // buf[10]=dme_dir_label[0];
+	buf[11]=0x00;  // buf[11]=dme_dir_label[1];
+	buf[12]=0x00;  // buf[12]=0x20;
 	buf[13]=checksum(buf);
 	write_client_tty(buf,14);
 }
-
 
 // Any FDC request might actually be a DME request
 // See ref/dme.txt for the full explaination because it's a lot.
@@ -1248,8 +1249,9 @@ void show_config () {
 	dbg(2,"dot_offset      : %d\n",dot_offset);
 	dbg(2,"baud            : %d\n",client_baud==B9600?9600:client_baud==B19200?19200:-1);
 	dbg(0,"dme_disabled    : %s\n",dme_disabled?"true":"false");
-	dbg(2,"dme_root_label  : \"%6.6s\"\n",dme_root_label);
-	dbg(2,"dme_parent_label: \"%6.6s\"\n",dme_parent_label);
+	dbg(2,"dme_root_label  : \"%-6.6s\"\n",dme_root_label);
+	dbg(2,"dme_parent_label: \"%-6.6s\"\n",dme_parent_label);
+	dbg(2,"dme_dir_label   : \"%-2.2s\"\n",dme_dir_label);
 	dbg(2,"default_attrib  : '%c'\n",default_attrib);
 }
 
@@ -1306,10 +1308,10 @@ int main(int argc, char **argv)
 	if (getenv("DOT_OFFSET")) dot_offset = atoi(getenv("DOT_OFFSET"));
 	if (getenv("BAUD")) {i=atoi(getenv("BAUD"));
 		client_baud=i==9600?B9600:i==19200?B19200:-1;}
-	if (getenv("ROOT_LABEL")) {char t[7];snprintf(t,7,"%-6.6s",getenv("ROOT_LABEL"));
-		memcpy(dme_root_label,t,6);memcpy(dme_cwd,t,6);}
-	if (getenv("PARENT_LABEL")) {char t[7];snprintf(t,7,"%-6.6s",getenv("PARENT_LABEL"));
-		memcpy(dme_parent_label,t,6);}
+	if (getenv("ROOT_LABEL")) {snprintf(dme_root_label,7,"%-6.6s",getenv("ROOT_LABEL"));
+		memcpy(dme_cwd,dme_root_label,6);}
+	if (getenv("PARENT_LABEL")) snprintf(dme_parent_label,7,"%-6.6s",getenv("PARENT_LABEL"));
+	if (getenv("DIR_LABEL")) snprintf(dme_dir_label,3,"%-2.2s",getenv("DIR_LABEL"));
 	if (getenv("ATTRIB")) default_attrib = *getenv("ATTRIB");
 
 	// commandline options
