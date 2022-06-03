@@ -450,17 +450,11 @@ FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 		if (f.client_fname[dot_offset+2]==0x00) f.client_fname[dot_offset+2]=0x20;
 
 	} else {
-		// raw mode (-0) - don't reformat anything
+		// raw mode - don't reformat or filter anything
 		snprintf(f.client_fname,25,"%-24.24s",namep);
 	}
 
 	dbg(1,"\"%s\"\t%s%s\n",f.client_fname,f.local_fname,f.flags==DIR_FLAG?"/":"");
-
-//	dbg(4," local: \"%s\"\n",f.local_fname);
-//	dbg(4,"client: \"%s\"\n",f.client_fname);
-//	dbg(4,"   len: %d\n",f.len);
-//	dbg(4," flags: %s\n",f.flags==0?"":f.flags==DIR_FLAG?"dir":"other");
-
 	return &f;
 }
 
