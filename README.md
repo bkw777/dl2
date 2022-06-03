@@ -1,14 +1,13 @@
 # dlplus
 DeskLink+ is a Tandy Portable Disk Drive emulator or "TPDD Server" implimented in C.  
-2022 [GGLabs](https://gglabs.us/) has added support for TS-DOS subdirectories.
-
-[Original README](README.txt)
-
-[Documentation for the original DeskLink](dl.do) (No longer exactly matches this program)
-
-[Original source](http://bitchin100.com/files/linux/dlplus.zip)
-
+2022 [GGLabs](https://gglabs.us/) has added support for TS-DOS subdirectories!  
+[hacky extra options](ref/advanced_options.txt)  
 [Serial Cable](http://tandy.wiki/Model_T_Serial_Cable)
+
+Docs from the past versions of this program. They don't exactly match this version any more.  
+[README.txt](README.txt) from dlplus by John R. Hogerhuis  
+[dl.do](dl.do) from dl 1.0-1.3 the original "DeskLink for \*nix) by Steven Hurd
+<!-- [Original source](http://bitchin100.com/files/linux/dlplus.zip) -->
 
 ## install
 ```
@@ -41,6 +40,12 @@ dl -b TS-DOS.100
 unzip REXCPMV21_b18.ZIP
 dl -b ./rxcini.DO ;dl -u
 ```
-
-## Advanced
-See [ref/advanced.options.txt]()
+## fun
+The "ROOT  " and "PARENT" labels are not hard coded in TS-DOS. You can set them to other things. Sadly, this does not extend as far as being able to use ".." for "PARENT". TS-DOS thinks it's an invalid filename (even though it DISPLAYS it in the menu list just fine. If it would just go ahead and send the command to "open" it, it would work.) However, plenty of other things that are all better than "ROOT  " and "PARENT" do work.
+```
+ROOT_LABEL=/ PARENT_LABEL=^ dl
+```
+or you can confuse someone...  
+```
+ROOT_LABEL='C:\' PARENT_LABEL='' dl -u
+```
