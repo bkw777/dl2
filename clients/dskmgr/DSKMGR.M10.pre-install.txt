@@ -1,5 +1,4 @@
-Type the following in BASIC on the M10:
+Type the following into BASIC on the Olivetti M10:
 
   CLEAR 0,60700
   RUN "COM:98N1EN"
-
