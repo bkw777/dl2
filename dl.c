@@ -114,7 +114,7 @@ MA 02111, USA.
 #define DEFAULT_CLIENT_BAUD B19200
 #endif
 
-#define DEFAULT_BASIC_BYTE_MSEC 6
+#define DEFAULT_BASIC_BYTE_MS 6
 #define DEFAULT_TPDD_FILE_ATTRIB 0x46 // F
 
 // These defaults are the same as what the original Desk-Link does.
@@ -125,6 +125,13 @@ MA 02111, USA.
 #define DEFAULT_DME_PARENT_LABEL "PARENT" // PARENT_LABEL'^:' '-back-'
 // this you can't change unless you also hack ts-dos
 #define DEFAULT_DME_DIR_LABEL    "<>"     // DIR_LABEL='/'
+
+// Ultimate ROM-II TS-DOS loader support: Special filenames from the
+// root dir that should always be loadable no matter what subdirectory
+// the client has switched to.
+#define DOS100 "DOS100.CO"
+#define DOS200 "DOS200.CO"
+#define DOSNEC "DOSNEC.CO"
 
 // termios VMIN & VTIME
 #define C_CC_VMIN 1
@@ -245,7 +252,8 @@ MA 02111, USA.
 #define LEN_RET_DME        0x0B
 #define LEN_RET_DIRENT     0x1C
 
-// KC-85 platform BASIC interpreter EOF byte for bootstrap()
+// KC-85 platform BASIC interpreter EOL & EOF byts for bootstrap()
+#define BASIC_EOL 0x0D
 #define BASIC_EOF 0x1A
 
 // configuration
@@ -254,12 +262,12 @@ bool upcase = false;
 bool rtscts = false;
 unsigned dot_offset = 6; // 0 for raw, 6 for KC-85, 8 for WP-2
 int client_baud = DEFAULT_CLIENT_BAUD;
-int BASIC_byte_msec = DEFAULT_BASIC_BYTE_MSEC;
+int BASIC_byte_us = DEFAULT_BASIC_BYTE_MS*1000;
 char dme_root_label[7] = DEFAULT_DME_ROOT_LABEL;
 char dme_parent_label[7] = DEFAULT_DME_PARENT_LABEL;
 char dme_dir_label[3] = DEFAULT_DME_DIR_LABEL;
 char default_attrib = DEFAULT_TPDD_FILE_ATTRIB;
-
+bool enable_ur2_dos_hack = true;
 bool getty_mode = false;
 bool bootstrap_mode = false;
 
@@ -278,6 +286,7 @@ int opr_mode = 1; // 0=FDC-mode 1=Operation-mode
 bool dme_detected = false;
 bool dme_fdc = false;
 bool dme_disabled = false;
+char ch[2] = {0xFF};
 
 FILE_ENTRY *cur_file;
 int dir_depth=0;
@@ -330,19 +339,21 @@ void client_tty_vmt(int m,int t) {
 	tcsetattr(client_tty_fd,TCSANOW,&client_termios);
 }
 
-int write_client_tty(void *b, size_t n) {
+int write_client_tty(void *b, int n) {
 	dbg(4,"%s(%u)\n",__func__,n);
-	dbg(3,"SEND: "); dbg_b(3,b,n);
-	return (write(client_tty_fd,b,n));
+	n = write(client_tty_fd,b,n);
+	dbg(3,"SENT: "); dbg_b(3,b,n);
+	return n;
 }
 
-// TODO - retry sanity check counter - don't retry forever
+// it's correct that this waits forever
+// the one time we don't want to block, we don't use this
 int read_client_tty(void *b, const unsigned int n) {
 	dbg(4,"%s(%u)\n",__func__,n);
 	unsigned t = 0;
 	int i = 0;
 	while (t<n) if ((i = read(client_tty_fd, b+t, n-t))) t+=i;
-	dbg(3,"RECV: "); dbg_b(3,b,n);
+	dbg(3,"RCVD: "); dbg_b(3,b,n);
 	return t;
 }
 
@@ -399,6 +410,17 @@ void lsx (char *path,char *match) {
 	}
 
 	closedir(dir);
+}
+
+int ck_ur2_dos(char *b) {
+	dbg(3,"%s(\"%s\")\n",__func__,b);
+	if (!enable_ur2_dos_hack) return 1;
+	if (!dir_depth) return 1; // fake root hack not needed in actual root
+	if (dot_offset!=6) return 1; // There's no UR2 for WP-2 or CP/M etc
+	if (strncmp(b,DOS100,9)==0) return 0;
+	if (strncmp(b,DOS200,9)==0) return 0;
+	if (strncmp(b,DOSNEC,9)==0) return 0;
+	return 1;
 }
 
 FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
@@ -519,7 +541,7 @@ void update_file_list() {
 // standard return - return for: error open close delete status write
 void ret_std(unsigned char err)
 {
-	dbg(2,"%s()\n",__func__);
+	dbg(3,"%s()\n",__func__);
 	buf[0]=RET_STD;
 	buf[1]=0x01;
 	buf[2]=err;
@@ -533,7 +555,6 @@ void ret_std(unsigned char err)
 int ret_dirent(FILE_ENTRY *ep)
 {
 	dbg(2,"%s(\"%s\")\n",__func__,ep->client_fname);
-	unsigned short size;
 	int i;
 
 	memset(buf,0x00,TPDD_DATA_MAX+3);
@@ -552,8 +573,8 @@ int ret_dirent(FILE_ENTRY *ep)
 		buf[26] = default_attrib;
 
 		// size
-		size = htons (ep->len);
-		memcpy (buf + 27, &size, 2);
+		buf[27]=(uint8_t)(ep->len >> 0x08); // most significant byte
+		buf[28]=(uint8_t)(ep->len & 0xFF);  // least significant byte
 	}
 
 	dbg(3,"\"%24.24s\"\n",buf+2);
@@ -602,8 +623,19 @@ int req_dirent(unsigned char *data)
 		// Remove trailing spaces
 		for (p = strrchr(filename,' '); p >= filename && *p == ' '; p--) *p = 0x00;
 		cur_file=find_file(filename);
-		if (cur_file) { 
+		if (cur_file) {
 			dbg(3,"Exists: \"%s\"  %u\n", cur_file->local_fname, cur_file->len);
+			ret_dirent(cur_file);
+		} else if (ck_ur2_dos(filename)==0) {
+			// let UR2 load <root>/DOSxxx.CO in any subdir
+			// if not found in current dir for real.
+			cur_file=make_file_entry(filename,0,0);
+			char t[LOCAL_FILENAME_MAX+1] = {0x00};
+			for (int i=dir_depth;i>0;i--) strncat(t,"../",3);
+			strncat(t,cur_file->local_fname,LOCAL_FILENAME_MAX-dir_depth*3);
+			memset(cur_file->local_fname,0x00,LOCAL_FILENAME_MAX);
+			memcpy(cur_file->local_fname,t,LOCAL_FILENAME_MAX);
+			dbg(3,"Virtual: \"%s\" <-- \"%s\"\n",cur_file->client_fname,cur_file->local_fname);
 			ret_dirent(cur_file);
 		} else {
 			if (filename[dot_offset+1]==dme_dir_label[0] && filename[dot_offset+2]==dme_dir_label[1]) f = DIR_FLAG;
@@ -646,8 +678,11 @@ void update_dme_cwd() {
 	(void)(getcwd(cwd,PATH_MAX-1)+1);
 	dbg(0,"Changed Dir: %s\n",cwd);
 	if (dir_depth) {
-		for (i=strlen(cwd); i>=0 ; i--) if (cwd[i]=='/') break;
-		snprintf(dme_cwd,7,"%-6.6s",cwd+i+1);
+		for (i=strlen(cwd); i>=0 ; i--) {
+			if (cwd[i]=='/') break;
+			if (upcase && cwd[i]>='a' && cwd[i]<='z') cwd[i]=cwd[i]-32;
+		}
+		snprintf(dme_cwd,7,"%-6.6s",cwd+1+i);
 	} else {
 		memcpy(dme_cwd,dme_root_label,6);
 	}
@@ -705,7 +740,7 @@ void req_fdc() {
 // b[3] = chk
 int req_open(unsigned char *data)
 {
-	dbg(2,"%s(\"%s\")\n",__func__,cur_file->local_fname);
+	dbg(2,"%s(\"%s\")\n",__func__,cur_file->client_fname);
 	dbg(5,"data[]\n"); dbg_b(5,data,-1);
 	dbg_p(4,data);
 
@@ -730,7 +765,7 @@ int req_open(unsigned char *data)
 				ret_std(ERR_FMT_MISMATCH);
 			else {
 				f_open_mode=omode;
-				dbg(1,"Open for write: %s\n",cur_file->local_fname);
+				dbg(1,"Open for write: \"%s\"\n",cur_file->local_fname);
 				ret_std(ERR_SUCCESS);
 			}
 		}
@@ -750,7 +785,7 @@ int req_open(unsigned char *data)
 			ret_std(ERR_FMT_MISMATCH);
 		else {
 			f_open_mode=omode;
-			dbg(1,"Open for append: %s\n",cur_file->local_fname);
+			dbg(1,"Open for append: \"%s\"\n",cur_file->local_fname);
 			ret_std (ERR_SUCCESS);
 		}
 		break;
@@ -784,12 +819,12 @@ int req_open(unsigned char *data)
 			else ret_std (ERR_SUCCESS);
 		} else {
 			// regular file
-			o_file_h = open (cur_file->local_fname, O_RDONLY);
+			o_file_h = open(cur_file->local_fname, O_RDONLY);
 			if (o_file_h<0)
 				ret_std (ERR_NO_FILE);
 			else {
 				f_open_mode = omode;
-				dbg(1,"Open for read: %s\n",cur_file->local_fname);
+				dbg(1,"Open for read: \"%s\"\n",cur_file->local_fname);
 				ret_std (ERR_SUCCESS);
 			}
 		}
@@ -802,7 +837,7 @@ int req_open(unsigned char *data)
 // b[1] = 0x00
 // b[2] = chk
 void req_read(void) {
-	dbg(2,"%s()\n",__func__);
+	if (ch[1]!=REQ_READ || debug>2) dbg(2,"%s()\n",__func__);
 	int i;
 
 	buf[0]=RET_READ;
@@ -815,10 +850,15 @@ void req_read(void) {
 		return;
 	}
 
-	i = read (o_file_h, buf+2, TPDD_DATA_MAX);
+	i = read(o_file_h, buf+2, TPDD_DATA_MAX);
 
 	buf[1] = (unsigned char) i;
 	buf[2+i] = checksum(buf);
+
+	if(ch[1]==REQ_READ && debug<4) {
+		dbg(1,".");
+		if (i<TPDD_DATA_MAX) dbg(1,"\n");
+	}
 
 	dbg(4,"...outgoing packet...\n");
 	dbg(5,"buf[]\n"); dbg_b(5,buf,-1);
@@ -833,7 +873,7 @@ void req_read(void) {
 // b[2] = b[1] bytes
 // b[2+len] = chk
 void req_write(unsigned char *data) {
-	dbg(2,"%s()\n",__func__);
+	if (ch[1]!=REQ_WRITE || debug>2) dbg(2,"%s()\n",__func__);
 	dbg(4,"...incoming packet...\n");
 	dbg(5,"data[]\n"); dbg_b(5,data,-1);
 	dbg_p(4,data);
@@ -844,6 +884,11 @@ void req_write(unsigned char *data) {
 	if (f_open_mode!=F_OPEN_WRITE && f_open_mode !=F_OPEN_APPEND) {
 		ret_std(ERR_FMT_MISMATCH);
 		return;
+	}
+
+	if(ch[1]==REQ_WRITE && debug<4) {
+		dbg(1,".",data[1]);
+		if (data[1]<TPDD_DATA_MAX) dbg(1,"\n");
 	}
 
 	if (write (o_file_h,data+2,data[1]) != data[1]) ret_std (ERR_SECTOR_NUM);
@@ -918,29 +963,29 @@ void req_format() {
 	ret_std(ERR_SUCCESS);
 }
 
-void dispatch_opr_cmd(unsigned char *data) {
-	dbg(3,"%s(%02X)\n",__func__,data[0]);
-	switch(data[0]) {
-		case REQ_DIRENT:        req_dirent(data);     break;
-		case REQ_OPEN:          req_open(data);       break;
-		case REQ_CLOSE:         req_close();          break;
-		case REQ_READ:          req_read();           break;
-		case REQ_WRITE:         req_write(data);      break;
-		case REQ_DELETE:        req_delete();         break;
-		case REQ_FORMAT:        req_format();         break;
-		case REQ_STATUS:        req_status();         break;
-		case REQ_FDC:           req_fdc();            break;
-		case REQ_CONDITION:     req_condition();      break;
-		case REQ_RENAME:        req_rename(data);     break;
-		case REQ_TSDOS_MYSTERY: ret_tsdos_mystery();  break;
-		case REQ_CACHE_WRITE:   ret_cache_write();    break;
+void dispatch_opr_cmd(unsigned char *b) {
+	dbg(3,"%s(%02X)\n",__func__,b[0]);
+	switch(b[0]) {
+		case REQ_DIRENT:        req_dirent(b);       break;
+		case REQ_OPEN:          req_open(b);         break;
+		case REQ_CLOSE:         req_close();         break;
+		case REQ_READ:          req_read();          break;
+		case REQ_WRITE:         req_write(b);        break;
+		case REQ_DELETE:        req_delete();        break;
+		case REQ_FORMAT:        req_format();        break;
+		case REQ_STATUS:        req_status();        break;
+		case REQ_FDC:           req_fdc();           break;
+		case REQ_CONDITION:     req_condition();     break;
+		case REQ_RENAME:        req_rename(b);       break;
+		case REQ_TSDOS_MYSTERY: ret_tsdos_mystery(); break;
+		case REQ_CACHE_WRITE:   ret_cache_write();   break;
 	}
 }
 
 int get_opr_cmd(void)
 {
 	dbg(3,"%s()\n",__func__);
-	unsigned char b[TPDD_DATA_MAX+3] = { 0x00 };
+	unsigned char b[TPDD_DATA_MAX+3] = {0x00};
 	unsigned i = 0;
 	memset(buf,0x00,TPDD_DATA_MAX+3);
 
@@ -959,6 +1004,9 @@ int get_opr_cmd(void)
 		ret_std(ERR_PARAM);
 		return 7;
 	}
+
+	ch[1]=ch[0];
+	ch[0]=b[0];
 
 	dispatch_opr_cmd(b);
 	return 0;
@@ -1102,35 +1150,43 @@ void show_bootstrap_help() {
 	,args[0]);
 }
 
+void slowbyte(char b) {
+	write_client_tty(&b,1);
+	tcdrain(client_tty_fd);
+	usleep(BASIC_byte_us);
+	switch (debug) {
+		case 0: return;
+		case 1: putchar('.'); break;
+		case 2: // display nicely no matter if loader is CR, LF, or CRLF
+			if (b!=0x0A && buf[0]==0x0A) {buf[0]=0x00; putchar(0x0A); putchar(b);}
+			else if (b==0x0A || b==BASIC_EOL) buf[0]=0x0A;
+			else if (isprint(b)) putchar(b);
+			else printf("\033[7m%02X\033[m",b);
+			break;
+	}
+	fflush(stdout);
+}
+
 int send_BASIC(char *f)
 {
-	int w=0;
 	int fd;
-	int byte_usleep = BASIC_byte_msec*1000;
-	unsigned char b;
+	char b;
 
 	if ((fd=open(f,O_RDONLY))<0) {
-		dbg(1,"Failed to open %s for read.\n",f);
+		dbg(1,"Could not open \"%s\"\n",f);
 		return 9;
 	}
 
-	dbg(1,"Sending %s\n",f);
-
-	while(read(fd,&b,1)==1) {
-		write_client_tty(&b,1);
-		usleep(byte_usleep);
-		if (debug) dbg(0,"Sent: %d bytes\n",++w);
-		else dbg(0,".");
-		fflush(stdout);
-	}
-	dbg(0,"\n");
-	b = BASIC_EOF;
-	write_client_tty(&b,1);
+	printf("Sending \"%s\" ... ",f);
+	if (debug) puts("");
+	fflush(stdout);
+	while(read(fd,&b,1)==1) slowbyte(b);
+	if (b!=0x0A && b!=BASIC_EOL && b!=BASIC_EOF) slowbyte(BASIC_EOL);
+	if (b!=BASIC_EOF) slowbyte(BASIC_EOF);
+	if (debug) puts("");
+	puts("DONE");
 	close(fd);
 	close(client_tty_fd);
-
-	if (debug) dbg(0,"Sent %s",f);
-	dbg(0,"\n");
 
 	return 0;
 }
@@ -1162,23 +1218,25 @@ int bootstrap(char *f)
 	strcpy(post_install_txt_file,loader_file);
 	strcat(post_install_txt_file,".post-install.txt");
 
-	printf("Bootstrap: Installing %s\n", loader_file);
+	printf("Bootstrap: Installing \"%s\"\n\n", loader_file);
 
 	if (access(loader_file,F_OK)==-1) {
-		dbg(1,"Not found.\n");
+		puts("Not found.");
 		return 1;
 	}
 
 	if (access(pre_install_txt_file,F_OK)>=0) {
 		cat(pre_install_txt_file);
 	} else {
-		printf("Prepare the portable to receive. Hints:\n");
-		printf("\tRUN \"COM:98N1ENN\"\t(for TANDY, Kyotronic, Olivetti)\n");
-		printf("\tRUN \"COM:9N81XN\"\t(for NEC)\n");
-		printf("\n");
+		puts("Prepare BASIC to receive:");
+		puts("");
+		puts("    RUN \"COM:98N1ENN\" [Enter]    <-- for TANDY/Olivetti/Kyotronic");
+		puts("    RUN \"COM:9N81XN\"  [Enter]    <-- for NEC");
+		puts("");
 	}
 
-	printf("Press [Enter] when ready...");
+	puts("");
+	puts("Press [Enter] when ready...");
 	getchar();
 
 	if ((r=send_BASIC(loader_file))!=0) return r;
@@ -1187,7 +1245,7 @@ int bootstrap(char *f)
 
 	printf("\n\n\"%s -b\" will now exit.\n",args[0]);
 	printf("Re-run \"%s\" (without -b this time) to run the TPDD server.\n",args[0]);
-	printf("\n");
+	puts("");
 
 	return 0;
 }
@@ -1202,7 +1260,7 @@ void show_config () {
 	dbg(0,"rtscts          : %s\n",rtscts?"true":"false");
 	dbg(0,"verbosity       : %d\n",debug);
 	dbg(0,"dot_offset      : %d\n",dot_offset);
-	dbg(0,"BASIC_byte_msec : %d\n",BASIC_byte_msec);
+	dbg(0,"BASIC_byte_ms   : %d\n",BASIC_byte_us/1000);
 	dbg(0,"bootstrap_mode  : %s\n",bootstrap_mode?"true":"false");
 	dbg(0,"bootstrap_file  : \"%s\"\n",bootstrap_file);
 	dbg(0,"client_tty_name : \"%s\"\n",client_tty_name);
@@ -1214,6 +1272,7 @@ void show_config () {
 	dbg(2,"dme_root_label  : \"%-6.6s\"\n",dme_root_label);
 	dbg(2,"dme_parent_label: \"%-6.6s\"\n",dme_parent_label);
 	dbg(2,"dme_dir_label   : \"%-2.2s\"\n",dme_dir_label);
+	dbg(0,"ur2_dos_hack    : %s\n",enable_ur2_dos_hack?"enabled":"disabled");
 	dbg(2,"default_attrib  : '%c'\n",default_attrib);
 }
 
@@ -1231,7 +1290,7 @@ void show_main_help() {
 		"   -w       WP-2 mode - 8.2 filenames\n"
 		"   -u       Uppercase all filenames\n"
 		"   -r       RTS/CTS hardware flow control\n"
-		"   -z #     Milliseconds per byte for bootstrap (" S_(DEFAULT_BASIC_BYTE_MSEC) ")\n"
+		"   -z #     Milliseconds per byte for bootstrap (" S_(DEFAULT_BASIC_BYTE_MS) ")\n"
 		"   -0       Raw mode. Do not munge filenames in any way.\n"
 		"            Disables 6.2 or 8.2 filename trucating & padding\n"
 		"            Changes the attribute byte to ' ' instead of 'F'\n"
@@ -1267,6 +1326,7 @@ int main(int argc, char **argv)
 	// environment variable overrides for some things that don't have switches
 	if (getenv("OPR_MODE")) opr_mode = atoi(getenv("OPR_MODE"));
 	if (getenv("DISABLE_DME")) dme_disabled = true;
+	if (getenv("DISABLE_UR2_DOS_HACK")) enable_ur2_dos_hack = false;
 	if (getenv("DOT_OFFSET")) dot_offset = atoi(getenv("DOT_OFFSET"));
 	if (getenv("BAUD")) {i=atoi(getenv("BAUD"));
 		client_baud=i==9600?B9600:i==19200?B19200:-1;}
@@ -1287,7 +1347,7 @@ int main(int argc, char **argv)
 			case 'w': dot_offset = 8; break;
 			case 'h': show_main_help(); exit(0); break;
 			case 'l': show_bootstrap_help(); exit(0); break;
-			case 'z': BASIC_byte_msec=atoi(optarg); break;
+			case 'z': BASIC_byte_us=atoi(optarg)*1000; break;
 			case 'd': strcpy(client_tty_name,optarg); break;
 			case 'p': (void)(chdir(optarg)+1); break;
 			case 'b': bootstrap_mode=true; strcpy(bootstrap_file,optarg); break;
