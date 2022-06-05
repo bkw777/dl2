@@ -1118,7 +1118,7 @@ int get_fdc_cmd(void) {
 		case FDC_WRITE_ID_NV:     req_fdc_write_id_nv(b);     break;
 		case FDC_WRITE_SECTOR:    req_fdc_write_sector(b);    break;
 		case FDC_WRITE_SECTOR_NV: req_fdc_write_sector_nv(b); break;
-		case 0x00: if (!i) {dbg(1,"FDC: empty command\n"); break;}
+		case 0x00: if (!i) {dbg(1,"FDC: empty command\n");    break;}
 		default: dbg(1,"FDC: unknown command\n");
 	}
 	return 0;
@@ -1339,24 +1339,24 @@ int main(int argc, char **argv)
 	// commandline options
 	while ((i = getopt (argc, argv, ":0gurvd:p:wb:z:hl^")) >=0)
 		switch (i) {
-			case '0': dot_offset=0; upcase=false; default_attrib=0x20; break;
-			case 'g': getty_mode = true; debug = 0; break;
-			case 'u': upcase = true; break;
-			case 'r': rtscts = true; break;
-			case 'v': debug++; break;
-			case 'w': dot_offset = 8; break;
-			case 'h': show_main_help(); exit(0); break;
-			case 'l': show_bootstrap_help(); exit(0); break;
-			case 'z': BASIC_byte_us=atoi(optarg)*1000; break;
-			case 'd': strcpy(client_tty_name,optarg); break;
-			case 'p': (void)(chdir(optarg)+1); break;
+			case '0': dot_offset=0; upcase=false; default_attrib=0x20;    break;
+			case 'g': getty_mode = true; debug = 0;                       break;
+			case 'u': upcase = true;                                      break;
+			case 'r': rtscts = true;                                      break;
+			case 'v': debug++;                                            break;
+			case 'w': dot_offset = 8;                                     break;
+			case 'h': show_main_help(); exit(0);                          break;
+			case 'l': show_bootstrap_help(); exit(0);                     break;
+			case 'z': BASIC_byte_us=atoi(optarg)*1000;                    break;
+			case 'd': strcpy(client_tty_name,optarg);                     break;
+			case 'p': (void)(chdir(optarg)+1);                            break;
 			case 'b': bootstrap_mode=true; strcpy(bootstrap_file,optarg); break;
-			case '^': x=true; break; // debugging
-			case ':': dbg(0,"\"-%c\" requires a value\n",optopt); break;
+			case '^': x=true;                                             break;
+			case ':': dbg(0,"\"-%c\" requires a value\n",optopt);         break;
 			case '?':
 				if (isprint(optopt)) dbg(0,"Unknown option `-%c'.\n",optopt);
 				else dbg(0,"Unknown option character `\\x%x'.\n",optopt);
-			default: show_main_help(); return 1;
+			default: show_main_help();                                 return 1;
 		}
 
 	// commandline non-option arguments
@@ -1422,7 +1422,7 @@ int main(int argc, char **argv)
 	// send loader and exit
 	if (bootstrap_mode) return (bootstrap(bootstrap_file));
 
-	// create the file list (for reverse order traversal)
+	// create the file list
 	file_list_init();
 	if (debug) update_file_list();
 
