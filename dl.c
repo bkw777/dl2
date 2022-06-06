@@ -49,7 +49,7 @@ MA 02111, USA.
  * and the +3 is 3 extra bytes for type, length, and checksum.
  * 
  * Similarly, most functions include frequent references to these
- * byte offsets buf[0], buf[1], buf[2], buf+2, buf[buf[1]+2].
+ * byte offsets gb[0], gb[1], gb[2], gb+2, gb[gb[1]+2].
  * 
  * functions named req_*() receive a command in this format
  * functions named ret_*() generate a response in this format
@@ -277,7 +277,7 @@ int f_open_mode = F_OPEN_NONE;
 int client_tty_fd = -1;
 struct termios client_termios;
 int o_file_h = -1;
-unsigned char buf[TPDD_DATA_MAX+3];
+unsigned char gb[TPDD_DATA_MAX+3];
 char cwd[PATH_MAX] = {0x00};
 char dme_cwd[7] = DEFAULT_DME_ROOT_LABEL;
 char client_tty_name[PATH_MAX];
@@ -538,13 +538,13 @@ void update_file_list() {
 void ret_std(unsigned char err)
 {
 	dbg(3,"%s()\n",__func__);
-	buf[0]=RET_STD;
-	buf[1]=0x01;
-	buf[2]=err;
-	buf[3]=checksum(buf);
+	gb[0]=RET_STD;
+	gb[1]=0x01;
+	gb[2]=err;
+	gb[3]=checksum(gb);
 	dbg(3,"Response: %02X\n",err);
-	write_client_tty(buf,4);
-	if (buf[2]!=ERR_SUCCESS) dbg(2,"ERROR RESPONSE TO CLIENT\n");
+	write_client_tty(gb,4);
+	if (gb[2]!=ERR_SUCCESS) dbg(2,"ERROR RESPONSE TO CLIENT\n");
 }
 
 // return for dirent
@@ -553,32 +553,32 @@ int ret_dirent(FILE_ENTRY *ep)
 	dbg(2,"%s(\"%s\")\n",__func__,ep->client_fname);
 	int i;
 
-	memset(buf,0x00,TPDD_DATA_MAX+3);
-	buf[0]=RET_DIRENT;
-	buf[1]=LEN_RET_DIRENT;
+	memset(gb,0x00,TPDD_DATA_MAX+3);
+	gb[0]=RET_DIRENT;
+	gb[1]=LEN_RET_DIRENT;
 
 	if (ep && ep->client_fname) {
 
 		// name
-		memset (buf + 2, ' ', TPDD_FILENAME_LEN);
+		memset (gb + 2, ' ', TPDD_FILENAME_LEN);
 		if (dot_offset) for (i=0;i<dot_offset+3;i++)
-			buf[i+2]=(ep->client_fname[i])?ep->client_fname[i]:' ';
-		else memcpy (buf+2,ep->client_fname,TPDD_FILENAME_LEN);
+			gb[i+2]=(ep->client_fname[i])?ep->client_fname[i]:' ';
+		else memcpy (gb+2,ep->client_fname,TPDD_FILENAME_LEN);
 
 		// attrib
-		buf[26] = default_attrib;
+		gb[26] = default_attrib;
 
 		// size
-		buf[27]=(uint8_t)(ep->len >> 0x08); // most significant byte
-		buf[28]=(uint8_t)(ep->len & 0xFF);  // least significant byte
+		gb[27]=(uint8_t)(ep->len >> 0x08); // most significant byte
+		gb[28]=(uint8_t)(ep->len & 0xFF);  // least significant byte
 	}
 
-	dbg(3,"\"%24.24s\"\n",buf+2);
+	dbg(3,"\"%24.24s\"\n",gb+2);
 
-	buf[29] = TPDD_FREE_SECTORS;
-	buf[30] = checksum (buf);
+	gb[29] = TPDD_FREE_SECTORS;
+	gb[30] = checksum (gb);
 
-	return (write_client_tty(buf,31) == 31);
+	return (write_client_tty(gb,31) == 31);
 }
 
 void dirent_set_name(unsigned char *b) {
@@ -687,16 +687,16 @@ void update_dme_cwd() {
 // Construct a DME packet around dme_cwd and send it to the client
 void ret_dme_cwd() {
 	dbg(2,"%s(\"%s\")\n",__func__,dme_cwd);
-	buf[0]=RET_STD;
-	buf[1]=LEN_RET_DME;
-	buf[2]=0x00;
-	memcpy(buf+3,dme_cwd,6);
-	buf[9]=0x00;   // buf[9]='.'; // contents don't matter but length does
-	buf[10]=0x00;  // buf[10]=dme_dir_label[0];
-	buf[11]=0x00;  // buf[11]=dme_dir_label[1];
-	buf[12]=0x00;  // buf[12]=0x20;
-	buf[13]=checksum(buf);
-	write_client_tty(buf,14);
+	gb[0]=RET_STD;
+	gb[1]=LEN_RET_DME;
+	gb[2]=0x00;
+	memcpy(gb+3,dme_cwd,6);
+	gb[9]=0x00;   // gb[9]='.'; // contents don't matter but length does
+	gb[10]=0x00;  // gb[10]=dme_dir_label[0];
+	gb[11]=0x00;  // gb[11]=dme_dir_label[1];
+	gb[12]=0x00;  // gb[12]=0x20;
+	gb[13]=checksum(gb);
+	write_client_tty(gb,14);
 }
 
 // Any FDC request might actually be a DME request
@@ -711,11 +711,11 @@ void req_fdc() {
 
 	if (!dme_fdc && !dme_disabled) {
 		dbg(3,"testing for dme\n");
-		buf[0] = 0x00;
+		gb[0] = 0x00;
 		client_tty_vmt(0,1);   // allow this read to time out
-		(void)(read(client_tty_fd,buf,1)+1);
+		(void)(read(client_tty_fd,gb,1)+1);
 		client_tty_vmt(-1,-1); // restore normal VMIN/VTIME
-		if (buf[0]==0x0D) dme_fdc = true;
+		if (gb[0]==0x0D) dme_fdc = true;
 	}
 	if (dme_fdc) {
 		dme_detected=true;
@@ -835,7 +835,7 @@ void req_read(void) {
 	if (ch[1]!=REQ_READ || debug>2) dbg(2,"%s()\n",__func__);
 	int i;
 
-	buf[0]=RET_READ;
+	gb[0]=RET_READ;
 	if (o_file_h<0) {
 		ret_std(ERR_CMDSEQ);
 		return;
@@ -845,10 +845,10 @@ void req_read(void) {
 		return;
 	}
 
-	i = read(o_file_h, buf+2, TPDD_DATA_MAX);
+	i = read(o_file_h, gb+2, TPDD_DATA_MAX);
 
-	buf[1] = (unsigned char) i;
-	buf[2+i] = checksum(buf);
+	gb[1] = (unsigned char) i;
+	gb[2+i] = checksum(gb);
 
 	if(ch[1]==REQ_READ && debug<4) {
 		dbg(1,".");
@@ -856,11 +856,11 @@ void req_read(void) {
 	}
 
 	dbg(4,"...outgoing packet...\n");
-	dbg(5,"buf[]\n"); dbg_b(5,buf,-1);
-	dbg_p(4,buf);
+	dbg(5,"gb[]\n"); dbg_b(5,gb,-1);
+	dbg_p(4,gb);
 	dbg(4,".....................\n");
 
-	write_client_tty(buf, 3+i);
+	write_client_tty(gb, 3+i);
 }
 
 // b[0] = 0x04
@@ -906,11 +906,11 @@ void req_delete(void) {
 // https://github.com/bkw777/pdd.sh/blob/41053c21f6f2ee349db2abf51547117de0a51b59/pdd.sh#L1637
 void ret_cache_write() {
 	dbg(3,"%s()\n",__func__);
-	buf[0]=RET_CACHE_STD;
-	buf[1]=0x01;
-	buf[2]=ERR_SUCCESS;
-	buf[3]=checksum(buf);
-	write_client_tty(buf,4);
+	gb[0]=RET_CACHE_STD;
+	gb[1]=0x01;
+	gb[2]=ERR_SUCCESS;
+	gb[3]=checksum(gb);
+	write_client_tty(gb,4);
 }
 
 // Another part of TS-DOS's drive/server capabilities detection scheme.
@@ -919,9 +919,9 @@ void ret_cache_write() {
 void ret_tsdos_mystery() {
 	dbg(3,"%s()\n",__func__);
 	static unsigned char canned[] = {RET_TSDOS_MYSTERY, 0x0F, 0x41, 0x10, 0x01, 0x00, 0x50, 0x05, 0x00, 0x02, 0x00, 0x28, 0x00, 0xE1, 0x00, 0x00, 0x00};
-	memcpy(buf, canned, canned[1]+2);
-	buf[canned[1]+2] = checksum(buf);
-	write_client_tty(buf, buf[1]+3);
+	memcpy(gb, canned, canned[1]+2);
+	gb[canned[1]+2] = checksum(gb);
+	write_client_tty(gb, gb[1]+3);
 }
 
 void req_rename(unsigned char *b) {
@@ -982,7 +982,7 @@ int get_opr_cmd(void)
 	dbg(3,"%s()\n",__func__);
 	unsigned char b[TPDD_DATA_MAX+3] = {0x00};
 	unsigned i = 0;
-	memset(buf,0x00,TPDD_DATA_MAX+3);
+	memset(gb,0x00,TPDD_DATA_MAX+3);
 
 	while (read_client_tty(&b,1) == 1) {
 		if (b[0]==0x5A) i++; else { i=0; b[0]=0x00; continue; }
@@ -1083,7 +1083,7 @@ int get_fdc_cmd(void) {
 	bool eol = false;
 
 	// see if the command byte was collected already by req_fdc()
-	if (buf[0]>0x00 && buf[0]!=0x0D && buf[1]==0x00) {b[0]=buf[0];i=1;}
+	if (gb[0]>0x00 && gb[0]!=0x0D && gb[1]==0x00) {b[0]=gb[0];i=1;}
 
 	// TODO canonical mode
 	// read command
@@ -1153,8 +1153,8 @@ void slowbyte(char b) {
 		case 0: return;
 		case 1: putchar('.'); break;
 		case 2: // display nicely no matter if loader is CR, LF, or CRLF
-			if (b!=0x0A && buf[0]==0x0A) {buf[0]=0x00; putchar(0x0A); putchar(b);}
-			else if (b==0x0A || b==BASIC_EOL) buf[0]=0x0A;
+			if (b!=0x0A && gb[0]==0x0A) {gb[0]=0x00; putchar(0x0A); putchar(b);}
+			else if (b==0x0A || b==BASIC_EOL) gb[0]=0x0A;
 			else if (isprint(b)) putchar(b);
 			else printf("\033[7m%02X\033[m",b);
 			break;
