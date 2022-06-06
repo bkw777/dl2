@@ -366,16 +366,13 @@ void cat(char *f) {
 	close(h);
 }
 
-// b[] = TPDD Operation-mode return block
 // b[0] = cmd
-// b[1] = len (how many more bytes to read after this one, 0-128)
+// b[1] = len
 // b[2] to b[1+len] = 0 to 128 bytes of payload
-// contents after b[1+len] are ignored
+// ignore everything after b[1+len]
 unsigned char checksum(unsigned char *b) {
 	unsigned short s=0;
-	int i;
-
-	for (i=0;i<2+b[1];i++) s+=b[i];
+	for (int i=0;i<2+b[1];i++) s+=b[i];
 	return ((s&0xFF)^0xFF);
 }
 
@@ -467,7 +464,6 @@ FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 		f.client_fname[dot_offset+3]=0x00;
 		if (upcase) for(i=0;i<TPDD_FILENAME_LEN;i++) f.client_fname[i]=toupper(f.client_fname[i]);
 
-		// lame...
 		if (f.client_fname[dot_offset+1]==0x00) f.client_fname[dot_offset+1]=0x20;
 		if (f.client_fname[dot_offset+2]==0x00) f.client_fname[dot_offset+2]=0x20;
 
@@ -585,86 +581,85 @@ int ret_dirent(FILE_ENTRY *ep)
 	return (write_client_tty(buf,31) == 31);
 }
 
-// REQ_DIRENT 
-// b[0]-b[23] = filename
-// b[24] = attrib
-// b[25] = search
-/*
- * heads-up
- * TS-DOS sometimes submits request with junk in the filename & attrib fields
- * in some cases where a real drive would ignore them (get-first/get-next).
- * So only look at those fields for the set-name.
-*/ 
-int req_dirent(unsigned char *data)
-{
-	dbg(2,"%s()\n",__func__);
-	dbg(5,"data[]\n"); dbg_b(5,data,-1);
-	dbg_p(4,data);
-
+void dirent_set_name(unsigned char *b) {
+	dbg(2,"%s(%-24.24s)\n",__func__,b+2);
 	char *p;
-	char filename[TPDD_FILENAME_LEN+1] = { 0x00 };
+	char filename[TPDD_FILENAME_LEN+1]={0x00};
 	int f = 0;
-
-	switch (data[27]) {
-	case DIRENT_SET_NAME:	/* set filename for subsequent actions */
-		dbg(3,"DIRENT_SET_NAME\n");
-		if (data[2]) {
-			dbg(3,"filename: \"%-24.24s\"\n",data+2);
-			dbg(3,"  attrib: \"%c\" (%1$02X)\n",data[26]);
-		}
-		// we must update before every set-name for at least 2 reasons
-		// 1 - get-first is not required before set-name
-		//     TEENY for instance never does get-first or get-next
-		// 2 - Files may be changed by other processes than ourself
-		// set-name however is required for, and before, any other action
-		update_file_list();
-		strncpy(filename,(char *)data+2,TPDD_FILENAME_LEN);
-		filename[TPDD_FILENAME_LEN]=0;
-		// Remove trailing spaces
-		for (p = strrchr(filename,' '); p >= filename && *p == ' '; p--) *p = 0x00;
+	if (b[2]) {
+		dbg(3,"filename: \"%-24.24s\"\n",b+2);
+		dbg(3,"  attrib: \"%c\" (%1$02X)\n",b[26]);
+	}
+	// we must update before every set-name for at least 2 reasons
+	// 1 - get-first is not required before set-name
+	//     TEENY for instance never does get-first or get-next
+	//     UR2 doesn't do get-first/get-next before requesting DOS100.CO
+	// 2 - Files may be changed by other processes than ourself
+	// set-name however is required for, and before, any other action
+	// than get-first, so updating here and get-first covers everything else.
+	update_file_list();
+	strncpy(filename,(char *)b+2,TPDD_FILENAME_LEN);
+	filename[TPDD_FILENAME_LEN]=0;
+	// Remove trailing spaces
+	for (p = strrchr(filename,' '); p >= filename && *p == ' '; p--) *p = 0x00;
 		cur_file=find_file(filename);
-		if (cur_file) {
-			dbg(3,"Exists: \"%s\"  %u\n", cur_file->local_fname, cur_file->len);
-			ret_dirent(cur_file);
-		} else if (ck_ur2_dos(filename)==0) {
-			// let UR2 load <root>/DOSxxx.CO in any subdir
-			// if not found in current dir for real.
-			cur_file=make_file_entry(filename,0,0);
-			char t[LOCAL_FILENAME_MAX+1] = {0x00};
-			for (int i=dir_depth;i>0;i--) strncat(t,"../",3);
-			strncat(t,cur_file->local_fname,LOCAL_FILENAME_MAX-dir_depth*3);
-			memset(cur_file->local_fname,0x00,LOCAL_FILENAME_MAX);
-			memcpy(cur_file->local_fname,t,LOCAL_FILENAME_MAX);
-			dbg(3,"Virtual: \"%s\" <-- \"%s\"\n",cur_file->client_fname,cur_file->local_fname);
-			ret_dirent(cur_file);
-		} else {
-			if (filename[dot_offset+1]==dme_dir_label[0] && filename[dot_offset+2]==dme_dir_label[1]) f = DIR_FLAG;
-			cur_file=make_file_entry(collapse_padded_name(filename), 0, f);
-			dbg(3,"New %s: \"%s\"\n",f==DIR_FLAG?"Directory":"File",cur_file->local_fname);
-			ret_dirent(NULL);
-		}
-		break;
-	case DIRENT_GET_FIRST:
-		dbg(3,"DIRENT_GET_FIRST\n");
-		if (debug==1) dbg(2,"Directory Listing\n");
-		// we must update every time before get-first,
-		// because set-name is not required before get-first
-		update_file_list();
-		ret_dirent(get_first_file());
-		dme_fdc = 0; // see ref/fdc.txt
-		break;
-	case DIRENT_GET_NEXT:
-		dbg(3,"DIRENT_GET_NEXT\n");
-		ret_dirent(get_next_file());
-		break;
-	case DIRENT_GET_PREV:
-		dbg(3,"DIRENT_GET_PREV\n");
-		ret_dirent(get_prev_file());
-		break;
-	case DIRENT_CLOSE:
-		dbg(3,"DIRENT_CLOSE\n");
-		// does it expect a return?
-		break;
+	if (cur_file) {
+		dbg(3,"Exists: \"%s\"  %u\n", cur_file->local_fname, cur_file->len);
+		ret_dirent(cur_file);
+	} else if (ck_ur2_dos(filename)==0) {
+		// let UR2 load <root>/DOSxxx.CO in any subdir
+		// if not found in current dir for real.
+		cur_file=make_file_entry(filename,0,0);
+		char t[LOCAL_FILENAME_MAX+1] = {0x00};
+		for (int i=dir_depth;i>0;i--) strncat(t,"../",3);
+		strncat(t,cur_file->local_fname,LOCAL_FILENAME_MAX-dir_depth*3);
+		memset(cur_file->local_fname,0x00,LOCAL_FILENAME_MAX);
+		memcpy(cur_file->local_fname,t,LOCAL_FILENAME_MAX);
+		dbg(3,"Virtual: \"%s\" <-- \"%s\"\n",cur_file->client_fname,cur_file->local_fname);
+		ret_dirent(cur_file);
+	} else {
+		if (filename[dot_offset+1]==dme_dir_label[0] && filename[dot_offset+2]==dme_dir_label[1]) f = DIR_FLAG;
+		cur_file=make_file_entry(collapse_padded_name(filename), 0, f);
+		dbg(3,"New %s: \"%s\"\n",f==DIR_FLAG?"Directory":"File",cur_file->local_fname);
+		ret_dirent(NULL);
+	}
+}
+
+void dirent_get_first() {
+	if (debug==1) dbg(2,"Directory Listing\n");
+	// we must update every time before get-first,
+	// because set-name is not required before get-first
+	update_file_list();
+	ret_dirent(get_first_file());
+	dme_fdc = 0; // see req_fdc() & ref/fdc.txt
+}
+
+// b[0] = cmd
+// b[1] = len
+// b[2]-b[25] = filename
+// b[26] = attrib
+// b[27] = action (search form)
+//
+// Don't even look at the data yet except the action byte.
+// TS-DOS submits get-first & get-next requests with junk data
+// in the filename & attrib fields left over from previous actions.
+int req_dirent(unsigned char *b) {
+	dbg(2,"%s(%s)\n",__func__,
+		b[27]==DIRENT_SET_NAME?"set_name":
+		b[27]==DIRENT_GET_FIRST?"get_first":
+		b[27]==DIRENT_GET_NEXT?"get_next":
+		b[27]==DIRENT_GET_PREV?"get_prev":
+		b[27]==DIRENT_CLOSE?"close":
+		"UNKNOWN");
+	dbg(5,"b[]\n"); dbg_b(5,b,-1);
+	dbg_p(4,b);
+
+	switch (b[27]) {
+		case DIRENT_SET_NAME:  dirent_set_name(b);          break;
+		case DIRENT_GET_FIRST: dirent_get_first();          break;
+		case DIRENT_GET_NEXT:  ret_dirent(get_next_file()); break;
+		case DIRENT_GET_PREV:  ret_dirent(get_prev_file()); break;
+		case DIRENT_CLOSE:                                  break;
 	}
 	return 0;
 }
@@ -738,13 +733,13 @@ void req_fdc() {
 //             0x02 write append
 //             0x03 read
 // b[3] = chk
-int req_open(unsigned char *data)
+int req_open(unsigned char *b)
 {
 	dbg(2,"%s(\"%s\")\n",__func__,cur_file->client_fname);
-	dbg(5,"data[]\n"); dbg_b(5,data,-1);
-	dbg_p(4,data);
+	dbg(5,"b[]\n"); dbg_b(5,b,-1);
+	dbg_p(4,b);
 
-	unsigned char omode = data[2];
+	unsigned char omode = b[2];
 
 	switch(omode) {
 	case F_OPEN_WRITE:
@@ -872,11 +867,11 @@ void req_read(void) {
 // b[1] = 0x01 - 0x80
 // b[2] = b[1] bytes
 // b[2+len] = chk
-void req_write(unsigned char *data) {
+void req_write(unsigned char *b) {
 	if (ch[1]!=REQ_WRITE || debug>2) dbg(2,"%s()\n",__func__);
 	dbg(4,"...incoming packet...\n");
-	dbg(5,"data[]\n"); dbg_b(5,data,-1);
-	dbg_p(4,data);
+	dbg(5,"b[]\n"); dbg_b(5,b,-1);
+	dbg_p(4,b);
 	dbg(4,".....................\n");
 
 	if (o_file_h<0) {ret_std(ERR_CMDSEQ); return;}
@@ -887,11 +882,11 @@ void req_write(unsigned char *data) {
 	}
 
 	if(ch[1]==REQ_WRITE && debug<4) {
-		dbg(1,".",data[1]);
-		if (data[1]<TPDD_DATA_MAX) dbg(1,"\n");
+		dbg(1,".",b[1]);
+		if (b[1]<TPDD_DATA_MAX) dbg(1,"\n");
 	}
 
-	if (write (o_file_h,data+2,data[1]) != data[1]) ret_std (ERR_SECTOR_NUM);
+	if (write (o_file_h,b+2,b[1]) != b[1]) ret_std (ERR_SECTOR_NUM);
 	else ret_std (ERR_SUCCESS);
 }
 
@@ -929,9 +924,9 @@ void ret_tsdos_mystery() {
 	write_client_tty(buf, buf[1]+3);
 }
 
-void req_rename(unsigned char *data) {
-	dbg(3,"%s(%-24.24s)\n",__func__,data+2);
-	char *t = (char *)data + 2;
+void req_rename(unsigned char *b) {
+	dbg(3,"%s(%-24.24s)\n",__func__,b+2);
+	char *t = (char *)b + 2;
 	memcpy(t,collapse_padded_name(t),TPDD_FILENAME_LEN);
 	if (rename (cur_file->local_fname,t))
 		ret_std(ERR_SECTOR_NUM);
@@ -944,7 +939,7 @@ void req_rename(unsigned char *data) {
 void req_close() {
 	if (o_file_h>=0) close(o_file_h);
 	o_file_h = -1;
-	dbg(2,"Closed: %s\n",cur_file->local_fname);
+	dbg(2,"\nClosed: \"%s\"\n",cur_file->local_fname);
 	ret_std(ERR_SUCCESS);
 }
 
