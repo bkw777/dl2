@@ -158,7 +158,7 @@ MA 02111, USA.
 #define REQ_RENAME        0x0D
 #define REQ_REQ_EXT_QUERY 0x0E
 #define REQ_COND_LIST     0x0F
-#define REQ_TSDOS_MYSTERY 0x23 // TS-DOS mystery - part of drive/emulator detection
+#define REQ_TSDOS_MYSTERY 0x23 // TS-DOS mystery - part of drive/emulator detection TPDD2 responds, TPDD1 does not.
 #define REQ_CACHE_LOAD    0x30 // TPDD2 sector access
 #define REQ_CACHE_WRITE   0x31 // TPDD2 sector access
 #define REQ_CACHE_READ    0x32 // TPDD2 sector access
@@ -916,6 +916,9 @@ void ret_cache_write() {
 // Another part of TS-DOS's drive/server capabilities detection scheme.
 // Used to be called "TS-DOS mystery command 2", but now it's the only one.
 // ("mystery command 1" was the TPDD2 sector cache command above)
+// TS-DOS sends: 5A 5A 23 00 DC
+// TPDD2 responds: 14 0F 41 10 01 00 50 05 00 02 00 28 00 E1 00 00 00 2A
+// TPDD1 does not respond.
 void ret_tsdos_mystery() {
 	dbg(3,"%s()\n",__func__);
 	static unsigned char canned[] = {RET_TSDOS_MYSTERY, 0x0F, 0x41, 0x10, 0x01, 0x00, 0x50, 0x05, 0x00, 0x02, 0x00, 0x28, 0x00, 0xE1, 0x00, 0x00, 0x00};
@@ -928,7 +931,7 @@ void req_rename(unsigned char *b) {
 	dbg(3,"%s(%-24.24s)\n",__func__,b+2);
 	char *t = (char *)b + 2;
 	memcpy(t,collapse_padded_name(t),TPDD_FILENAME_LEN);
-	if (rename (cur_file->local_fname,t))
+	if (rename(cur_file->local_fname,t))
 		ret_std(ERR_SECTOR_NUM);
 	else {
 		dbg(1,"Renamed: %s -> %s\n",cur_file->local_fname,t);
@@ -977,7 +980,7 @@ void dispatch_opr_cmd(unsigned char *b) {
 	}
 }
 
-int get_opr_cmd(void)
+void get_opr_cmd(void)
 {
 	dbg(3,"%s()\n",__func__);
 	unsigned char b[TPDD_DATA_MAX+3] = {0x00};
@@ -987,7 +990,7 @@ int get_opr_cmd(void)
 	while (read_client_tty(&b,1) == 1) {
 		if (b[0]==0x5A) i++; else { i=0; b[0]=0x00; continue; }
 		if (i<2) { b[0]=0x00; continue; }
-		if ((read_client_tty(&b,2) == 2) && (read_client_tty(&b[2],b[1]+1) == b[1]+1)) break;
+		if (read_client_tty(&b,2) == 2) if (read_client_tty(&b[2],b[1]+1) == b[1]+1) break;
 		i=0; memset(b,0x00,TPDD_DATA_MAX+3);
 	}
 
@@ -996,15 +999,12 @@ int get_opr_cmd(void)
 	i = checksum(b);
 	if (b[b[1]+2]!=i) {
 		dbg(0,"Failed checksum: received: %02X  calculated: %02X\n",b[b[1]+2],i);
-		ret_std(ERR_PARAM);
-		return 7;
+		return; // real drive does not return anything
 	}
 
-	ch[1]=ch[0];
-	ch[0]=b[0];
+	ch[1]=ch[0]; ch[0]=b[0];
 
 	dispatch_opr_cmd(b);
-	return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1076,9 +1076,9 @@ void req_fdc_write_sector_nv(char *b) {
 }
 
 /* ref/fdc.txt */
-int get_fdc_cmd(void) {
+void get_fdc_cmd(void) {
 	dbg(3,"%s()\n",__func__);
-	char b[TPDD_DATA_MAX] = { 0x00 };
+	char b[TPDD_DATA_MAX] = {0x00};
 	unsigned i = 0;
 	bool eol = false;
 
@@ -1116,7 +1116,6 @@ int get_fdc_cmd(void) {
 		case 0x00: if (!i) {dbg(1,"FDC: empty command\n");    break;}
 		default: dbg(1,"FDC: unknown command\n");
 	}
-	return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1176,13 +1175,12 @@ int send_BASIC(char *f)
 	if (debug) puts("");
 	fflush(stdout);
 	while(read(fd,&b,1)==1) slowbyte(b);
+	close(fd);
 	if (b!=0x0A && b!=BASIC_EOL && b!=BASIC_EOF) slowbyte(BASIC_EOL);
 	if (b!=BASIC_EOF) slowbyte(BASIC_EOF);
 	if (debug) puts("");
 	puts("DONE");
-	close(fd);
 	close(client_tty_fd);
-
 	return 0;
 }
 
