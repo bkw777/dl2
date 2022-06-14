@@ -114,8 +114,13 @@ MA 02111, USA.
 #define DEFAULT_CLIENT_BAUD B19200
 #endif
 
-#define DEFAULT_BASIC_BYTE_MS 6
-#define DEFAULT_TPDD_FILE_ATTRIB 0x46 // F
+// most things get away with 5 here.
+// rxcini.do for REXCPM setup, requires 6.
+// new high-water mark: TS-DOS.200 requires 7.
+// If this is 6, a "?" (print) on line 3 gets dropped every time.
+#define DEFAULT_BASIC_BYTE_MS 7
+
+#define DEFAULT_TPDD_FILE_ATTR 0x46 // F
 
 // These defaults are the same as what the original Desk-Link does.
 // But you can change them to pretty much anything. The parent label is
@@ -266,7 +271,7 @@ int BASIC_byte_us = DEFAULT_BASIC_BYTE_MS*1000;
 char dme_root_label[7] = DEFAULT_DME_ROOT_LABEL;
 char dme_parent_label[7] = DEFAULT_DME_PARENT_LABEL;
 char dme_dir_label[3] = DEFAULT_DME_DIR_LABEL;
-char default_attrib = DEFAULT_TPDD_FILE_ATTRIB;
+char default_attr = DEFAULT_TPDD_FILE_ATTR;
 bool enable_ur2_dos_hack = true;
 bool getty_mode = false;
 bool bootstrap_mode = false;
@@ -565,8 +570,8 @@ int ret_dirent(FILE_ENTRY *ep)
 			gb[i+2]=(ep->client_fname[i])?ep->client_fname[i]:' ';
 		else memcpy (gb+2,ep->client_fname,TPDD_FILENAME_LEN);
 
-		// attrib
-		gb[26] = default_attrib;
+		// attribute
+		gb[26] = default_attr;
 
 		// size
 		gb[27]=(uint8_t)(ep->len >> 0x08); // most significant byte
@@ -588,7 +593,7 @@ void dirent_set_name(unsigned char *b) {
 	int f = 0;
 	if (b[2]) {
 		dbg(3,"filename: \"%-24.24s\"\n",b+2);
-		dbg(3,"  attrib: \"%c\" (%1$02X)\n",b[26]);
+		dbg(3,"    attr: \"%c\" (%1$02X)\n",b[26]);
 	}
 	// we must update before every set-name for at least 2 reasons
 	// 1 - get-first is not required before set-name
@@ -637,12 +642,12 @@ void dirent_get_first() {
 // b[0] = cmd
 // b[1] = len
 // b[2]-b[25] = filename
-// b[26] = attrib
+// b[26] = attr
 // b[27] = action (search form)
 //
 // Don't even look at the data yet except the action byte.
 // TS-DOS submits get-first & get-next requests with junk data
-// in the filename & attrib fields left over from previous actions.
+// in the filename & attribute fields left over from previous actions.
 int req_dirent(unsigned char *b) {
 	dbg(2,"%s(%s)\n",__func__,
 		b[27]==DIRENT_SET_NAME?"set_name":
@@ -898,12 +903,12 @@ void req_delete(void) {
 	ret_std (ERR_SUCCESS);
 }
 
-// TPDD2 sector cache write - but not really doing that
+// TPDD2 sector cache write - but not really doing it
 // This is just something TS-DOS does to detect TPDD2, and we do implement
 // other TPDD2 features, so we respond to this just enough to satisfy TS-DOS.
 // We just blindly return a packet that means "cache write suceeded".
 // http://bitchin100.com/wiki/index.php?title=TPDD-2_Sector_Access_Protocol
-// https://github.com/bkw777/pdd.sh/blob/41053c21f6f2ee349db2abf51547117de0a51b59/pdd.sh#L1637
+// https://github.com/bkw777/pdd.sh search for "pdd2_write_cache
 void ret_cache_write() {
 	dbg(3,"%s()\n",__func__);
 	gb[0]=RET_CACHE_STD;
@@ -1266,7 +1271,7 @@ void show_config () {
 	dbg(2,"dme_parent_label: \"%-6.6s\"\n",dme_parent_label);
 	dbg(2,"dme_dir_label   : \"%-2.2s\"\n",dme_dir_label);
 	dbg(0,"ur2_dos_hack    : %s\n",enable_ur2_dos_hack?"enabled":"disabled");
-	dbg(2,"default_attrib  : '%c'\n",default_attrib);
+	dbg(2,"default_attr    : '%c'\n",default_attr);
 }
 
 void show_main_help() {
@@ -1327,12 +1332,12 @@ int main(int argc, char **argv)
 		memcpy(dme_cwd,dme_root_label,6);}
 	if (getenv("PARENT_LABEL")) snprintf(dme_parent_label,7,"%-6.6s",getenv("PARENT_LABEL"));
 	if (getenv("DIR_LABEL")) snprintf(dme_dir_label,3,"%-2.2s",getenv("DIR_LABEL"));
-	if (getenv("ATTRIB")) default_attrib = *getenv("ATTRIB");
+	if (getenv("ATTR")) default_attr = *getenv("ATTR");
 
 	// commandline options
 	while ((i = getopt (argc, argv, ":0gurvd:p:wb:z:hl^")) >=0)
 		switch (i) {
-			case '0': dot_offset=0; upcase=false; default_attrib=0x20;    break;
+			case '0': dot_offset=0; upcase=false; default_attr=0x20;      break;
 			case 'g': getty_mode = true; debug = 0;                       break;
 			case 'u': upcase = true;                                      break;
 			case 'r': rtscts = true;                                      break;

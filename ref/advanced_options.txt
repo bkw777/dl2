@@ -58,7 +58,7 @@ Example:
 	to work, it has to be left-justified like a real filename would be.
 	It takes some trial & error to figure out what works.
 
- ATTRIB       ''   'A'  'F'  any single character
+ ATTR     'F'   ' '   any single character
 
 	The TPDD drive has a single-character field along with every filename.
 	It's just a text field that the drive can use to return a a group of
