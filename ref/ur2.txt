@@ -1,0 +1,55 @@
+Special support for the TS-DOS button in Ultimate ROM II
+
+A few "magic" filenames that have the following behavior/properties:
+
+* Name: DOS100.CO, DOS200.CO, DOSNEC.CO
+
+* If client tries to open(read), and file doesn't exist in cwd, silently
+  succeed and supply contents from the same file from share root instead.
+
+* Do not include in directory listing unless it actually exists in cwd.
+
+* Do not supply substitute contents if file actually exists in cwd.
+  Ff client tries to load a file that actually exists in cwd,
+  it should work as normal, not sustitute the contents from some other file.
+
+* Do not apply to open(write) or append. If client tries to save a file,
+  it should work as normal, not overwite the copy in the share root!
+
+* DO allow overwriting the share root copy if the client is actually in
+  the share root dir.
+
+* Don't even look if not in "floppy compat" mode (dot_offset=6).
+  There is no UR-II for CP/M or WP-2 or any other kind of client,
+  it's an option ROM for KC-85 platform clones only.
+
+Explaination
+
+UR-II has a "TS-DOS" button that tries to load a file named "DOS100.CO" on
+the fly.
+
+(or DOS200.CO for TANDY Model 200, or DOSNEC.CO for NEC PC-8201/PC-8300)
+
+UR-II does not know about directories, and does not do anything to try
+to cd to the root dir before trying to open the file.
+
+On a real drive, this works fine. If a disk simply contains a copy of
+the file, then the open() works and so the TS-DOS button works.
+
+On an emulated drive that can cd into sub-directories, it's possible for
+the user to launch TS-DOS, cd into a sub-directory that does not contain
+a copy of DOS100.CO, and then exit TS-DOS (without cd-ing back up to the
+root dir before exiting).
+
+In that case, all else being equal, the TS-DOS button in UR-II would
+not work any more unless/until you re-start the server.
+
+The next time the user tries to use the TS-DOS button, UR-II tries
+to load "DOS100.CO", no such file exists (in the current dir), the
+open() fails, and the user can never get back into TS-DOS again. They
+can't cd back to root to fix it, since they can't launch TS-DOS to do
+the cd. You have to re-start the server to make it work again.
+
+So this just makes it so that any attempt to open one of these specific
+filenames (for reading only) always works, regardless what directory the
+server is currently cd'd to.

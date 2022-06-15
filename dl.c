@@ -78,6 +78,7 @@ MA 02111, USA.
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include "constants.h"
 #include "dir_list.h"
 
 #if defined(__darwin__)
@@ -131,135 +132,25 @@ MA 02111, USA.
 // this you can't change unless you also hack ts-dos
 #define DEFAULT_DME_DIR_LABEL    "<>"     // DIR_LABEL='/'
 
-// Ultimate ROM-II TS-DOS loader support: Special filenames from the
-// root dir that should always be loadable no matter what subdirectory
-// the client has switched to.
+// Support for Ultimate ROM-II TS-DOS loader: see ref/ur2.txt
+// files from share root dir that are always readable in any cd path
+// TODO
+// * put these in an array
+// * allow user to specify an arbitrary list of magic files
+// * 3 or more search paths: cwd, share-root, ~/.local/app, app-lib
+//   any file in the list is searched first in the current dir,
+//   then in the root shared dir, then in a specified lib/share dir.
 #define DOS100 "DOS100.CO"
 #define DOS200 "DOS200.CO"
 #define DOSNEC "DOSNEC.CO"
+//#define DOSK85 "DOSK85.CO" // probably don't exist
+//#define DOSM10 "DOSM10.CO"
 
 // termios VMIN & VTIME
 #define C_CC_VMIN 1
 #define C_CC_VTIME 5
 
 /*************************************************************/
-
-// drive firmware/protocol constants
-
-// TPDD request block formats
-#define REQ_DIRENT        0x00
-#define REQ_OPEN          0x01
-#define REQ_CLOSE         0x02
-#define REQ_READ          0x03
-#define REQ_WRITE         0x04
-#define REQ_DELETE        0x05
-#define REQ_FORMAT        0x06
-#define REQ_STATUS        0x07
-#define REQ_FDC           0x08
-#define REQ_SEEK          0x09
-#define REQ_TELL          0x0A
-#define REQ_SET_EXT       0x0B
-#define REQ_CONDITION     0x0C // TPDD2
-#define REQ_RENAME        0x0D
-#define REQ_REQ_EXT_QUERY 0x0E
-#define REQ_COND_LIST     0x0F
-#define REQ_TSDOS_MYSTERY 0x23 // TS-DOS mystery - part of drive/emulator detection TPDD2 responds, TPDD1 does not.
-#define REQ_CACHE_LOAD    0x30 // TPDD2 sector access
-#define REQ_CACHE_WRITE   0x31 // TPDD2 sector access
-#define REQ_CACHE_READ    0x32 // TPDD2 sector access
-
-// TPDD return block formats
-#define RET_READ          0x10
-#define RET_DIRENT        0x11
-#define RET_STD           0x12 // shared return format for: error open close delete status write
-#define RET_TSDOS_MYSTERY 0x14
-#define RET_CONDITION     0x15 // TPDD2
-#define RET_CACHE_STD     0x38 // TPDD2 shared return format for: sector_cache write_cache
-#define RET_READ_CACHE    0x39 // TPDD2
-
-// directory entry request types
-#define DIRENT_SET_NAME   0x00
-#define DIRENT_GET_FIRST  0x01
-#define DIRENT_GET_NEXT   0x02
-#define DIRENT_GET_PREV   0x03 // TPDD2
-#define DIRENT_CLOSE      0x04 // TPDD2
-
-// file open access modes
-#define F_OPEN_NONE       0x00  // used in here, not part of protocol
-#define F_OPEN_WRITE      0x01
-#define F_OPEN_APPEND     0x02
-#define F_OPEN_READ       0x03
-
-// TPDD Operation-mode error codes
-#define ERR_SUCCESS       0x00 // 'Operation Complete'
-#define ERR_NO_FILE       0x10 // 'File Not Found'
-#define ERR_EXISTS        0x11 // 'File Exists'
-#define ERR_CMDSEQ        0x30 // 'Command Parameter or Sequence Error'
-#define ERR_DIR_SEARCH    0x31 // 'Directory Search Error'
-#define ERR_BANK          0x35 // 'Bank Error'
-#define ERR_PARAM         0x36 // 'Parameter Error'
-#define ERR_FMT_MISMATCH  0x37 // 'Open Format Mismatch'
-#define ERR_EOF           0x3F // 'End of File'
-#define ERR_NO_START      0x40 // 'No Start Mark'
-#define ERR_ID_CRC        0x41 // 'ID CRC Check Error'
-#define ERR_SECTOR_LEN    0x42 // 'Sector Length Error'
-#define ERR_FMT_VERIFY    0x44 // 'Format Verify Error'
-#define ERR_NOT_FORMATTED 0x45 // 'Disk Not Formatted'
-#define ERR_FMT_INTERRUPT 0x46 // 'Format Interruption'
-#define ERR_ERASE_OFFSET  0x47 // 'Erase Offset Error'
-#define ERR_DATA_CRC      0x49 // 'DATA CRC Check Error'
-#define ERR_SECTOR_NUM    0x4A // 'Sector Number Error'
-#define ERR_READ_TIMEOUT  0x4B // 'Read Data Timeout'
-#define ERR_SECTOR_NUM2   0x4D // 'Sector Number Error'
-#define ERR_WRITE_PROTECT 0x50 // 'Write-Protected Disk'
-#define ERR_DISK_NOINIT   0x5E // 'Disk Not Formatted'
-#define ERR_DIR_FULL      0x60 // 'Disk Full or Max File Size Exceeded or Directory Full' / TPDD2 'Directory Full'
-#define ERR_DISK_FULL     0x61 // 'Disk Full'
-#define ERR_FILE_LEN      0x6E // 'File Too Long' (real drive limits to 65534, we exceed for REXCPM)
-#define ERR_NO_DISK       0x70 // 'No Disk'
-#define ERR_DISK_CHG      0x71 // 'Disk Not Inserted or Disk Change Error' / TPDD2 'Disk Change Error'
-#define ERR_DEFECTIVE     0x83 // 'Defective Disk'  (real drive needs a power-cycle to clear this error)
-
-// TPDD1 FDC-mode commands
-#define FDC_SET_MODE        'M' // set Operation-mode or FDC-mode
-#define FDC_CONDITION       'D' // drive condition
-#define FDC_FORMAT          'F' // format disk
-#define FDC_FORMAT_NV       'G' // format disk without verify
-#define FDC_READ_ID         'A' // read sector ID
-#define FDC_READ_SECTOR     'R' // read sector data
-#define FDC_SEARCH_ID       'S' // search sector ID
-#define FDC_WRITE_ID        'B' // write sector ID
-#define FDC_WRITE_ID_NV     'C' // write sector ID without verify
-#define FDC_WRITE_SECTOR    'W' // write sector data
-#define FDC_WRITE_SECTOR_NV 'X' // write sector data without verify
-
-// TPDD1 FDC-mode error codes
-// There is no documentation for FDC error codes.
-// These are guesses from experimenting.
-// These appear in the first hex pair of an 8-byte FDC-mode response.
-#define ERR_FDC_SUCCESS         0 // 'OK'
-#define ERR_FDC_LSN_LO         17 // 'Logical Sector Number Below Range'
-#define ERR_FDC_LSN_HI         18 // 'Logical Sector Number Above Range'
-#define ERR_FDC_PSN HI         19 // 'Physical Sector Number Above Range'
-#define ERR_FDC_PARAM          33 // 'Parameter Invalid, Wrong Type'
-#define ERR_FDC_LSSC_LO        50 // 'Invalid Logical Sector Size Code'
-#define ERR_FDC_LSSC_HI        51 // 'Logical Sector Size Code Above Range'
-#define ERR_FDC_NOT_FORMATTED 160 // 'Disk Not Formatted'
-#define ERR_FDC_READ          161 // 'Read Error'
-#define ERR_FDC_WRITE_PROTECT 176 // 'Write-Protected Disk'
-#define ERR_FDC_COMMAND       193 // 'Invalid Command'
-#define ERR_FDC_NO_DISK       209 // 'Disk Not Inserted'
-
-// fixed lengths
-#define TPDD_DATA_MAX      0x80
-#define TPDD_FREE_SECTORS  0x50 // max valid value is 80 sectors
-#define LEN_RET_STD        0x01
-#define LEN_RET_DME        0x0B
-#define LEN_RET_DIRENT     0x1C
-
-// KC-85 platform BASIC interpreter EOL & EOF byts for bootstrap()
-#define BASIC_EOL 0x0D
-#define BASIC_EOF 0x1A
 
 // configuration
 int debug = 0;
@@ -414,7 +305,7 @@ void lsx (char *path,char *match) {
 	closedir(dir);
 }
 
-int ck_ur2_dos(char *b) {
+int do_magic_file(char *b) {
 	dbg(3,"%s(\"%s\")\n",__func__,b);
 	if (!enable_ur2_dos_hack) return 1;
 	if (!dir_depth) return 1; // fake root hack not needed in actual root
@@ -595,13 +486,9 @@ void dirent_set_name(unsigned char *b) {
 		dbg(3,"filename: \"%-24.24s\"\n",b+2);
 		dbg(3,"    attr: \"%c\" (%1$02X)\n",b[26]);
 	}
-	// we must update before every set-name for at least 2 reasons
-	// 1 - get-first is not required before set-name
-	//     TEENY for instance never does get-first or get-next
-	//     UR2 doesn't do get-first/get-next before requesting DOS100.CO
-	// 2 - Files may be changed by other processes than ourself
-	// set-name however is required for, and before, any other action
-	// than get-first, so updating here and get-first covers everything else.
+	// update before every set-name for at least 2 reasons
+	// * clients may open files without ever listing (teeny, ur2, etc)
+	// * local files may be changed at any time by other processes
 	update_file_list();
 	strncpy(filename,(char *)b+2,TPDD_FILENAME_LEN);
 	filename[TPDD_FILENAME_LEN]=0;
@@ -611,9 +498,8 @@ void dirent_set_name(unsigned char *b) {
 	if (cur_file) {
 		dbg(3,"Exists: \"%s\"  %u\n", cur_file->local_fname, cur_file->len);
 		ret_dirent(cur_file);
-	} else if (ck_ur2_dos(filename)==0) {
-		// let UR2 load <root>/DOSxxx.CO in any subdir
-		// if not found in current dir for real.
+	} else if (do_magic_file(filename)==0) {
+		// let UR2 load <root>/DOSxxx.CO from anywhere
 		cur_file=make_file_entry(filename,0,0);
 		char t[LOCAL_FILENAME_MAX+1] = {0x00};
 		for (int i=dir_depth;i>0;i--) strncat(t,"../",3);
@@ -632,7 +518,7 @@ void dirent_set_name(unsigned char *b) {
 
 void dirent_get_first() {
 	if (debug==1) dbg(2,"Directory Listing\n");
-	// we must update every time before get-first,
+	// update every time before get-first,
 	// because set-name is not required before get-first
 	update_file_list();
 	ret_dirent(get_first_file());
@@ -645,7 +531,7 @@ void dirent_get_first() {
 // b[26] = attr
 // b[27] = action (search form)
 //
-// Don't even look at the data yet except the action byte.
+// Ignore the name & attr until after determining the action.
 // TS-DOS submits get-first & get-next requests with junk data
 // in the filename & attribute fields left over from previous actions.
 int req_dirent(unsigned char *b) {
@@ -904,11 +790,14 @@ void req_delete(void) {
 }
 
 // TPDD2 sector cache write - but not really doing it
-// This is just something TS-DOS does to detect TPDD2, and we do implement
-// other TPDD2 features, so we respond to this just enough to satisfy TS-DOS.
-// We just blindly return a packet that means "cache write suceeded".
+// Previously called "TS-DOS mystery command 1"
+// This is just something TS-DOS does to detect TPDD2. Respond just enough
+// to satisfy TS-DOS that it may use TPDD2 features like dirent(get-prev).
+// Just return a canned packet that means "cache write suceeded".
 // http://bitchin100.com/wiki/index.php?title=TPDD-2_Sector_Access_Protocol
 // https://github.com/bkw777/pdd.sh search for "pdd2_write_cache
+// FIXME: We should really only respond success if the payload exactly
+// matches TS-DOS's, and error any other attempt to use this function.
 void ret_cache_write() {
 	dbg(3,"%s()\n",__func__);
 	gb[0]=RET_CACHE_STD;
@@ -919,14 +808,36 @@ void ret_cache_write() {
 }
 
 // Another part of TS-DOS's drive/server capabilities detection scheme.
-// Used to be called "TS-DOS mystery command 2", but now it's the only one.
-// ("mystery command 1" was the TPDD2 sector cache command above)
-// TS-DOS sends: 5A 5A 23 00 DC
-// TPDD2 responds: 14 0F 41 10 01 00 50 05 00 02 00 28 00 E1 00 00 00 2A
+// Previously called "TS-DOS mystery command 2"
+// The function of the command in a real drive is unknown.
+// The meaning of the response is unkmnown.
+// But the command apparently takes no parameters, and a real TPDD2 always
+// responds with the same string of bytes, and TPDD1 ignores it.
+// not counting ZZ or checksums:
+// Client sends  : 23 00
+// TPDD2 responds: 14 0F 41 10 01 00 50 05 00 02 00 28 00 E1 00 00 00
 // TPDD1 does not respond.
-void ret_tsdos_mystery() {
+void ret_pdd2_unk23() {
 	dbg(3,"%s()\n",__func__);
-	static unsigned char canned[] = {RET_TSDOS_MYSTERY, 0x0F, 0x41, 0x10, 0x01, 0x00, 0x50, 0x05, 0x00, 0x02, 0x00, 0x28, 0x00, 0xE1, 0x00, 0x00, 0x00};
+	static unsigned char canned[] = {RET_PDD2_UNK23, 0x0F, 0x41, 0x10, 0x01, 0x00, 0x50, 0x05, 0x00, 0x02, 0x00, 0x28, 0x00, 0xE1, 0x00, 0x00, 0x00};
+	memcpy(gb, canned, canned[1]+2);
+	gb[canned[1]+2] = checksum(gb);
+	write_client_tty(gb, gb[1]+3);
+}
+
+// Similar to unk23, except the response is different, and not used by TS-DOS
+// Nothing uses this command that I know of. I just found it by feeding
+// abitrary commands to a real drive with github/bkw777/pdd.sh
+// 0x11 and 0x33 both produce the same response. Possibly 0x11 and 0x33 are
+// just different versions of the same function, like how 0x4# commands are
+// really just 0x0# commands for bank 1 instead of bank 0? Just a guess.
+// not counting ZZ or checksums:
+// Client sends  : 11 00
+//     or sends  : 33 00
+// TPDD2 responds: 3A 06 80 13 05 00 10 E1
+void ret_pdd2_unk11() {
+	dbg(3,"%s()\n",__func__);
+	static unsigned char canned[] = {RET_PDD2_UNK11, 0x06, 0x80, 0x13, 0x05, 0x00, 0x10, 0xE1};
 	memcpy(gb, canned, canned[1]+2);
 	gb[canned[1]+2] = checksum(gb);
 	write_client_tty(gb, gb[1]+3);
@@ -980,8 +891,10 @@ void dispatch_opr_cmd(unsigned char *b) {
 		case REQ_FDC:           req_fdc();           break;
 		case REQ_CONDITION:     req_condition();     break;
 		case REQ_RENAME:        req_rename(b);       break;
-		case REQ_TSDOS_MYSTERY: ret_tsdos_mystery(); break;
+		case REQ_PDD2_UNK23:    ret_pdd2_unk23();    break;
 		case REQ_CACHE_WRITE:   ret_cache_write();   break;
+		case REQ_PDD2_UNK11:    ret_pdd2_unk11();    break;
+		case REQ_PDD2_UNK33:    ret_pdd2_unk11();    break;
 	}
 }
 

@@ -34,9 +34,9 @@ static FILE_ENTRY * current_record (void);
 
 int file_list_init ()
 {
-	tblp = malloc (sizeof (FILE_ENTRY) * QUANTUM );
+	tblp = malloc (sizeof (FILE_ENTRY) * FEQ );
 	if (!tblp) return -1;
-	allocated = QUANTUM;
+	allocated = FEQ;
 	ndx = 0;
 	cur = 0;
 	return 0;
@@ -59,13 +59,13 @@ void file_list_clear_all ()
    
 int add_file (FILE_ENTRY *fe)
 {
-	/** reallocate QUANTUM more records if out of space */
+	/** allocate FEQ more records if out of space */
 	if (ndx >= allocated)
 	{
 		/** resize the array */
-		tblp = realloc (tblp, (allocated + QUANTUM) * sizeof (FILE_ENTRY) );
+		tblp = realloc (tblp, (allocated + FEQ) * sizeof (FILE_ENTRY) );
 		if (!tblp) return -1;
-		allocated += QUANTUM;	
+		allocated += FEQ;
 	}
 
 	/** reference the entry */

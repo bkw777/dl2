@@ -22,11 +22,9 @@ MA 02111, USA.
 #define DIR_LIST
 
 #include <stdint.h>
+#include "constants.h"
 
-#define QUANTUM 10
-#define TPDD_FILENAME_LEN 24
-#define LOCAL_FILENAME_MAX 256
-#define DIR_FLAG 0x01
+#define FEQ  10 // number of FILE_ENTRYs to malloc for at a time
 
 typedef struct
 {
