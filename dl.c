@@ -506,6 +506,7 @@ void dirent_set_name(unsigned char *b) {
 		strncat(t,cur_file->local_fname,LOCAL_FILENAME_MAX-dir_depth*3);
 		memset(cur_file->local_fname,0x00,LOCAL_FILENAME_MAX);
 		memcpy(cur_file->local_fname,t,LOCAL_FILENAME_MAX);
+		struct stat st; if (!stat(cur_file->local_fname,&st)) cur_file->len=st.st_size;
 		dbg(3,"Virtual: \"%s\" <-- \"%s\"\n",cur_file->client_fname,cur_file->local_fname);
 		ret_dirent(cur_file);
 	} else {
