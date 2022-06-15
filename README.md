@@ -6,7 +6,7 @@ DeskLink+ is a Tandy Portable Disk Drive emulator or "TPDD Server" implimented i
 
 Docs from the past versions of this program. They don't exactly match this version any more.  
 [README.txt](README.txt) from dlplus by John R. Hogerhuis  
-[dl.do](dl.do) from dl 1.0-1.3 the original "DeskLink for \*nix) by Steven Hurd
+[dl.do](dl.do) from dl 1.0-1.3 the original "DeskLink for \*nix" by Steven Hurd
 <!-- [Original source](http://bitchin100.com/files/linux/dlplus.zip) -->
 
 ## install
