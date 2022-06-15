@@ -372,7 +372,7 @@ FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
 	return &f;
 }
 
-int read_next_dirent(DIR *dir) {
+int read_next_dirent(DIR *dir,int m) {
 	dbg(3,"%s()\n",__func__);
 	struct stat st;
 	struct dirent *dire;
@@ -381,7 +381,7 @@ int read_next_dirent(DIR *dir) {
 	if (dir == NULL) {
 		dire=NULL;
 		dbg(0,"%s(NULL) ???\n",__func__);
-		ret_std(ERR_NO_DISK);
+		if (m) ret_std(ERR_NO_DISK);
 		return 0;
 	}
 
@@ -389,7 +389,7 @@ int read_next_dirent(DIR *dir) {
 		flags=0;
 
 		if (stat(dire->d_name,&st)) {
-			ret_std(DIRENT_GET_FIRST);
+			if (m) ret_std(ERR_NO_FILE);
 			return 0;
 		}
 
@@ -403,7 +403,6 @@ int read_next_dirent(DIR *dir) {
 			if (strlen(dire->d_name)>LOCAL_FILENAME_MAX) continue; // skip long filenames
 		}
 
-		/* add file to list so we can traverse any order */
 		add_file(make_file_entry(dire->d_name, st.st_size, flags));
 		break;
 	}
@@ -413,7 +412,7 @@ int read_next_dirent(DIR *dir) {
 	return 1;
 }
 
-void update_file_list() {
+void update_file_list(int m) {
 	dbg(3,"%s()\n",__func__);
 	DIR * dir;
 
@@ -421,7 +420,7 @@ void update_file_list() {
 	file_list_clear_all();
 	dbg(1,"-------------------------------------------------------------------------------\n");
 	if (dir_depth) add_file(make_file_entry("..", 0, DIR_FLAG));
-	while (read_next_dirent(dir));
+	while (read_next_dirent(dir,m));
 	dbg(1,"-------------------------------------------------------------------------------\n");
 	closedir(dir);
 }
@@ -489,7 +488,7 @@ void dirent_set_name(unsigned char *b) {
 	// update before every set-name for at least 2 reasons
 	// * clients may open files without ever listing (teeny, ur2, etc)
 	// * local files may be changed at any time by other processes
-	update_file_list();
+	update_file_list(ALLOW_RET);
 	strncpy(filename,(char *)b+2,TPDD_FILENAME_LEN);
 	filename[TPDD_FILENAME_LEN]=0;
 	// Remove trailing spaces
@@ -521,7 +520,7 @@ void dirent_get_first() {
 	if (debug==1) dbg(2,"Directory Listing\n");
 	// update every time before get-first,
 	// because set-name is not required before get-first
-	update_file_list();
+	update_file_list(ALLOW_RET);
 	ret_dirent(get_first_file());
 	dme_fdc = 0; // see req_fdc() & ref/fdc.txt
 }
@@ -1336,7 +1335,7 @@ int main(int argc, char **argv)
 
 	// create the file list
 	file_list_init();
-	if (debug) update_file_list();
+	if (debug) update_file_list(NO_RET);
 
 	// process commands forever
 	while (1) if (opr_mode) get_opr_cmd(); else get_fdc_cmd();

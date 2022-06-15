@@ -126,4 +126,7 @@
 
 #define DIR_FLAG 0x01
 
+#define NO_RET 0
+#define ALLOW_RET 1
+
 #endif
