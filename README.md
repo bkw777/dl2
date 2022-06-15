@@ -24,6 +24,65 @@ sudo make uninstall
 dl -h
 ```
 
+```
+bkw@fw:~/src/dlplus$ dl -h
+dl - DeskLink+ v1.5.010-47-g93f3db4 - help
+
+usage: dl [options] [tty_device] [share_path]
+
+options:
+   -0       Raw mode. Do not munge filenames in any way.
+            Disables 6.2 or 8.2 filename trucating & padding
+            Changes the attribute byte to ' ' instead of 'F'
+            Disables adding the TS-DOS ".<>" extension for directories
+            The entire 24 bytes of the filename field on a real drive is used.
+   -a c     Attr - attribute used for all files (F)
+   -b file  Bootstrap: Send loader file to client
+   -d tty   Serial device to client (ttyUSB0)
+   -g       Getty mode - run as daemon
+   -h       Print this help
+   -l       List available loader files and bootstrap help
+   -p dir   Share path - directory with files to be served (.)
+   -r       RTS/CTS hardware flow control
+   -s #     Speed - serial port baud rate 9600 or 19200 (19200)
+   -u       Uppercase all filenames
+   -v       Verbose/debug mode - more v's = more verbose
+   -w       WP-2 mode - 8.2 filenames
+   -z #     Milliseconds per byte for bootstrap (7)
+
+Alternative to the -d and -p options,
+The 1st non-option argument is another way to specify the tty device.
+The 2nd non-option argument is another way to specify the share path.
+
+   dl
+   dl -vv /dev/ttyS0
+   dl ttyUSB1 -v -w ~/Documents/wp2files
+
+bkw@fw:~/src/dlplus$ 
+```
+```
+bkw@fw:~/src/dlplus$ dl -l
+dl - DeskLink+ v1.5.010-47-g93f3db4 - "bootstrap" help
+
+Available loader files (in /usr/local/lib/dl):
+
+TRS-80 Model 100 & 102 : TEENY.100 TINY.100 TS-DOS.100 DSKMGR.100
+TANDY Model 200        : TEENY.200 TS-DOS.200 DSKMGR.200
+NEC PC-8201(a)/PC-8300 : TEENY.NEC TS-DOS.NEC
+Kyotronic KC-85        : DSKMGR.K85
+Olivetti M-10          : DSKMGR.M10 TEENY.M10
+
+Filenames given without any leading path are taken from above.
+To specify a file in the current directory, include the "./"
+Examples:
+
+   dl -b TS-DOS.100
+   dl -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
+   dl -b ./rxcini.DO
+
+bkw@fw:~/src/dlplus$ 
+```
+
 ## run the TPDD server, verbose, upcase, serving files from the current directory
 ```
 dl -vu
