@@ -224,6 +224,10 @@ void dbg_p(const int v, unsigned char *b) {
 	dbg_b(v,b+2,b[1]);
 }
 
+void set_baud (char * s) {
+	client_baud=atoi(s)==9600?B9600:B19200;
+}
+
 // set termios VMIN & VTIME
 void client_tty_vmt(int m,int t) {
 	if (m<-1 || t<-1) tcgetattr(client_tty_fd,&client_termios);
@@ -1193,22 +1197,24 @@ void show_main_help() {
 		"usage: %1$s [options] [tty_device] [share_path]\n"
 		"\n"
 		"options:\n"
-		"   -h       Print this help\n"
-		"   -v       Verbose/debug mode - more v's = more verbose\n"
-		"   -d tty   Serial device to client (" S_(DEFAULT_CLIENT_TTY) ")\n"
-		"   -p dir   Share path - directory with files to be served (.)\n"
-		"   -g       Getty mode - run as daemon\n"
-		"   -w       WP-2 mode - 8.2 filenames\n"
-		"   -u       Uppercase all filenames\n"
-		"   -r       RTS/CTS hardware flow control\n"
-		"   -z #     Milliseconds per byte for bootstrap (" S_(DEFAULT_BASIC_BYTE_MS) ")\n"
 		"   -0       Raw mode. Do not munge filenames in any way.\n"
 		"            Disables 6.2 or 8.2 filename trucating & padding\n"
 		"            Changes the attribute byte to ' ' instead of 'F'\n"
 		"            Disables adding the TS-DOS \".<>\" extension for directories\n"
 		"            The entire 24 bytes of the filename field on a real drive is used.\n"
+		"   -a c     Attr - attribute used for all files (F)\n"
 		"   -b file  Bootstrap: Send loader file to client\n"
+		"   -d tty   Serial device to client (" S_(DEFAULT_CLIENT_TTY) ")\n"
+		"   -g       Getty mode - run as daemon\n"
+		"   -h       Print this help\n"
 		"   -l       List available loader files and bootstrap help\n"
+		"   -p dir   Share path - directory with files to be served (.)\n"
+		"   -r       RTS/CTS hardware flow control\n"
+		"   -s #     Speed - serial port baud rate 9600 or 19200 (19200)\n"
+		"   -u       Uppercase all filenames\n"
+		"   -v       Verbose/debug mode - more v's = more verbose\n"
+		"   -w       WP-2 mode - 8.2 filenames\n"
+		"   -z #     Milliseconds per byte for bootstrap (" S_(DEFAULT_BASIC_BYTE_MS) ")\n"
 		"\n"
 		"Alternative to the -d and -p options,\n"
 		"The 1st non-option argument is another way to specify the tty device.\n"
@@ -1239,8 +1245,7 @@ int main(int argc, char **argv)
 	if (getenv("DISABLE_DME")) dme_disabled = true;
 	if (getenv("DISABLE_UR2_DOS_HACK")) enable_ur2_dos_hack = false;
 	if (getenv("DOT_OFFSET")) dot_offset = atoi(getenv("DOT_OFFSET"));
-	if (getenv("BAUD")) {i=atoi(getenv("BAUD"));
-		client_baud=i==9600?B9600:i==19200?B19200:-1;}
+	if (getenv("BAUD")) set_baud(getenv("BAUD"));
 	if (getenv("ROOT_LABEL")) {snprintf(dme_root_label,7,"%-6.6s",getenv("ROOT_LABEL"));
 		memcpy(dme_cwd,dme_root_label,6);}
 	if (getenv("PARENT_LABEL")) snprintf(dme_parent_label,7,"%-6.6s",getenv("PARENT_LABEL"));
@@ -1248,20 +1253,22 @@ int main(int argc, char **argv)
 	if (getenv("ATTR")) default_attr = *getenv("ATTR");
 
 	// commandline options
-	while ((i = getopt (argc, argv, ":0gurvd:p:wb:z:hl^")) >=0)
+	while ((i = getopt (argc, argv, ":0a:b:d:ghlp:rs:uvwz:^")) >=0)
 		switch (i) {
 			case '0': dot_offset=0; upcase=false; default_attr=0x20;      break;
+			case 'a': default_attr=*strndup(optarg,1);                    break;
+			case 'b': bootstrap_mode=true; strcpy(bootstrap_file,optarg); break;
+			case 'd': strcpy(client_tty_name,optarg);                     break;
 			case 'g': getty_mode = true; debug = 0;                       break;
-			case 'u': upcase = true;                                      break;
-			case 'r': rtscts = true;                                      break;
-			case 'v': debug++;                                            break;
-			case 'w': dot_offset = 8;                                     break;
 			case 'h': show_main_help(); exit(0);                          break;
 			case 'l': show_bootstrap_help(); exit(0);                     break;
-			case 'z': BASIC_byte_us=atoi(optarg)*1000;                    break;
-			case 'd': strcpy(client_tty_name,optarg);                     break;
 			case 'p': (void)(chdir(optarg)+1);                            break;
-			case 'b': bootstrap_mode=true; strcpy(bootstrap_file,optarg); break;
+			case 'r': rtscts = true;                                      break;
+			case 's': set_baud(optarg);                                   break;
+			case 'u': upcase = true;                                      break;
+			case 'v': debug++;                                            break;
+			case 'w': dot_offset = 8;                                     break;
+			case 'z': BASIC_byte_us=atoi(optarg)*1000;                    break;
 			case '^': x=true;                                             break;
 			case ':': dbg(0,"\"-%c\" requires a value\n",optopt);         break;
 			case '?':
