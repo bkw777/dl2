@@ -81,8 +81,11 @@ MA 02111, USA.
 #include "constants.h"
 #include "dir_list.h"
 
-#if defined(__darwin__)
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#if TARGET_OS_MAC
 #include <util.h>
+#endif
 #endif
 
 #if defined(__FreeBSD__)
@@ -456,7 +459,7 @@ int ret_dirent(FILE_ENTRY *ep)
 	gb[0]=RET_DIRENT;
 	gb[1]=LEN_RET_DIRENT;
 
-	if (ep && ep->client_fname) {
+//	if (ep && ep->client_fname) {
 
 		// name
 		memset (gb + 2, ' ', TPDD_FILENAME_LEN);
@@ -470,7 +473,7 @@ int ret_dirent(FILE_ENTRY *ep)
 		// size
 		gb[27]=(uint8_t)(ep->len >> 0x08); // most significant byte
 		gb[28]=(uint8_t)(ep->len & 0xFF);  // least significant byte
-	}
+//	}
 
 	dbg(3,"\"%24.24s\"\n",gb+2);
 
@@ -1235,7 +1238,7 @@ int main(int argc, char **argv)
 
 	// default client tty device
 	strcpy (client_tty_name,S_(DEFAULT_CLIENT_TTY));
-	if (client_tty_name[0]!='/') {
+	if (client_tty_name[0] && client_tty_name[0]!='/') {
 		strcpy(client_tty_name,"/dev/");
 		strcat(client_tty_name,S_(DEFAULT_CLIENT_TTY));
 	}
@@ -1283,6 +1286,7 @@ int main(int argc, char **argv)
 		switch (i++) {
 			case 0: // tty device
 				switch (argv[optind][0]) {
+					case 0x00: break;
 					case '/':
 						strcpy (client_tty_name,argv[optind]);
 						break;
