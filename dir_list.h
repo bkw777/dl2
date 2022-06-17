@@ -30,8 +30,8 @@ typedef struct
 {
 	char     client_fname[TPDD_FILENAME_LEN+1];
 	char     local_fname[LOCAL_FILENAME_MAX];
-	u_int32_t len;
-	u_int8_t  flags;
+	uint32_t len;
+	uint8_t  flags;
 } FILE_ENTRY;
 
 int file_list_init ();

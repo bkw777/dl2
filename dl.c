@@ -328,7 +328,7 @@ int check_magic_file(char *b) {
 	return 1;
 }
 
-FILE_ENTRY *make_file_entry(char *namep, u_int32_t len, u_int8_t flags)
+FILE_ENTRY *make_file_entry(char *namep, uint32_t len, uint8_t flags)
 {
 	dbg(3,"%s(\"%s\")\n",__func__,namep);
 	static FILE_ENTRY f;

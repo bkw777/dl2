@@ -25,9 +25,9 @@ MA 02111, USA.
 #include <ctype.h>
 #include "dir_list.h"
 
-static u_int16_t  allocated;
-static u_int16_t  ndx;
-static u_int16_t  cur; 
+static uint16_t  allocated;
+static uint16_t  ndx;
+static uint16_t  cur;
 static FILE_ENTRY *tblp = 0;
 
 static FILE_ENTRY * current_record (void);
