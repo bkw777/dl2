@@ -42,18 +42,18 @@ CLIENT_OTHER := \
 DOCS := dl.do README.txt README.md LICENSE $(CLIENT_DOCS)
 SOURCES := dl.c dir_list.c
 
-DEFINES := \
-	-DAPP_VERSION=$(APP_VERSION) \
-	-DAPP_LIB_DIR=$(APP_LIB_DIR) \
-	-DDEFAULT_CLIENT_TTY=$(DEFAULT_CLIENT_TTY)
-
 ifeq ($(OS),Darwin)
  # /dev/cu.usbserial-AB0MQNN1
- DEFAULT_CLIENT_TTY := cu.usbserial-*
+ #DEFAULT_CLIENT_TTY := cu.usbserial-*
 else
  DEFAULT_CLIENT_TTY := ttyUSB0
  LDLIBS += -lutil
 endif
+
+DEFINES := \
+	-DAPP_VERSION=$(APP_VERSION) \
+	-DAPP_LIB_DIR=$(APP_LIB_DIR) \
+	-DDEFAULT_CLIENT_TTY=$(DEFAULT_CLIENT_TTY)
 
 ifdef DEBUG
  CFLAGS += -g

@@ -118,10 +118,9 @@ MA 02111, USA.
 #define DEFAULT_CLIENT_BAUD B19200
 #endif
 
-// most things get away with 5 here.
-// rxcini.do for REXCPM setup, requires 6.
-// new high-water mark: TS-DOS.200 requires 7.
-// If this is 6, a "?" (print) on line 3 gets dropped every time.
+// Most things get away with 5ms.
+// REXCPM rxcini.do requires 6ms.
+// TS-DOS.200 requires 7ms. (a "?" on line 3 gets dropped)
 #define DEFAULT_BASIC_BYTE_MS 7
 
 #define DEFAULT_TPDD_FILE_ATTR 0x46 // F
@@ -136,18 +135,22 @@ MA 02111, USA.
 #define DEFAULT_DME_DIR_LABEL    "<>"     // DIR_LABEL='/'
 
 // Support for Ultimate ROM-II TS-DOS loader: see ref/ur2.txt
-// files from share root dir that are always readable in any cd path
-// TODO
-// * put these in an array
-// * allow user to specify an arbitrary list of magic files
-// * 3 or more search paths: cwd, share-root, ~/.local/app, app-lib
-//   any file in the list is searched first in the current dir,
-//   then in the root shared dir, then in a specified lib/share dir.
-#define DOS100 "DOS100.CO"
-#define DOS200 "DOS200.CO"
-#define DOSNEC "DOSNEC.CO"
-//#define DOSK85 "DOSK85.CO" // probably don't exist
-//#define DOSM10 "DOSM10.CO"
+// files that are always readable in any cd path.
+// Search path for any of these: cwd, then share root.
+// TODO add $XDG_DATA_HOME (~/.local/share/myapp  mac: ~/Library/myapp/)
+//      then APP_LIB_DIR
+char * magic_files [] = {
+	"DOS100.CO",
+	"SAR100.CO",
+	"DOS200.CO",
+	"SAR200.CO",
+	"DOSNEC.CO",
+	"SARNEC.CO",
+	"DOSK85.CO",	// these probably never existed but whatever
+	"SARK85.CO",
+	"DOSM10.CO",
+	"SARM10.CO"
+};
 
 // termios VMIN & VTIME
 #define C_CC_VMIN 1
@@ -312,14 +315,16 @@ void lsx (char *path,char *match) {
 	closedir(dir);
 }
 
-int do_magic_file(char *b) {
+int check_magic_file(char *b) {
 	dbg(3,"%s(\"%s\")\n",__func__,b);
 	if (!enable_ur2_dos_hack) return 1;
 	if (!dir_depth) return 1; // fake root hack not needed in actual root
-	if (dot_offset!=6) return 1; // There's no UR2 for WP-2 or CP/M etc
-	if (strncmp(b,DOS100,9)==0) return 0;
-	if (strncmp(b,DOS200,9)==0) return 0;
-	if (strncmp(b,DOSNEC,9)==0) return 0;
+	if (dot_offset!=6) return 1; // UR2 is only on the KC-85 platform
+
+	int l = sizeof(magic_files)/sizeof(magic_files[0]);
+	int i;
+	for (i = 0; i < l; ++i) if (!strcmp(magic_files[i],b)) return 0;
+
 	return 1;
 }
 
@@ -459,8 +464,7 @@ int ret_dirent(FILE_ENTRY *ep)
 	gb[0]=RET_DIRENT;
 	gb[1]=LEN_RET_DIRENT;
 
-//	if (ep && ep->client_fname) {
-
+	if (ep) {
 		// name
 		memset (gb + 2, ' ', TPDD_FILENAME_LEN);
 		if (dot_offset) for (i=0;i<dot_offset+3;i++)
@@ -473,7 +477,7 @@ int ret_dirent(FILE_ENTRY *ep)
 		// size
 		gb[27]=(uint8_t)(ep->len >> 0x08); // most significant byte
 		gb[28]=(uint8_t)(ep->len & 0xFF);  // least significant byte
-//	}
+	}
 
 	dbg(3,"\"%24.24s\"\n",gb+2);
 
@@ -504,7 +508,7 @@ void dirent_set_name(unsigned char *b) {
 	if (cur_file) {
 		dbg(3,"Exists: \"%s\"  %u\n", cur_file->local_fname, cur_file->len);
 		ret_dirent(cur_file);
-	} else if (do_magic_file(filename)==0) {
+	} else if (check_magic_file(filename)==0) {
 		// let UR2 load <root>/DOSxxx.CO from anywhere
 		cur_file=make_file_entry(filename,0,0);
 		char t[LOCAL_FILENAME_MAX+1] = {0x00};
@@ -513,7 +517,7 @@ void dirent_set_name(unsigned char *b) {
 		memset(cur_file->local_fname,0x00,LOCAL_FILENAME_MAX);
 		memcpy(cur_file->local_fname,t,LOCAL_FILENAME_MAX);
 		struct stat st; if (!stat(cur_file->local_fname,&st)) cur_file->len=st.st_size;
-		dbg(3,"Virtual: \"%s\" <-- \"%s\"\n",cur_file->client_fname,cur_file->local_fname);
+		dbg(3,"Magic: \"%s\" <-- \"%s\"\n",cur_file->client_fname,cur_file->local_fname);
 		ret_dirent(cur_file);
 	} else {
 		if (filename[dot_offset+1]==dme_dir_label[0] && filename[dot_offset+2]==dme_dir_label[1]) f = DIR_FLAG;
