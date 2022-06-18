@@ -1178,10 +1178,9 @@ int bootstrap(char *f)
 	if (f[0]=='~' && f[1]=='/') {
 		strcpy(loader_file,getenv("HOME"));
 		strcat(loader_file,f+1);
-	}
+	} else strcpy(loader_file,f);
 
-	if ((f[0]=='/') || (f[0]=='.' && f[1]=='/'))
-		strcpy(loader_file,f);
+	if (access(loader_file,F_OK)) memset(loader_file,0x00,PATH_MAX);
 
 	if (loader_file[0]==0) {
 		strcpy(loader_file,app_lib_dir);
