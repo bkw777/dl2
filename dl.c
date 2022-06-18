@@ -39,11 +39,10 @@ MA 02111, USA.
  * payload  - length bytes   range is 0-128
  * checksum - 1 byte         includes type, length, and payload
  * 
- * Most functions pass around a buffer containing this entire
- * structure, often minus the checksum. checksum() itself
- * takes this as input for instance.
+ * Most functions pass around a pointer to a buffer containing this
+ * entire structure.
  * 
- * Frequently a buffer will be declared with a SIZE+3, which is
+ * Frequently a buffer will be declared with a SIZE+3, where
  * SIZE will be a pertinent payload size of a given command,
  * like 128 for the max possible, or 11 for a DME message, etc,
  * and the +3 is 3 extra bytes for type, length, and checksum.
@@ -51,8 +50,8 @@ MA 02111, USA.
  * Similarly, most functions include frequent references to these
  * byte offsets gb[0], gb[1], gb[2], gb+2, gb[gb[1]+2].
  * 
- * functions named req_*() receive a command in this format
- * functions named ret_*() generate a response in this format
+ * functions named req_*() (request) receive a command in this format
+ * functions named ret_*() (return) generate a response in this format
  * 
  * There is also an FDC-mode that TPDD1/FB-100 drives have, which has
  * a completely different format. This program only implements
@@ -61,7 +60,7 @@ MA 02111, USA.
  * some of which this program does implement.
  * 
  * See the ref/ directory for more details, including a copy of the
- * TPDD1 software manual. There is no TPDD2 software manual known yet.
+ * TPDD1 software manual. There is no known TPDD2 software manual.
  */
 
 #include <termios.h>
@@ -101,17 +100,14 @@ MA 02111, USA.
 #include <netinet/in.h>
 #endif
 
-#define STRINGIFY2(X) #X
-#define S_(X) STRINGIFY2(X)
-
 /*** config **************************************************/
 
 #ifndef APP_LIB_DIR
-#define APP_LIB_DIR .
+#define APP_LIB_DIR "."
 #endif
 
 #ifndef DEFAULT_CLIENT_TTY
-#define DEFAULT_CLIENT_TTY ttyS0
+#define DEFAULT_CLIENT_TTY "ttyS0"
 #endif
 
 #ifndef DEFAULT_CLIENT_BAUD
@@ -165,6 +161,8 @@ bool rtscts = false;
 unsigned dot_offset = 6; // 0 for raw, 6 for KC-85, 8 for WP-2
 int client_baud = DEFAULT_CLIENT_BAUD;
 int BASIC_byte_us = DEFAULT_BASIC_BYTE_MS*1000;
+char client_tty_name[PATH_MAX] = DEFAULT_CLIENT_TTY;
+char app_lib_dir[PATH_MAX] = APP_LIB_DIR;
 char dme_root_label[7] = DEFAULT_DME_ROOT_LABEL;
 char dme_parent_label[7] = DEFAULT_DME_PARENT_LABEL;
 char dme_dir_label[3] = DEFAULT_DME_DIR_LABEL;
@@ -234,6 +232,23 @@ void set_baud (char * s) {
 	client_baud=atoi(s)==9600?B9600:B19200;
 }
 
+void resolve_client_tty_name () {
+	dbg(3,"%s()\n",__func__);
+	switch (client_tty_name[0]) {
+		case 0x00:
+		case '-':
+			strcpy (client_tty_name,"/dev/tty");
+			client_tty_fd=1;
+			break;
+		default:
+			if(!access(client_tty_name,F_OK)) break;
+			char t[PATH_MAX];
+			strcpy(t,client_tty_name);
+			strcpy(client_tty_name,"/dev/");
+			strcat(client_tty_name,t);
+	}
+}
+
 // set termios VMIN & VTIME
 void client_tty_vmt(int m,int t) {
 	if (m<-1 || t<-1) tcgetattr(client_tty_fd,&client_termios);
@@ -243,6 +258,45 @@ void client_tty_vmt(int m,int t) {
 	client_termios.c_cc[VMIN] = m;
 	client_termios.c_cc[VTIME] = t;
 	tcsetattr(client_tty_fd,TCSANOW,&client_termios);
+}
+
+int open_client_tty () {
+	dbg(3,"%s()\n",__func__);
+
+	if (client_tty_fd<0)
+		client_tty_fd=open((char *)client_tty_name,O_RDWR,O_NOCTTY);
+
+	if (client_tty_fd<0) {
+		dbg(1,"Can't open \"%s\"\n",client_tty_name);
+		return 1;
+	}
+
+	if (getty_mode) {
+		if (login_tty(client_tty_fd)==0) client_tty_fd = STDIN_FILENO;
+		else (void)(daemon(1,1)+1);
+	}
+
+	(void)(tcflush(client_tty_fd, TCIOFLUSH)+1);
+
+	int off=0;
+	ioctl(client_tty_fd, FIONBIO, &off);
+	ioctl(client_tty_fd, FIOASYNC, &off);
+
+	if (tcgetattr(client_tty_fd,&client_termios)==-1) return 21;
+
+	cfmakeraw(&client_termios);
+	client_termios.c_cflag |= CLOCAL|CS8;
+
+	if (rtscts) client_termios.c_cflag |= CRTSCTS;
+	else client_termios.c_cflag &= ~CRTSCTS;
+
+	if (cfsetspeed(&client_termios,client_baud)==-1) return 22;
+
+	if (tcsetattr(client_tty_fd,TCSANOW,&client_termios)==-1) return 23;
+
+	client_tty_vmt(-2,-2);
+
+	return 0;
 }
 
 int write_client_tty(void *b, int n) {
@@ -1053,19 +1107,19 @@ void get_fdc_cmd(void) {
 
 void show_bootstrap_help() {
 	dbg(0,
-		"%1$s - DeskLink+ " S_(APP_VERSION) " - \"bootstrap\" help\n\n"
-		"Available loader files (in " S_(APP_LIB_DIR) "):\n\n",args[0]);
+		"%1$s - DeskLink+ " APP_VERSION " - \"bootstrap\" help\n\n"
+		"Available loader files (in %2$s):\n\n",args[0],app_lib_dir);
 
-	dbg(0,  "TRS-80 Model 100 & 102 :"); lsx(S_(APP_LIB_DIR),"100");
-	dbg(0,"\nTANDY Model 200        :"); lsx(S_(APP_LIB_DIR),"200");
-	dbg(0,"\nNEC PC-8201(a)/PC-8300 :"); lsx(S_(APP_LIB_DIR),"NEC");
-	dbg(0,"\nKyotronic KC-85        :"); lsx(S_(APP_LIB_DIR),"K85");
-	dbg(0,"\nOlivetti M-10          :"); lsx(S_(APP_LIB_DIR),"M10");
+	dbg(0,  "TRS-80 Model 100/102 :"); lsx(app_lib_dir,"100");
+	dbg(0,"\nTANDY Model 200      :"); lsx(app_lib_dir,"200");
+	dbg(0,"\nNEC PC-8201/PC-8300  :"); lsx(app_lib_dir,"NEC");
+	dbg(0,"\nKyotronic KC-85      :"); lsx(app_lib_dir,"K85");
+	dbg(0,"\nOlivetti M-10        :"); lsx(app_lib_dir,"M10");
 
 	dbg(0,
 		"\n\n"
-		"Filenames given without any leading path are taken from above.\n"
-		"To specify a file in the current directory, include the \"./\"\n"
+		"Filenames given without any path are searched from above\n"
+		"as well as the current dir.\n"
 		"Examples:\n\n"
 		"   %1$s -b TS-DOS.100\n"
 		"   %1$s -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100\n"
@@ -1105,11 +1159,13 @@ int send_BASIC(char *f)
 	fflush(stdout);
 	while(read(fd,&b,1)==1) slowbyte(b);
 	close(fd);
-	if (b!=0x0A && b!=BASIC_EOL && b!=BASIC_EOF) slowbyte(BASIC_EOL);
-	if (b!=BASIC_EOF) slowbyte(BASIC_EOF);
+	if (dot_offset) { // don't modify data in raw mode
+		if (b!=0x0A && b!=BASIC_EOL && b!=BASIC_EOF) slowbyte(BASIC_EOL);
+		if (b!=BASIC_EOF) slowbyte(BASIC_EOF);
+	}
+	close(client_tty_fd);
 	if (debug) puts("");
 	puts("DONE");
-	close(client_tty_fd);
 	return 0;
 }
 
@@ -1129,7 +1185,7 @@ int bootstrap(char *f)
 		strcpy(loader_file,f);
 
 	if (loader_file[0]==0) {
-		strcpy(loader_file,S_(APP_LIB_DIR));
+		strcpy(loader_file,app_lib_dir);
 		strcat(loader_file,"/");
 		strcat(loader_file,f);
 	}
@@ -1188,7 +1244,6 @@ void show_config () {
 	dbg(0,"client_tty_name : \"%s\"\n",client_tty_name);
 	dbg(0,"share_path      : \"%s\"\n",cwd);
 	dbg(2,"opr_mode        : %d\n",opr_mode);
-	dbg(2,"dot_offset      : %d\n",dot_offset);
 	dbg(2,"baud            : %d\n",client_baud==B9600?9600:client_baud==B19200?19200:-1);
 	dbg(0,"dme_disabled    : %s\n",dme_disabled?"true":"false");
 	dbg(2,"dme_root_label  : \"%-6.6s\"\n",dme_root_label);
@@ -1200,28 +1255,24 @@ void show_config () {
 
 void show_main_help() {
 	dbg(0,
-		"%1$s - DeskLink+ " S_(APP_VERSION) " - help\n\n"
+		"%1$s - DeskLink+ " APP_VERSION " - help\n\n"
 		"usage: %1$s [options] [tty_device] [share_path]\n"
 		"\n"
 		"options:\n"
-		"   -0       Raw mode. Do not munge filenames in any way.\n"
-		"            Disables 6.2 or 8.2 filename trucating & padding\n"
-		"            Changes the attribute byte to ' ' instead of 'F'\n"
-		"            Disables adding the TS-DOS \".<>\" extension for directories\n"
-		"            The entire 24 bytes of the filename field on a real drive is used.\n"
-		"   -a c     Attr - attribute used for all files (F)\n"
-		"   -b file  Bootstrap: Send loader file to client\n"
-		"   -d tty   Serial device to client (" S_(DEFAULT_CLIENT_TTY) ")\n"
+		"   -0       Raw mode - no filename munging, attr = ' '\n"
+		"   -a c     Attr - attribute used for all files (%2$c)\n"
+		"   -b file  Bootstrap - send loader file to client\n"
+		"   -d tty   Serial device connected to client (" DEFAULT_CLIENT_TTY ")\n"
 		"   -g       Getty mode - run as daemon\n"
 		"   -h       Print this help\n"
-		"   -l       List available loader files and bootstrap help\n"
+		"   -l       List loader files and show bootstrap help\n"
 		"   -p dir   Share path - directory with files to be served (.)\n"
 		"   -r       RTS/CTS hardware flow control\n"
 		"   -s #     Speed - serial port baud rate 9600 or 19200 (19200)\n"
 		"   -u       Uppercase all filenames\n"
 		"   -v       Verbose/debug mode - more v's = more verbose\n"
 		"   -w       WP-2 mode - 8.2 filenames\n"
-		"   -z #     Milliseconds per byte for bootstrap (" S_(DEFAULT_BASIC_BYTE_MS) ")\n"
+		"   -z #     Milliseconds per byte for bootstrap (%3$d)\n"
 		"\n"
 		"Alternative to the -d and -p options,\n"
 		"The 1st non-option argument is another way to specify the tty device.\n"
@@ -1230,24 +1281,16 @@ void show_main_help() {
 		"   %1$s\n"
 		"   %1$s -vv /dev/ttyS0\n"
 		"   %1$s ttyUSB1 -v -w ~/Documents/wp2files\n\n"
-	,args[0]);
+	,args[0],DEFAULT_TPDD_FILE_ATTR,DEFAULT_BASIC_BYTE_MS);
 }
 
 int main(int argc, char **argv)
 {
-	int off=0;
 	int i;
 	bool x = false;
 	args = argv;
 
-	// default client tty device
-	strcpy (client_tty_name,S_(DEFAULT_CLIENT_TTY));
-	if (client_tty_name[0] && client_tty_name[0]!='/') {
-		strcpy(client_tty_name,"/dev/");
-		strcat(client_tty_name,S_(DEFAULT_CLIENT_TTY));
-	}
-
-	// environment variable overrides for some things that don't have switches
+	// environment
 	if (getenv("OPR_MODE")) opr_mode = atoi(getenv("OPR_MODE"));
 	if (getenv("DISABLE_DME")) dme_disabled = true;
 	if (getenv("DISABLE_UR2_DOS_HACK")) enable_ur2_dos_hack = false;
@@ -1259,7 +1302,7 @@ int main(int argc, char **argv)
 	if (getenv("DIR_LABEL")) snprintf(dme_dir_label,3,"%-2.2s",getenv("DIR_LABEL"));
 	if (getenv("ATTR")) default_attr = *getenv("ATTR");
 
-	// commandline options
+	// commandline
 	while ((i = getopt (argc, argv, ":0a:b:d:ghlp:rs:uvwz:^")) >=0)
 		switch (i) {
 			case '0': dot_offset=0; upcase=false; default_attr=0x20;      break;
@@ -1279,8 +1322,8 @@ int main(int argc, char **argv)
 			case '^': x=true;                                             break;
 			case ':': dbg(0,"\"-%c\" requires a value\n",optopt);         break;
 			case '?':
-				if (isprint(optopt)) dbg(0,"Unknown option `-%c'.\n",optopt);
-				else dbg(0,"Unknown option character `\\x%x'.\n",optopt);
+				if (isprint(optopt)) dbg(0,"Unknown option \"-%c\"\n",optopt);
+				else dbg(0,"Unknown option character \"0x%02X\"\n",optopt);
 			default: show_main_help();                                 return 1;
 		}
 
@@ -1288,67 +1331,28 @@ int main(int argc, char **argv)
 	for (i=0; optind < argc; optind++) {
 		if (x) dbg(1,"non-option arg %u: \"%s\"\n",i,argv[optind]);
 		switch (i++) {
-			case 0: // tty device
-				switch (argv[optind][0]) {
-					case 0x00: break;
-					case '/':
-						strcpy (client_tty_name,argv[optind]);
-						break;
-					case '-':
-						if (argv[optind][1]==0x00) {
-							strcpy (client_tty_name,"/dev/tty");
-							client_tty_fd = 1;
-							break;
-						}
-					default:
-						strcpy(client_tty_name,"/dev/");
-						strcat(client_tty_name,argv[optind]);
-				} break;
-			case 1: // share path
-				(void)(chdir(argv[optind])+1); break;
+			case 0: strcpy (client_tty_name,argv[optind]); break; // tty device
+			case 1: (void)(chdir(argv[optind])+1); break; // share path
 			default: dbg(0,"Unknown argument: \"%s\"\n",argv[optind]);
 		}
 	}
+
+	resolve_client_tty_name();
 
 	(void)(getcwd(cwd,PATH_MAX-1)+1);
 
 	if (x) { show_config(); return 0; }
 
-	dbg(0,"DeskLink+ " S_(APP_VERSION) "\n"
+	dbg(0,"DeskLink+ " APP_VERSION "\n"
 		  "Serial Device: %s\n"
-		  "Working Dir: %s\n",client_tty_name,cwd);
+		  "Working Dir  : %s\n",client_tty_name,cwd);
 
-	if (client_tty_fd<0)
-		client_tty_fd=open((char *)client_tty_name,O_RDWR,O_NOCTTY);
-
-	if (client_tty_fd<0) {
-		dbg(1,"Can't open \"%s\"\n",client_tty_name);
-		return 1;
-	}
-
-	// getty mode
-	if (getty_mode) {
-		if (login_tty(client_tty_fd)==0) client_tty_fd = STDIN_FILENO;
-		else (void)(daemon(1,1)+1);
-	}
-
-	// serial line setup
-	(void)(tcflush(client_tty_fd, TCIOFLUSH)+1);
-	ioctl(client_tty_fd, FIONBIO, &off);
-	ioctl(client_tty_fd, FIOASYNC, &off);
-	if (tcgetattr(client_tty_fd,&client_termios)==-1) return 21;
-	cfmakeraw(&client_termios);
-	client_termios.c_cflag |= CLOCAL|CS8;
-	if (rtscts) client_termios.c_cflag |= CRTSCTS;
-	else client_termios.c_cflag &= ~CRTSCTS;
-	if (cfsetspeed(&client_termios,client_baud)==-1) return 22;
-	if (tcsetattr(client_tty_fd,TCSANOW,&client_termios)==-1) return 23;
-	client_tty_vmt(-2,-2);
+	if ((i=open_client_tty())) return i;
 
 	// send loader and exit
 	if (bootstrap_mode) return (bootstrap(bootstrap_file));
 
-	// create the file list
+	// initialize the file list
 	file_list_init();
 	if (debug) update_file_list(NO_RET);
 
