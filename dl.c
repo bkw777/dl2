@@ -1241,6 +1241,7 @@ void show_config () {
 	dbg(0,"BASIC_byte_ms   : %d\n",BASIC_byte_us/1000);
 	dbg(0,"bootstrap_mode  : %s\n",bootstrap_mode?"true":"false");
 	dbg(0,"bootstrap_file  : \"%s\"\n",bootstrap_file);
+	dbg(0,"app_lib_dir     : \"%s\"\n",app_lib_dir);
 	dbg(0,"client_tty_name : \"%s\"\n",client_tty_name);
 	dbg(0,"share_path      : \"%s\"\n",cwd);
 	dbg(2,"opr_mode        : %d\n",opr_mode);
