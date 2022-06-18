@@ -180,7 +180,6 @@ int o_file_h = -1;
 unsigned char gb[TPDD_DATA_MAX+3];
 char cwd[PATH_MAX] = {0x00};
 char dme_cwd[7] = DEFAULT_DME_ROOT_LABEL;
-char client_tty_name[PATH_MAX];
 char bootstrap_file[PATH_MAX] = {0x00};
 int opr_mode = 1; // 0=FDC-mode 1=Operation-mode
 bool dme_detected = false;
