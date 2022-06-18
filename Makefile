@@ -66,16 +66,15 @@ $(APP_NAME): $(SOURCES)
 	$(CC) $(CFLAGS) $(DEFINES) $(SOURCES) $(LDLIBS) -o $(@)
 
 install: $(APP_NAME) $(CLIENT_LOADERS) $(CLIENT_OTHER) $(DOCS)
+	mkdir -p $(APP_LIB_DIR)
 	for s in $(CLIENT_LOADERS) ;do \
-		d=$(APP_LIB_DIR)/$${s} ; \
-		mkdir -p $${d%/*} ; \
+		d=$(APP_LIB_DIR)/$${s##*/} ; \
 		install -o root -m 0644 $${s} $${d} ; \
 		install -o root -m 0644 $${s}.pre-install.txt $${d}.pre-install.txt ; \
 		install -o root -m 0644 $${s}.post-install.txt $${d}.post-install.txt ; \
 	done
 	for s in $(CLIENT_OTHER) ;do \
-		d=$(APP_LIB_DIR)/$${s} ; \
-		mkdir -p $${d%/*} ; \
+		d=$(APP_LIB_DIR)/$${s##*/} ; \
 		install -o root -m 0644 $${s} $${d} ; \
 	done
 	for s in $(DOCS) ;do \
