@@ -110,19 +110,18 @@ ROOT_LABEL='C:\' PARENT_LABEL='UP:' dl
 ```
 ## UR-II
 Ultimate ROM II ([docs](http://www.club100.org/library/libdoc.html)) ([roms](https://bitchin100.com/wiki/index.php?title=REXsharp#Option_ROM_Images_for_Download)) has a feature where it can load a RAM version of TS-DOS from disk on-the-fly.  
+This allows you to keep the TS-DOS executable on the disk instead of in ram, and it is loaded and then discarded on-demand by selecting the TS-DOS menu entry from inside UR2.
 
-This allows you to keep the TS-DOS executable on the disk instead of in ram, and it is loaded and then discarded on-demand by selecting the TS-DOS menu entry from inside UR2. You don't have to install TS-DOS via the bootstrapper if you have an UR2 option rom installed.  
+A potential problem with this, with an emulator that supports TS_DOS directories, is that UR2 doesn't know anything about directories, and just tries to load a file named "DOS___.CO".  
 
-For that feature to work, a file named DOS100.CO, DOS200.CO, or DOSNEC.CO (depending on your model of computer) must exist on the "disk".  
+If you had previously used the UR-II TS-DOS feature and used it to navigate into a subdirectory that didn't contain a copy of DOS___.CO, then UR2 would normally fail to load TS-DOS after that, until you restarted the TPDD server to make it go back to the root share dir.  
 
-UR2 doesn't know anything about directories, and just tries to load a file named "DOS___.CO".  
-
-If you had previously loaded TS-DOS and used it to navigate into a subdirectory, and that subdirectory didn't also have a copy of DOS___.CO in it, then UR2 would normally fail to load TS-DOS after that, until you restarted the TPDD server to make it go back to the root share dir.  
-
-This version of dlplus has a special feature to support UR2, so that UR2 may still load DOS100.CO, DOS200.CO, or DOSNEC.CO no matter what subdirectory the server has been navigated to, as long as there is a copy in the root shared directory.  
+This version of dlplus has special support for UR2, so that UR2 may still load DOS100.CO, DOS200.CO, or DOSNEC.CO no matter what subdirectory the server has been navigated to, and no matter if the share path contains a copy enywhere in any directory.  
+When the client requests any of the special filenames, the file is searched in the current directory first, like any other file. If it's found, it's used.  
+If the file is not found in the current dir, then the root share dir is tried next, and if that fails then finally the app lib dir is tried.
 
 The [clients/](clients/) directory includes copies of [DOS100.CO](clients/ts-dos/DOS100.CO), [DOS200.CO](clients/ts-dos/DOS200.CO), and [DOSNEC.CO](clients/ts-dos/DOSNEC.CO)  
-These are also installed to ```/usr/local/lib/dl``` by ```sudo make install```  
+These are also installed to ```/usr/local/lib/dl``` by ```sudo make install```, but you can pretty much ignore them since they will be loaded from the lib dir any time they are needed. You don't have to place copies in your share dir like you would have to on a readl disk.
 
 ## OS Compatibility
 Tested on Linux, Macos, FreeBSD

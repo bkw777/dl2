@@ -124,10 +124,10 @@ MA 02111, USA.
 #define DEFAULT_DME_DIR_LABEL    "<>"     // DIR_LABEL='/'
 
 // Support for Ultimate ROM-II TS-DOS loader: see ref/ur2.txt
-// files that are always readable in any cd path.
-// Search path for any of these: cwd, then share root.
+// files that are always readable in any cd path, or even if
+// the file doesn't exist anywhere in the share tree.
+// Search path for any of these: cwd, then share root, then app_lib_dir.
 // TODO add $XDG_DATA_HOME (~/.local/share/myapp  mac: ~/Library/myapp/)
-//      then APP_LIB_DIR
 char * magic_files [] = {
 	"DOS100.CO",
 	"SAR100.CO",
@@ -354,26 +354,19 @@ void lsx (char *path,char *match) {
 	DIR *dir = opendir(path);
 	int i;
 	if (dir == NULL){dbg(0,"Cannot open \"%s\"",path); return;}
-
 	while ((files = readdir(dir)) != NULL) {
 		for (i=strlen(files->d_name);files->d_name[i]!='.';i--);
-		if (files->d_name[i+1]==match[0] && files->d_name[i+2]==match[1] && files->d_name[i+3]==match[2])
-			dbg(0," %s",files->d_name);
+		if (!strcmp(files->d_name+i+1,match)) dbg(0," %s",files->d_name);
 	}
-
 	closedir(dir);
 }
 
 int check_magic_file(char *b) {
 	dbg(3,"%s(\"%s\")\n",__func__,b);
 	if (!enable_ur2_dos_hack) return 1;
-	if (!dir_depth) return 1; // fake root hack not needed in actual root
 	if (dot_offset!=6) return 1; // UR2 is only on the KC-85 platform
-
 	int l = sizeof(magic_files)/sizeof(magic_files[0]);
-	int i;
-	for (i = 0; i < l; ++i) if (!strcmp(magic_files[i],b)) return 0;
-
+	for (int i=0;i<l;++i) if (!strcmp(magic_files[i],b)) return 0;
 	return 1;
 }
 
@@ -561,15 +554,24 @@ void dirent_set_name(unsigned char *b) {
 		// let UR2 load <root>/DOSxxx.CO from anywhere
 		cur_file=make_file_entry(filename,0,0);
 		char t[LOCAL_FILENAME_MAX+1] = {0x00};
+		// try share root
 		for (int i=dir_depth;i>0;i--) strncat(t,"../",3);
 		strncat(t,cur_file->local_fname,LOCAL_FILENAME_MAX-dir_depth*3);
-		memset(cur_file->local_fname,0x00,LOCAL_FILENAME_MAX);
-		memcpy(cur_file->local_fname,t,LOCAL_FILENAME_MAX);
-		struct stat st; if (!stat(cur_file->local_fname,&st)) cur_file->len=st.st_size;
-		dbg(3,"Magic: \"%s\" <-- \"%s\"\n",cur_file->client_fname,cur_file->local_fname);
-		ret_dirent(cur_file);
+		struct stat st; int e=stat(t,&st);
+		if (e) { // try loaders dir
+			strcpy(t,app_lib_dir);
+			strcat(t,"/");
+			strcat(t,cur_file->local_fname);
+			e=stat(t,&st);
+		}
+		if (e) ret_dirent(NULL); else {
+			strcpy(cur_file->local_fname,t);
+			cur_file->len=st.st_size;
+			dbg(3,"Magic: \"%s\" <-- \"%s\"\n",cur_file->client_fname,cur_file->local_fname);
+			ret_dirent(cur_file);
+		}
 	} else {
-		if (filename[dot_offset+1]==dme_dir_label[0] && filename[dot_offset+2]==dme_dir_label[1]) f = DIR_FLAG;
+		if (!strncmp(filename+dot_offset+1,dme_dir_label,2)) f = DIR_FLAG;
 		cur_file=make_file_entry(collapse_padded_name(filename), 0, f);
 		dbg(3,"New %s: \"%s\"\n",f==DIR_FLAG?"Directory":"File",cur_file->local_fname);
 		ret_dirent(NULL);
