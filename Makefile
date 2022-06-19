@@ -24,7 +24,6 @@ CLIENT_LOADERS := \
 	clients/tiny/TINY.100 \
 #	clients/power-dos/POWR-D.100
 
-
 CLIENT_DOCS := \
 	clients/teeny/teenydoc.txt \
 	clients/teeny/hownec.do \
@@ -43,10 +42,15 @@ DOCS := dl.do README.txt README.md LICENSE $(CLIENT_DOCS)
 SOURCES := dl.c dir_list.c
 
 ifeq ($(OS),Darwin)
- # /dev/cu.usbserial-AB0MQNN1
- #DEFAULT_CLIENT_TTY := cu.usbserial-*
+ #DEFAULT_CLIENT_TTY := cu.*
 else
- DEFAULT_CLIENT_TTY := ttyUSB0
+ ifneq (,$(findstring BSD,$(OS)))
+  #DEFAULT_CLIENT_TTY := cu*
+ else ifeq ($(OS),Linux)
+  DEFAULT_CLIENT_TTY := ttyUSB0
+ else
+  DEFAULT_CLIENT_TTY := ttyS0
+ endif
  LDLIBS += -lutil
 endif
 

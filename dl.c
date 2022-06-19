@@ -76,20 +76,17 @@ MA 02111, USA.
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <errno.h>
 #include <stdbool.h>
 #include "constants.h"
 #include "dir_list.h"
 
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(__APPLE__) || defined(__NetBSD__) || defined(OpenBSD)
 #include <util.h>
 #endif
 
 #if defined(__FreeBSD__)
 #include <libutil.h>
-#endif
-
-#if defined(__NetBSD__) || defined(OpenBSD)
-#include <util.h>
 #endif
 
 #if defined(__linux__)
@@ -237,10 +234,12 @@ void resolve_client_tty_name () {
 			break;
 		default:
 			if(!access(client_tty_name,F_OK)) break;
-			char t[PATH_MAX];
+			char t[PATH_MAX]={0x00};
+			int i = 0;
 			strcpy(t,client_tty_name);
 			strcpy(client_tty_name,"/dev/");
-			strcat(client_tty_name,t);
+			if (!strncmp(client_tty_name,t,5)) i=5;
+			strcat(client_tty_name,t+i);
 	}
 }
 
@@ -258,13 +257,14 @@ void client_tty_vmt(int m,int t) {
 int open_client_tty () {
 	dbg(3,"%s()\n",__func__);
 
-	if (client_tty_fd<0)
-		client_tty_fd=open((char *)client_tty_name,O_RDWR,O_NOCTTY);
+	if (client_tty_fd<0) client_tty_fd=open((char *)client_tty_name,O_RDWR,O_NOCTTY);
 
 	if (client_tty_fd<0) {
-		dbg(1,"Can't open \"%s\"\n",client_tty_name);
+		dbg(1,"Can't open \"%s\": %s\n",client_tty_name,strerror(errno));
 		return 1;
 	}
+
+	ioctl(client_tty_fd,TIOCEXCL);
 
 	if (getty_mode) {
 		if (login_tty(client_tty_fd)==0) client_tty_fd = STDIN_FILENO;
