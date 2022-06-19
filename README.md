@@ -121,7 +121,7 @@ When the client requests any of the special filenames, the file is searched in t
 If the file is not found in the current dir, then the root share dir is tried next, and if that fails then finally the app lib dir is tried.
 
 The [clients/](clients/) directory includes copies of [DOS100.CO](clients/ts-dos/DOS100.CO), [DOS200.CO](clients/ts-dos/DOS200.CO), and [DOSNEC.CO](clients/ts-dos/DOSNEC.CO)  
-These are also installed to ```/usr/local/lib/dl``` by ```sudo make install```, but you can pretty much ignore them since they will be loaded from the lib dir any time they are needed. You don't have to place copies in your share dir like you would have to on a readl disk.
+These are also installed to ```/usr/local/lib/dl``` by ```sudo make install```, but you can pretty much ignore them since they will be loaded from the lib dir any time they are needed. You don't have to place copies in your share dir like you would have to on a real disk.
 
 ## OS Compatibility
 Tested on Linux, Macos, FreeBSD
