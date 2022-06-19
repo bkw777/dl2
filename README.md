@@ -13,7 +13,6 @@ Docs from the past versions of this program. They don't exactly match this versi
 ```
 make clean all && sudo make install
 ```
-<sup>(use gmake on BSD)</sup>
 
 ## uninstall
 ```
@@ -124,3 +123,8 @@ This version of dlplus has a special feature to support UR2, so that UR2 may sti
 
 The [clients/](clients/) directory includes copies of [DOS100.CO](clients/ts-dos/DOS100.CO), [DOS200.CO](clients/ts-dos/DOS200.CO), and [DOSNEC.CO](clients/ts-dos/DOSNEC.CO)  
 These are also installed to ```/usr/local/lib/dl``` by ```sudo make install```  
+
+## OS Compatibility
+Tested on Linux, Macos, FreeBSD
+
+Notes for [FreeBSD](ref/freebsd.txt)
