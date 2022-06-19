@@ -123,4 +123,4 @@ If you had previously loaded TS-DOS and used it to navigate into a subdirectory,
 This version of dlplus has a special feature to support UR2, so that UR2 may still load DOS100.CO, DOS200.CO, or DOSNEC.CO no matter what subdirectory the server has been navigated to, as long as there is a copy in the root shared directory.  
 
 The [clients/](clients/) directory includes copies of [DOS100.CO](clients/ts-dos/DOS100.CO), [DOS200.CO](clients/ts-dos/DOS200.CO), and [DOSNEC.CO](clients/ts-dos/DOSNEC.CO)  
-These are also installed to ```/usr/local/lib/dlplus/clients/ts-dos/``` by ```sudo make install```  
+These are also installed to ```/usr/local/lib/dl``` by ```sudo make install```  
