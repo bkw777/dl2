@@ -80,11 +80,8 @@ MA 02111, USA.
 #include "constants.h"
 #include "dir_list.h"
 
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#if TARGET_OS_MAC
+#if defined(__APPLE__) && defined(__MACH__)
 #include <util.h>
-#endif
 #endif
 
 #if defined(__FreeBSD__)
@@ -97,7 +94,6 @@ MA 02111, USA.
 
 #if defined(__linux__)
 #include <utmp.h>
-#include <netinet/in.h>
 #endif
 
 /*** config **************************************************/
