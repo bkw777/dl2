@@ -13,6 +13,7 @@ Docs from the past versions of this program. They don't exactly match this versi
 ```
 make clean all && sudo make install
 ```
+<sup>(use gmake on BSD)</sup>
 
 ## uninstall
 ```
