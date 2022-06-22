@@ -11,12 +11,12 @@ APP_DOC_DIR := $(PREFIX)/share/doc/$(APP_NAME)
 APP_VERSION := $(shell git describe --long 2>&-)
 
 CLIENT_LOADERS := \
-	clients/ttwd/TINY.100 \
-	clients/ttwd/D_WEENY.100 \
-	clients/ttwd/TEENY.100 \
-	clients/ttwd/TEENY.200 \
-	clients/ttwd/TEENY.NEC \
-	clients/ttwd/TEENY.M10 \
+	clients/teeny/TINY.100 \
+	clients/teeny/D_WEENY.100 \
+	clients/teeny/TEENY.100 \
+	clients/teeny/TEENY.200 \
+	clients/teeny/TEENY.NEC \
+	clients/teeny/TEENY.M10 \
 	clients/dskmgr/DSKMGR.100 \
 	clients/dskmgr/DSKMGR.200 \
 	clients/dskmgr/DSKMGR.K85 \
@@ -34,11 +34,11 @@ LIB_OTHER := \
 	clients/disk_power/Disk_Power_KC-85_Install_Disk.p1h
 
 CLIENT_DOCS := \
-	clients/ttwd/teenydoc.txt \
-	clients/ttwd/hownec.do \
-	clients/ttwd/TNYO10.TXT \
-	clients/ttwd/tindoc.do \
-	clients/ttwd/ddoc.do \
+	clients/teeny/teenydoc.txt \
+	clients/teeny/hownec.do \
+	clients/teeny/TNYO10.TXT \
+	clients/teeny/tindoc.do \
+	clients/teeny/ddoc.do \
 	clients/dskmgr/DSKMGR.DOC \
 	clients/ts-dos/tsdos.pdf \
 	clients/disk_power/Disk_Power.txt \
