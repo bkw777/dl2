@@ -1,0 +1,80 @@
+Disk Power for KC-85
+
+Excerpt, more info here:
+http://tandy.wiki/TPDD_client:Disk_Power:KC-85
+
+Disk Power requires both the original distribution disk and the cassette
+installer program to install. The cassette program has been repackaged into
+a BASIC loader, so a cassette or cassette cable is no longer required, but
+a working TPDD1 drive is still required to create the disk and then to read
+it during install. Once installed, the disk and drive are no longer needed.
+
+---------------------------------------------------------------------------
+
+Installation:
+
+1 - Gather the necessary hardware:
+    https://github.com/bkw777/pdd.sh/blob/main/hardware.md
+
+2 - Install https://github.com/bkw777/pdd.sh
+
+3 - Re-create the install disk:
+    Connect the TPDD1 drive to the modern computer.
+    Close the write-protect door on the corner of a blank DD/720K disk.
+    Turn on the TPDD and insert the disk.
+
+    $ pdd rd /usr/local/lib/dl/Disk_Power_KC-85_Install_Disk.p1h
+
+    Remove the disk and open the write-protect door in the corner of the disk.
+    Power-cycle the drive and re-insert the disk.
+
+4 - Run the Disk Power bootstrap
+    Connect the KC-85 to the modern computer.
+
+    $ dl -vvb Disk_Power.K85
+
+    Follow the prompts after that.
+
+---------------------------------------------------------------------------
+
+Usage:
+
++------+--------+--------+--------+--------+--------+--------+--------+--------+
+| DISK | NewDsk |  Load  |  ALL   | RAMDIR |  Kill  |  List  | Format |  Menu  |
++------+--------+--------+--------+--------+--------+--------+--------+--------+
+| RAM  | ClrBAS |  Save  |  ALL   | DSKDIR |  Kill  |  List  | ClrPST |  Menu  |
++------+--------+--------+--------+--------+--------+--------+--------+--------+
+       |   F1   |   F2   |   F3   |   F4   |   F5   |   F6   |   F7   |   F8   |
+       +--------+--------+--------+--------+--------+--------+--------+--------+
+
+The top row are DISK functions, available while in DISK view.
+The bottom row are RAM functions, available while in RAM view.
+
+F4 toggles between RAM and DISK view.
+
+F8 exits back to the main menu.
+
+ClrBAS and ClrPST clear the BASIC program area an the Paste buffer to
+recover ram for saving files.
+
+F7 Format quirk: F4 will not enter DISK view unless there is a valid
+formatted disk inserted to read. This means it's not possible to format a
+new blank disk unless you already have some other formatted disk to put in
+the drive first in order to access DISK view. Once in DISK view, then you
+can swap in the blank disk and press F7 to format it. You can use the install
+disk for that if nothing else. You can also format a new disk with pdd.sh
+
+---------------------------------------------------------------------------
+
+Printable reproductions of the keyboard template and disk label:
+http://tandy.wiki/TPDD_client:Disk_Power:KC-85
+
+Disk_Power_F-Keys_Template.odg and Disk_Power_F-Keys_Template.pdf contain
+a printable reproduction of the template to label the F1-F8 buttons.
+
+Disk_Power_KC-85_disk.glabels is a disk label for the install disk using
+https://github.com/jimevins/glabels-qt
+and https://www.onlinelabels.com/ol775.htm (aka Avery 6490).
+
+Disk_Power_KC-85_disk_labels.pdf is a pdf print-to-file version of the
+disk label that can be printed without the glabels program.

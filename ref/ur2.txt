@@ -1,32 +1,35 @@
 Special support for the TS-DOS button in Ultimate ROM II
 
-A few "magic" filenames that have the following behavior/properties:
+A few "magic" filenames that have the following properties:
 
-* Name: DOS100.CO, DOS200.CO, DOSNEC.CO
+* Names: DOS100.CO, DOS200.CO, DOSNEC.CO
+  (1)
 
 * If client tries to open(read), and file doesn't exist in cwd, silently
-  succeed and supply contents from the same file from share root instead.
+  succeed anyway and supply contents from the same file from the share root
+  dir instead. Failing that, get from the app lib dir (/usr/local/lib/dl).
 
 * Do not include in directory listing unless it actually exists in cwd.
 
 * Do not supply substitute contents if file actually exists in cwd.
-  Ff client tries to load a file that actually exists in cwd,
+  If client tries to load a file that actually exists in cwd,
   it should work as normal, not sustitute the contents from some other file.
 
-* Do not apply to open(write) or append. If client tries to save a file,
-  it should work as normal, not overwite the copy in the share root!
-
-* DO allow overwriting the share root copy if the client is actually in
-  the share root dir.
+X Do not apply to open(write) or open(append). If client tries to save a
+  file, it should work as normal, not overwite the copy in the share root!
+  (2)
+    
+X DO allow overwriting the share root copy if the client is actually in
+  the share root dir. Not implemented yet but no problem to.
 
 * Don't even look if not in "floppy compat" mode (dot_offset=6).
-  There is no UR-II for CP/M or WP-2 or any other kind of client,
+  There is no UR-II for CP/M or WP-2 or Z88 any other kind of client,
   it's an option ROM for KC-85 platform clones only.
 
 Explaination
 
-UR-II has a "TS-DOS" button that tries to load a file named "DOS100.CO" on
-the fly.
+Ultimate ROM II has a "TS-DOS" button that tries to load a file named
+"DOS100.CO" on the fly.
 
 (or DOS200.CO for TANDY Model 200, or DOSNEC.CO for NEC PC-8201/PC-8300)
 
@@ -38,18 +41,67 @@ the file, then the open() works and so the TS-DOS button works.
 
 On an emulated drive that can cd into sub-directories, it's possible for
 the user to launch TS-DOS, cd into a sub-directory that does not contain
-a copy of DOS100.CO, and then exit TS-DOS (without cd-ing back up to the
-root dir before exiting).
+a copy of DOS100.CO, and then exit TS-DOS.
 
-In that case, all else being equal, the TS-DOS button in UR-II would
-not work any more unless/until you re-start the server.
+Now the server is chdir'd into a directory that does not contain DOS100.CO,
+and the user has exited TS-DOS, which unloaded their temporary copy of
+DOS100.CO from ram. If the user tries to use the TS-DOS button again,
+the server just gets a request to open "DOS100.CO", which does not exist,
+and so the user has no way to load TS-DOS again.
 
-The next time the user tries to use the TS-DOS button, UR-II tries
-to load "DOS100.CO", no such file exists (in the current dir), the
-open() fails, and the user can never get back into TS-DOS again. They
-can't cd back to root to fix it, since they can't launch TS-DOS to do
-the cd. You have to re-start the server to make it work again.
+So this version of dlplus has special support so that whenever one of those
+particular filenames are requested, if it isn't found in the current dir
+naturally like any other file, then the server silently also looks in the
+share root dir, and failing that finally gets it from /usr/local/lib/dl, so
+the load always succeeds no matter if the user has CD'd into some subdirectory,
+no matter if there is even no copy of DOS100.CO anywhere in the share tree.
 
-So this just makes it so that any attempt to open one of these specific
-filenames (for reading only) always works, regardless what directory the
-server is currently cd'd to.
+-------------------------------------------------------------------------------
+
+(1) There are actually more filenames in the list, but the rest either don't
+    actually exist or we're not yet implementing the features needed to use
+    them. The rest of the recognized filenames are DOSM10.CO, DOSK85.CO,
+    SAR100.CO, SAR200.CO, SARNEC.CO, SARM10.CO, and SARK85.CO.
+
+    *M10 & *K85 would be TS-DOS & Sardine for Olivetti and Kyotronic,
+     which may not exist. If they did exist, these are just my guesses
+     what the filenames would be. Maybe they will turn up some day.
+
+    SAR* is Sardine, which does exist at least for 100 & 200, and did exist
+    for NEC though is currently lost, but requires emulating TPDD1 FDC-mode.
+
+
+(2) *Not quite possible*
+
+    The magic files don't get overwritten, so it's only an annoying cosmetic
+    problem, but there's basically no way around it unless we can detect
+    something unique about the way UR-II requests DOS100.CO vs any other client.
+    I don't think there is any such tell, but maybe.
+
+    The problem is the tpdd protocol requires the server to say if a file
+    exists *before* the client says what they intend to do with it. If we
+    answer set-name with null, then the magic LOAD doesn't work because
+    we told the client that the file doesn't exist. If we answer set-name
+    with the filename & size, then SAVE doesn't work because we told the
+    client that the file already exists.
+
+    It's far more frequently needed, and more useful & important to load
+    DOS___.CO than to save it, so dl defaults to make load work. And if the
+    user does actually answer "Overwrite" when trying to save, it harmlessly
+    fails to overwrite the real file in /usr/local/lib/dl due to permissions.
+
+    This could be made slightly better by recognizing the special filename
+    after the set-name step, and doing something different during open(write)
+    if that's what ends up happening. Like write to the current dir instead
+    of trying to overwite the magic file. The user would still get an annoying
+    "Overwrite? Append? Cancel?" message, but at least if they just ignore
+    that and choose Overwite, the file would appear in the current dir
+    otherwise as expected. This last little bit is not implemented yet.
+
+
+
+
+
+
+-----------
+

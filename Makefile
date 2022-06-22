@@ -3,6 +3,7 @@
 OS ?= $(shell uname)
 CC ?= gcc
 CFLAGS += -O2 -Wall
+#CFLAGS += -std=c90 -D_DEFAULT_SOURCE    # prove the code is still plain c
 PREFIX ?= /usr/local
 APP_NAME := dl
 APP_LIB_DIR := $(PREFIX)/lib/$(APP_NAME)
@@ -10,10 +11,12 @@ APP_DOC_DIR := $(PREFIX)/share/doc/$(APP_NAME)
 APP_VERSION := $(shell git describe --long 2>&-)
 
 CLIENT_LOADERS := \
-	clients/teeny/TEENY.100 \
-	clients/teeny/TEENY.200 \
-	clients/teeny/TEENY.NEC \
-	clients/teeny/TEENY.M10 \
+	clients/ttwd/TINY.100 \
+	clients/ttwd/D_WEENY.100 \
+	clients/ttwd/TEENY.100 \
+	clients/ttwd/TEENY.200 \
+	clients/ttwd/TEENY.NEC \
+	clients/ttwd/TEENY.M10 \
 	clients/dskmgr/DSKMGR.100 \
 	clients/dskmgr/DSKMGR.200 \
 	clients/dskmgr/DSKMGR.K85 \
@@ -21,22 +24,25 @@ CLIENT_LOADERS := \
 	clients/ts-dos/TS-DOS.100 \
 	clients/ts-dos/TS-DOS.200 \
 	clients/ts-dos/TS-DOS.NEC \
-	clients/tiny/TINY.100 \
+	clients/disk_power/Disk_Power.K85 \
 #	clients/power-dos/POWR-D.100
 
-CLIENT_DOCS := \
-	clients/teeny/teenydoc.txt \
-	clients/teeny/hownec.do \
-	clients/teeny/TNYO10.TXT \
-	clients/dskmgr/DSKMGR.DOC \
-	clients/ts-dos/tsdos.pdf \
-	clients/tiny/tindoc.do \
-#	clients/power-dos/powr-d.txt
-
-CLIENT_OTHER := \
+LIB_OTHER := \
 	clients/ts-dos/DOS100.CO \
 	clients/ts-dos/DOS200.CO \
-	clients/ts-dos/DOSNEC.CO
+	clients/ts-dos/DOSNEC.CO \
+	clients/disk_power/Disk_Power_KC-85_Install_Disk.p1h
+
+CLIENT_DOCS := \
+	clients/ttwd/teenydoc.txt \
+	clients/ttwd/hownec.do \
+	clients/ttwd/TNYO10.TXT \
+	clients/ttwd/tindoc.do \
+	clients/ttwd/ddoc.do \
+	clients/dskmgr/DSKMGR.DOC \
+	clients/ts-dos/tsdos.pdf \
+	clients/disk_power/Disk_Power.txt \
+#	clients/power-dos/powr-d.txt
 
 DOCS := dl.do README.txt README.md LICENSE $(CLIENT_DOCS)
 SOURCES := dl.c dir_list.c
@@ -69,7 +75,7 @@ all: $(APP_NAME)
 $(APP_NAME): $(SOURCES)
 	$(CC) $(CFLAGS) $(DEFINES) $(SOURCES) $(LDLIBS) -o $(@)
 
-install: $(APP_NAME) $(CLIENT_LOADERS) $(CLIENT_OTHER) $(DOCS)
+install: $(APP_NAME) $(CLIENT_LOADERS) $(LIB_OTHER) $(DOCS)
 	mkdir -p $(APP_LIB_DIR)
 	for s in $(CLIENT_LOADERS) ;do \
 		d=$(APP_LIB_DIR)/$${s##*/} ; \
@@ -77,7 +83,7 @@ install: $(APP_NAME) $(CLIENT_LOADERS) $(CLIENT_OTHER) $(DOCS)
 		install -o root -m 0644 $${s}.pre-install.txt $${d}.pre-install.txt ; \
 		install -o root -m 0644 $${s}.post-install.txt $${d}.post-install.txt ; \
 	done
-	for s in $(CLIENT_OTHER) ;do \
+	for s in $(LIB_OTHER) ;do \
 		d=$(APP_LIB_DIR)/$${s##*/} ; \
 		install -o root -m 0644 $${s} $${d} ; \
 	done

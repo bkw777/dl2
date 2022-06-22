@@ -11,21 +11,21 @@ Docs from the past versions of this program. They don't exactly match this versi
 
 ## install
 ```
-make clean all && sudo make install
+$ make clean all && sudo make install
 ```
 
 ## uninstall
 ```
-sudo make uninstall
+$ sudo make uninstall
 ```
 
 ## manual
 ```
-dl -h
+$ dl -h
 ```
 
 ```
-bkw@fw:~/src/dlplus$ dl -h
+$ dl -h
 dl - DeskLink+ v1.5.010-47-g93f3db4 - help
 
 usage: dl [options] [tty_device] [share_path]
@@ -58,10 +58,9 @@ The 2nd non-option argument is another way to specify the share path.
    dl -vv /dev/ttyS0
    dl ttyUSB1 -v -w ~/Documents/wp2files
 
-bkw@fw:~/src/dlplus$ 
 ```
 ```
-bkw@fw:~/src/dlplus$ dl -l
+$ dl -l
 dl - DeskLink+ v1.5.010-47-g93f3db4 - "bootstrap" help
 
 Available loader files (in /usr/local/lib/dl):
@@ -72,56 +71,54 @@ NEC PC-8201(a)/PC-8300 : TEENY.NEC TS-DOS.NEC
 Kyotronic KC-85        : DSKMGR.K85
 Olivetti M-10          : DSKMGR.M10 TEENY.M10
 
-Filenames given without any leading path are taken from above.
-To specify a file in the current directory, include the "./"
+Filenames without any leading path are searched from above
+if not found in the current directory.
 Examples:
 
    dl -b TS-DOS.100
    dl -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
    dl -b ./rxcini.DO
 
-bkw@fw:~/src/dlplus$ 
 ```
 
 ## run the TPDD server, verbose, upcase, serving files from the current directory
 ```
-dl -vu
+$ dl -vu
 ```
 
 ## list all available TPDD client installers, and then bootstrap one of them
 ```
-dl -l
-dl -vb TS-DOS.100
+$ dl -l
+$ dl -vb TS-DOS.100
 ```
 
 ## bootstrap a [REXCPM](http://bitchin100.com/wiki/index.php?title=REXCPM)
 ```
-unzip REXCPMV21_b19.ZIP
-dl -vb ./rxcini.DO ;dl -vu
+$ unzip REXCPMV21_b19.ZIP
+$ dl -vb ./rxcini.DO ;dl -vu
 ```
 ## fun
 The "ROOT  " and "PARENT" labels are not hard coded in TS-DOS. You can set them to other things. Sadly, this does not extend as far as being able to use ".." for "PARENT". TS-DOS thinks it's an invalid filename (even though it DISPLAYS it in the file list just fine. If it would just go ahead and send the command to "open" it, it would work.) However, plenty of other things that are all better than "ROOT  " and "PARENT" do work.
 ```
-ROOT_LABEL=/ PARENT_LABEL=^ dl
-ROOT_LABEL='-root-' PARENT_LABEL='-back-' dl
-ROOT_LABEL='0:' PARENT_LABEL='^:' dl
+$ ROOT_LABEL=/ PARENT_LABEL=^ dl
+$ ROOT_LABEL='-root-' PARENT_LABEL='-back-' dl
+$ ROOT_LABEL='0:' PARENT_LABEL='^:' dl
 or you can confuse someone...  
-ROOT_LABEL='C:\' PARENT_LABEL='UP:' dl
+$ ROOT_LABEL='C:\' PARENT_LABEL='UP:' dl
 ```
 ## UR-II
 Ultimate ROM II ([docs](http://www.club100.org/library/libdoc.html)) ([roms](https://bitchin100.com/wiki/index.php?title=REXsharp#Option_ROM_Images_for_Download)) has a feature where it can load a RAM version of TS-DOS from disk on-the-fly.  
 This allows you to keep the TS-DOS executable on the disk instead of in ram, and it is loaded and then discarded on-demand by selecting the TS-DOS menu entry from inside UR2.
 
-A potential problem with this, with an emulator that supports TS_DOS directories, is that UR2 doesn't know anything about directories, and just tries to load a file named "DOS___.CO".  
+That normally requires that there be a copy of DOS100.CO on the "disk" so that UR-II can load it. And since this "disk" is actually a server that can cd into other directories, you would normally need a copy of the file in every single directory.  
+This version of dlplus has special support for that so that the TS-DOS button always works, even if the file doesn't exist in the current directory, or even if the file doesn't exist anywhere within the share tree.
 
-If you had previously used the UR-II TS-DOS feature and used it to navigate into a subdirectory that didn't contain a copy of DOS___.CO, then UR2 would normally fail to load TS-DOS after that, until you restarted the TPDD server to make it go back to the root share dir.  
+There are copies of [DOS100.CO](clients/ts-dos/DOS100.CO), [DOS200.CO](clients/ts-dos/DOS200.CO), and [DOSNEC.CO](clients/ts-dos/DOSNEC.CO) installed to ```/usr/local/lib/dl``` by ```sudo make install```.
 
-This version of dlplus has special support for UR2, so that UR2 may still load DOS100.CO, DOS200.CO, or DOSNEC.CO no matter what subdirectory the server has been navigated to, and no matter if the share path contains a copy anywhere in any directory.  
-When the client requests any of the special filenames, the file is searched in the current directory first, like any other file. If it's found, it's used.  
-If the file is not found in the current dir, then the root share dir is tried next, and if that fails then finally the app lib dir is tried.
+When the client machine requests any of these files, dlplus first looks in the current directory like normal. If it's there, that is what is used.  
+Failing that, then it looks in the root share dir. Failing that, finally it gets the file from /usr/local/lib/dl. This way the TS-DOS button in Ultimate ROM II just always works by magic.
 
-The [clients/](clients/) directory includes copies of [DOS100.CO](clients/ts-dos/DOS100.CO), [DOS200.CO](clients/ts-dos/DOS200.CO), and [DOSNEC.CO](clients/ts-dos/DOSNEC.CO)  
-These are also installed to ```/usr/local/lib/dl``` by ```sudo make install```, but you can pretty much ignore them since they will be loaded from the lib dir any time they are needed. You don't have to place copies in your share dir like you would have to on a real disk.
+[More details](ref/ur2.txt)
 
 ## OS Compatibility
 Tested on Linux, Macos, FreeBSD
