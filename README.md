@@ -116,12 +116,12 @@ A potential problem with this, with an emulator that supports TS_DOS directories
 
 If you had previously used the UR-II TS-DOS feature and used it to navigate into a subdirectory that didn't contain a copy of DOS___.CO, then UR2 would normally fail to load TS-DOS after that, until you restarted the TPDD server to make it go back to the root share dir.  
 
-This version of dlplus has special support for UR2, so that UR2 may still load DOS100.CO, DOS200.CO, or DOSNEC.CO no matter what subdirectory the server has been navigated to, and no matter if the share path contains a copy enywhere in any directory.  
+This version of dlplus has special support for UR2, so that UR2 may still load DOS100.CO, DOS200.CO, or DOSNEC.CO no matter what subdirectory the server has been navigated to, and no matter if the share path contains a copy anywhere in any directory.  
 When the client requests any of the special filenames, the file is searched in the current directory first, like any other file. If it's found, it's used.  
 If the file is not found in the current dir, then the root share dir is tried next, and if that fails then finally the app lib dir is tried.
 
 The [clients/](clients/) directory includes copies of [DOS100.CO](clients/ts-dos/DOS100.CO), [DOS200.CO](clients/ts-dos/DOS200.CO), and [DOSNEC.CO](clients/ts-dos/DOSNEC.CO)  
-These are also installed to ```/usr/local/lib/dl``` by ```sudo make install```, but you can pretty much ignore them since they will be loaded from the lib dir any time they are needed. You don't have to place copies in your share dir like you would have to on a readl disk.
+These are also installed to ```/usr/local/lib/dl``` by ```sudo make install```, but you can pretty much ignore them since they will be loaded from the lib dir any time they are needed. You don't have to place copies in your share dir like you would have to on a real disk.
 
 ## OS Compatibility
 Tested on Linux, Macos, FreeBSD
