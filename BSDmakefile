@@ -1,3 +1,3 @@
-default:
-	@echo "Please run gmake instead."
-	exit 1
+$(.TARGETS) all:
+	@which gmake 2>&- >&- || { echo "Please install gmake." ;false ; }
+	@gmake $(.TARGETS)
