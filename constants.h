@@ -94,6 +94,7 @@
 #define FDC_WRITE_SECTOR    'W' // write sector data
 #define FDC_WRITE_SECTOR_NV 'X' // write sector data without verify
 
+
 // TPDD1 FDC-mode error codes
 // There is no documentation for FDC error codes.
 // These are guesses from experimenting.
@@ -123,8 +124,13 @@
 // KC-85 platform BASIC interpreter EOL & EOF bytes for bootstrap()
 #define BASIC_EOL 0x0D
 #define BASIC_EOF 0x1A
+#define LOCAL_EOL 0x0A
 
-#define DIR_FLAG 0x01
+#define OPR_CMD_SYNC 0x5A
+#define FDC_CMD_EOL 0x0D
+
+#define FE_FLAGS_NONE 0x00
+#define FE_FLAGS_DIR 0x01
 
 #define NO_RET 0
 #define ALLOW_RET 1

@@ -3,7 +3,7 @@
 OS ?= $(shell uname)
 CC ?= gcc
 CFLAGS += -O2 -Wall
-#CFLAGS += -std=c90 -D_DEFAULT_SOURCE    # prove the code is still plain c
+#CFLAGS += -std=c99 -D_DEFAULT_SOURCE    # prove the code is still plain c
 PREFIX ?= /usr/local
 APP_NAME := dl
 APP_LIB_DIR := $(PREFIX)/lib/$(APP_NAME)

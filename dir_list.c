@@ -32,8 +32,7 @@ static FILE_ENTRY *tblp = 0;
 
 static FILE_ENTRY * current_record (void);
 
-int file_list_init ()
-{
+int file_list_init () {
 	tblp = malloc (sizeof (FILE_ENTRY) * FEQ );
 	if (!tblp) return -1;
 	allocated = FEQ;
@@ -42,8 +41,7 @@ int file_list_init ()
 	return 0;
 }
 
-int file_list_cleanup()
-{
+int file_list_cleanup() {
 	allocated = 0;
 	ndx = 0;
 	cur = 0;
@@ -52,16 +50,13 @@ int file_list_cleanup()
 	return 0;
 }
 
-void file_list_clear_all ()
-{
+void file_list_clear_all () {
 	cur = ndx = 0;
 }
    
-int add_file (FILE_ENTRY *fe)
-{
+int add_file (FILE_ENTRY *fe) {
 	/** allocate FEQ more records if out of space */
-	if (ndx >= allocated)
-	{
+	if (ndx >= allocated) {
 		/** resize the array */
 		tblp = realloc (tblp, (allocated + FEQ) * sizeof (FILE_ENTRY) );
 		if (!tblp) return -1;
@@ -79,50 +74,35 @@ int add_file (FILE_ENTRY *fe)
 	return 0;
 }
 
-FILE_ENTRY * find_file (char *client_fname)
-{
+FILE_ENTRY * find_file (char *client_fname) {
 	int i;
-	for(i=0;i<ndx;i++) {
-		if(strcmp(client_fname,tblp[i].client_fname)==0) return &tblp[i];
+	for (i=0;i<ndx;i++) {
+		if (strcmp(client_fname,tblp[i].client_fname)==0) return &tblp[i];
 	}
 	return 0;
 }
 
-FILE_ENTRY * get_first_file (void)
-{
-	/** reset cur, get, next */
+FILE_ENTRY * get_first_file (void) {
 	cur = 0;
-	return current_record ();
+	return current_record();
 }
 
-FILE_ENTRY * get_next_file (void)
-{
-	/** return error if out-of-range */
-	if (cur + 1 > ndx)
-		return NULL;
-
+FILE_ENTRY * get_next_file (void) {
+	if (cur + 1 > ndx) return NULL;
 	cur++;
-	return current_record ();
+	return current_record();
 }
    
-FILE_ENTRY * get_prev_file (void)
-{
-	if(cur==0)
-		return NULL;
-
+FILE_ENTRY * get_prev_file (void) {
+	if (cur==0) return NULL;
 	cur--;
 	return current_record ();
 }
 
-static FILE_ENTRY * current_record (void)
-{
+static FILE_ENTRY * current_record (void) {
 	FILE_ENTRY *ep;
-
-	/** return error if out-of-range */
 	if (cur >= ndx) return NULL;
-
 	if (!tblp) return NULL;
-
 	ep = tblp + cur;
 	return ep;
 }
