@@ -185,7 +185,8 @@ char ch[2] = {0xFF};
 FILE_ENTRY *cur_file;
 int dir_depth=0;
 
-// blarghamagargle
+// blarghamagargles
+void show_main_help();
 void ret_std(unsigned char err);
 
 /* primitives and utilities */
@@ -273,7 +274,7 @@ int get_baud () {
 void resolve_client_tty_name () {
 	dbg(3,"%s()\n",__func__);
 	switch (client_tty_name[0]) {
-		case 0x00:
+		case 0x00: break;
 		case '-':
 			debug = 0;
 			strcpy (client_tty_name,"/dev/tty");
@@ -304,12 +305,14 @@ void client_tty_vmt(int m,int t) {
 int open_client_tty () {
 	dbg(3,"%s()\n",__func__);
 
-	if (client_tty_fd<0) client_tty_fd=open((char *)client_tty_name,O_RDWR,O_NOCTTY);
+	if (!strcmp(client_tty_name,"")) { show_main_help() ;dbg(0,"Error: No serial device specified\n"); return 1; }
 
-	if (client_tty_fd<0) {
-		dbg(1,"Can't open \"%s\" : %s\n",client_tty_name,strerror(errno));
-		return 1;
-	}
+	dbg(0,"Opening \"%s\" ... ",client_tty_name);
+	// open with O_NONBLOCK to avoid hang, then unset later.
+	// it can still hang on open anyway though if the client isn't connected or powered on
+	if (client_tty_fd<0) client_tty_fd=open((char *)client_tty_name,O_RDWR,O_NOCTTY,O_NONBLOCK);
+	if (client_tty_fd<0) { dbg(0,"%s\n",strerror(errno)); return 1; }
+	dbg(0,"\n");
 
 	ioctl(client_tty_fd,TIOCEXCL);
 
@@ -321,6 +324,7 @@ int open_client_tty () {
 
 	(void)(tcflush(client_tty_fd, TCIOFLUSH)+1);
 
+	// unset O_NONBLOCK
 	fcntl(client_tty_fd, F_SETFL, fcntl(client_tty_fd, F_GETFL, NULL) & ~O_NONBLOCK);
 
 	if (tcgetattr(client_tty_fd,&client_termios)==-1) return 21;
@@ -1179,8 +1183,7 @@ void get_fdc_cmd(void) {
 //
 
 void show_bootstrap_help() {
-	dbg(0,
-		"%1$s - DeskLink+ " APP_VERSION " - \"bootstrap\" help\n\n"
+	dbg(0,"%1$s - DeskLink+ " APP_VERSION " - \"bootstrap\" help\n\n"
 		"Available loader files (in %2$s):\n\n",args[0],app_lib_dir);
 
 	dbg(0,  "TRS-80 Model 100/102 :"); lsx(app_lib_dir,"100");
@@ -1276,7 +1279,7 @@ int bootstrap(char *f)
 	if (!access(prein,F_OK)) dcat(prein);
 	else dbg(0,"Prepare BASIC to receive:\n"
 		"\n"
-		"    RUN \"COM:98N1ENN\" [Enter]    <-- for TANDY/Olivetti/Kyotronic"
+		"    RUN \"COM:98N1ENN\" [Enter]    <-- for TANDY/Olivetti/Kyotronic\n"
 		"    RUN \"COM:9N81XN\"  [Enter]    <-- for NEC\n");
 
 	dbg(0,"\nPress [Enter] when ready...");
@@ -1287,7 +1290,7 @@ int bootstrap(char *f)
 	dcat(postin);
 
 	dbg(0,"\n\n\"%1$s -b\" will now exit.\n"
-	      "Re-run \"%s\" (without -b this time) to run the TPDD server.\n\n",args[0]);
+	      "Re-run \"%1$s\" (without -b this time) to run the TPDD server.\n\n",args[0]);
 
 	return 0;
 }
@@ -1392,8 +1395,8 @@ int main(int argc, char **argv)
 				else dbg(0,"Unknown option character \"0x%02X\"\n",optopt);
 			default: show_main_help();                                 return 1;
 		}
-
 	// commandline non-option arguments
+
 	for (i=0; optind < argc; optind++) {
 		if (x) dbg(1,"non-option arg %u: \"%s\"\n",i,argv[optind]);
 		switch (i++) {

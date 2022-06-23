@@ -51,7 +51,7 @@ ifeq ($(OS),Darwin)
  #DEFAULT_CLIENT_TTY := cu.*
 else
  ifneq (,$(findstring BSD,$(OS)))
-  #DEFAULT_CLIENT_TTY := ttyU0
+  DEFAULT_CLIENT_TTY := ttyU0
  else ifeq ($(OS),Linux)
   DEFAULT_CLIENT_TTY := ttyUSB0
  else
