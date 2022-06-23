@@ -310,7 +310,7 @@ int open_client_tty () {
 	dbg(0,"Opening \"%s\" ... ",client_tty_name);
 	// open with O_NONBLOCK to avoid hang, then unset later.
 	// it can still hang on open anyway though if the client isn't connected or powered on
-	if (client_tty_fd<0) client_tty_fd=open((char *)client_tty_name,O_RDWR,O_NOCTTY,O_NONBLOCK);
+	if (client_tty_fd<0) client_tty_fd=open((char *)client_tty_name,O_RDWR|O_NOCTTY|O_NONBLOCK);
 	if (client_tty_fd<0) { dbg(0,"%s\n",strerror(errno)); return 1; }
 	dbg(0,"\n");
 
