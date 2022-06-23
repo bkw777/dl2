@@ -18,3 +18,7 @@ Olivetti M-10:
 Aditionally,
 100 & 102 also accept "COM:98N1EN"
 All but NEC also accept "COM:98N1ENN"
+
+Thus, two commands cover all KC-85 platfom machines:
+RUN "COM:98N1ENN"  <-- TANDY, Olivetti, Kyotronic
+RUN "COM:9N81XN"   <-- NEC
