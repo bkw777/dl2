@@ -3,37 +3,28 @@ Disk Power for KC-85
 Excerpt, more info here:
 http://tandy.wiki/TPDD_client:Disk_Power:KC-85
 
-Disk Power requires both the original distribution disk and the cassette
-installer program to install. The cassette program has been repackaged into
-a BASIC loader, so a cassette or cassette cable is no longer required, but
-a working TPDD1 drive is still required to create the disk and then to read
-it during install. Once installed, the disk and drive are no longer needed.
+Disk Power normally requires both the INSTAL.CO program on the cassette
+(not the INSTAL.CO with the same name on the disk!), AND the original
+distribution disk to install (not any copies, they don't work!). And
+that means also needing a cassette player at least one time to record an
+mp3, and a working TPDD1 drive every time (TPDD1 or equivalent like
+FB-100 or Purple Computing specifically, not TPDD2).
+
+Here INSTAL.CO from the cassette has been repackaged into a standard BASIC
+loader which can be bootstrapped over the serial cable, and the disk has
+been imaged so that dlplus can act as a virtual drive for the raw sector
+access that the Disk Power installer uses.
 
 ---------------------------------------------------------------------------
 
-Installation:
+Installation: Just run the following command:
 
-1 - Gather the necessary hardware:
-    https://github.com/bkw777/pdd.sh/blob/main/hardware.md
+ $ dl -vb Disk_Power.K85 && dl -vui Disk_Power.K85.pdd1
 
-2 - Install https://github.com/bkw777/pdd.sh
+ Don't worry about the paths to those files. dlplus will get them from
+ /usr/local/lib/dl
 
-3 - Re-create the install disk:
-    Connect the TPDD1 drive to the modern computer.
-    Close the write-protect door on the corner of a blank DD/720K disk.
-    Turn on the TPDD and insert the disk.
-
-    $ pdd rd /usr/local/lib/dl/Disk_Power_KC-85_Install_Disk.p1h
-
-    Remove the disk and open the write-protect door in the corner of the disk.
-    Power-cycle the drive and re-insert the disk.
-
-4 - Run the Disk Power bootstrap
-    Connect the KC-85 to the modern computer.
-
-    $ dl -vvb Disk_Power.K85
-
-    Follow the prompts after that.
+When the installer prompts to insert the disk, just hit [Enter].
 
 ---------------------------------------------------------------------------
 

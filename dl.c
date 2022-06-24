@@ -158,6 +158,7 @@ unsigned dot_offset = 6; // 0 for raw, 6 for KC-85, 8 for WP-2
 int client_baud = DEFAULT_CLIENT_BAUD;
 int BASIC_byte_us = DEFAULT_BASIC_BYTE_MS*1000;
 char client_tty_name[PATH_MAX] = DEFAULT_CLIENT_TTY;
+char disk_img_fname[PATH_MAX] = {0x00};
 char app_lib_dir[PATH_MAX] = APP_LIB_DIR;
 char dme_root_label[7] = DEFAULT_DME_ROOT_LABEL;
 char dme_parent_label[7] = DEFAULT_DME_PARENT_LABEL;
@@ -170,22 +171,40 @@ bool bootstrap_mode = false;
 char **args;
 int f_open_mode = F_OPEN_NONE;
 int client_tty_fd = -1;
+int disk_img_fd = -1;
 struct termios client_termios;
 int o_file_h = -1;
 unsigned char gb[TPDD_DATA_MAX+3];
 char cwd[PATH_MAX] = {0x00};
 char dme_cwd[7] = DEFAULT_DME_ROOT_LABEL;
-char bootstrap_file[PATH_MAX] = {0x00};
+char bootstrap_fname[PATH_MAX] = {0x00};
 int opr_mode = 1;
 bool dme_detected = false;
 bool dme_fdc = false;
 bool dme_disabled = false;
 char ch[2] = {0xFF};
+const uint8_t il = PDD1_SECTOR_ID_LEN;
+const uint16_t sl = PDD1_SECTOR_DATA_LEN;
+unsigned char sb[(PDD1_SECTOR_ID_LEN+PDD1_SECTOR_DATA_LEN)]={0x00}; // avoid malloc/free
 
 FILE_ENTRY *cur_file;
 int dir_depth=0;
 
 // blarghamagargles
+const char valid_fdc_cmds[]={
+	FDC_SET_MODE,
+	FDC_CONDITION,
+	FDC_FORMAT,
+	FDC_FORMAT_NV,
+	FDC_READ_ID,
+	FDC_READ_SECTOR,
+	FDC_SEARCH_ID,
+	FDC_WRITE_ID,
+	FDC_WRITE_ID_NV,
+	FDC_WRITE_SECTOR,
+	FDC_WRITE_SECTOR_NV,
+	0x00
+};
 void show_main_help();
 void ret_std(unsigned char err);
 
@@ -223,7 +242,7 @@ void dbg_p(const int v, unsigned char *b) {
 	dbg_b(v,b+2,b[1]);
 }
 
-// On Linux 76800 requires termios2() and BOTHER
+// On Linux 76800 would require termios2() and BOTHER
 // https://stackoverflow.com/a/39924923/5754855
 // no idea about bsd or mac
 /*
@@ -247,6 +266,7 @@ void set_baud (char * s) {
 		i==2400?B2400:
 		i==4800?B4800:
 		i==9600?B9600:
+		//i==19200?B19200: // real drive default
 		i==38400?B38400:
 #if defined(__sparc__)
 		i==76800?B76800:
@@ -269,6 +289,36 @@ int get_baud () {
 		client_baud==B76800?76800:
 #endif
 		0;
+}
+
+void find_lib_file (char *f) {
+	if (f[0]==0x00) return;
+
+	char t[PATH_MAX]={0x00};
+
+	if (f[0]=='~' && f[1]=='/') {
+		strcpy(t,getenv("HOME"));
+		strcat(t,f+1);
+	} else strcpy(t,f);
+
+	if (f[0]!='/' && !(f[0]=='.' && f[1]=='/')) {
+		if (access(t,F_OK)) memset(t,0x00,PATH_MAX);
+		if (t[0]==0) {
+			strcpy(t,app_lib_dir);
+			strcat(t,"/");
+			strcat(t,f);
+		}
+	}
+
+	dbg(0,"Loading: \"%s\"\n",t);
+
+	if (access(t,F_OK)==-1) {
+		dbg(0,"Not found.\n");
+		return;
+	}
+
+	memset(f,0x00,PATH_MAX);
+	strcpy(f,t);
 }
 
 void resolve_client_tty_name () {
@@ -1067,86 +1117,330 @@ void get_opr_cmd(void)
 //
 
 /*
- * Just a stub, but one operation works, which is switching back
- * and forth between FDC-mode and Operation-mode. It is actually used
- * as part of DME detection.
- *
- * You can see it happen by running "OPR_MODE=0 dl -vv"
- * See it starts on get_fdc_cmd() instead of get_opr_cmd()
- * Then load the directory from TS-DOS.
+ * WIP:
+ *   [*] set_mode
+ *   [*] condition
+ *   [*] format
+ *   [*] read_id
+ *   [ ] search_id
+ *   [ ] write_id
+ *   [*] read_sector
+ *   [ ] write_sector
  */
 
+/*
+sectors: 0-79
+sector: 1297 bytes
+| ID 17 bytes | DATA 1280 bytes |
+---
+ 2 sector len
+ 2 sector num
+ 1 logical sector length code
+12 reserved
+---
+1280 data
+---
+*/
+
 // standard fdc-mode 8-byte response
-void ret_fdc_std(unsigned char e, unsigned char d, unsigned short l) {
+// e = error code ERR_FDC_* -> ascii hex pair
+// s = status or data       -> ascii hex pair
+// l = length or address    -> 2 ascii hex pairs
+// TODO - don't assume endianness
+void ret_fdc_std(uint8_t e, uint8_t s, uint16_t l) {
 	dbg(2,"%s()\n",__func__);
 	char b[9] = { 0x00 };
-	snprintf(b,9,"%02X%02X%04X",e,d,l);
+	snprintf(b,9,"%02X%02X%04X",e,s,l);
 	dbg(1,"FDC: response: \"%s\"\n",b);
 	write_client_tty(b,8);
 }
 
-void req_fdc_set_mode(char *b) {
-	dbg(2,"%s(%s)\n",__func__,b+1);
-	int m = atoi(&b[1]);
+int get_logical_size (int i) {
+	dbg(2,"%s(%d)\n",__func__,i);
+	return
+		i==FDC_LS_64?64:
+		i==FDC_LS_80?80:
+		i==FDC_LS_128?128:
+		//i==FDC_LS_256?256: // real drive default
+		i==FDC_LS_512?512:
+		i==FDC_LS_1024?1024:
+		i==FDC_LS_1280?1280:
+		256;
+}
+
+// p   : physical sector to seek to
+// wr  : read-only/write-only/read-write
+// ret : send or don't send response packet to client from here
+int open_disk_image (uint8_t p, int wr, int ret) {
+
+	if (!strcmp(disk_img_fname,"")) return ERR_FDC_NO_DISK;
+	int of; int e=ERR_FDC_SUCCESS;
+
+	switch (wr) {
+		case RW: of=O_RDWR; dbg(0,"edit\n");
+			if (access(disk_img_fname,W_OK)) e=ERR_FDC_WRITE_PROTECT;
+			break;
+		case WR: of=O_WRONLY;
+			if (access(disk_img_fname,F_OK)) { of|=O_CREAT; dbg(0,"create\n");} else {
+				of|=O_TRUNC; dbg(0,"overwite\n");
+				if (access(disk_img_fname,W_OK)) e=ERR_FDC_WRITE_PROTECT;
+			}
+			break;
+		default: of=O_RDONLY; dbg(0,"read\n"); break;
+	}
+
+	if (!e) {
+		disk_img_fd=open(disk_img_fname,of|O_EXCL,0666);
+		if (disk_img_fd<0) { dbg(0,"%s\n",strerror(errno)) ;e=ERR_FDC_READ;}
+	}
+
+	if (!e) {
+		int s = (p*(il+sl)); // initial seek position to start of physical sector
+		if (lseek(disk_img_fd,s,SEEK_SET)!=s) e=ERR_FDC_READ;
+	}
+
+	if (ret && e) ret_fdc_std(e,0,0);
+	return e;
+}
+
+void req_fdc_set_mode(int m) {
+	dbg(2,"%s(%d)\n",__func__,m);
 	dbg(1,"FDC: Switching to \"%s\" mode\n",m==0?"FDC":m==1?"Operation":"-invalid-");
 	opr_mode=m; // no response, just switch modes
 }
 
-void req_fdc_condition(char *b) {
-	dbg(2,"%s(%s)\n",__func__,b+1);
+// disk not-ready conditions
+// ret_fdc_std(e,s,l)
+// e = ERR_FDC_SUCCESS
+// s = bit flags:
+//   7: 1 = disk not inserted     FDC_COND_NOTINS
+//   6: 1 = disk removed          FDC_COND_REMOVED
+//   5: 1 = disk write-protected  FDC_COND_WP
+// l = 0
+// examples
+// ret_fdc_std(ERR_FDC_SUCCESS,FDC_COND_WP,0)
+// ret_fdc_std(ERR_FDC_SUCCESS,FDC_COND_NOTINS|FDC_COND_REMOVED,0)
+void req_fdc_condition() {
+	dbg(2,"%s()\n",__func__);
+	int s=FDC_COND_NONE;
+	if (access(disk_img_fname,F_OK)) s=FDC_COND_NOTINS;
+	else if (access(disk_img_fname,W_OK)) s=FDC_COND_WP;
+	ret_fdc_std(ERR_FDC_SUCCESS,s,0);
+}
+
+// lc = logical sector size code
+void req_fdc_format(uint8_t lc) {
+	dbg(2,"%s(%d)\n",__func__,lc);
+	if (lc<0 || lc>6) {ret_fdc_std(ERR_FDC_PARAM,0,0); return;}
+	int ll = get_logical_size(lc); // logical sector length in bytes
+	int lw = sl/ll; // number of whole logical sectors
+	int pn = 0;     // physical sector number
+	int pl = il + (ll*lw); // physical sector length in bytes
+	int tl = il+sl; // total length
+
+	dbg(0,"Format: Logical sector size: %d = %d\n",lc,ll);
+
+	if (open_disk_image(0,WR,ALLOW_RET)) return;
+
+	memset(sb,0x00,tl); // despite pl, we always fill all 1280 bytes
+	for (pn=0;pn<80;pn++) {
+
+// The first 2 bytes in the ID section in the manual are not exposed over
+// the wire by a real drive. They *probably* tell the drive firmware
+// internally the bounds of the following physical sector within the full
+// physical 1280, independant of calculating from the logical size code.
+// We don't need that really but it's mimicked here anyway.
+
+		// 1st 5 bytes of the ID section.
+		memcpy(sb,&pl,2);      // sector length
+		memcpy(sb+2,&pn,2);    // sector number
+		sb[4]=lc;              // logical sector length code (0-6)
+
+		if (write(disk_img_fd,sb,tl)<0) {
+			dbg(0,"%s\n",strerror(errno));
+			(void)(close(disk_img_fd)+1);
+			ret_fdc_std(ERR_FDC_READ,pn,0);
+			return;
+		}
+	}
+
+	(void)(close(disk_img_fd)+1);
 	ret_fdc_std(ERR_FDC_SUCCESS,0,0);
 }
-void req_fdc_format(char *b) {
-	dbg(2,"%s(%s)\n",__func__,b+1);
+
+// p = physical sector number
+void req_fdc_read_id(int p) {
+	dbg(2,"%s(%d)\n",__func__,p);
+	if (open_disk_image(p,RD,ALLOW_RET)) return; // open and seek
+	uint8_t r = read(disk_img_fd,sb,il); // read all 17 bytes of ID disk
+	dbg_b(2,sb,il);
+	int l = get_logical_size(sb[PDD1_ID_HDR_LEN-1]); // get logical size from header
+	ret_fdc_std(ERR_FDC_SUCCESS,p,l); // send OK
+	char t=0x00; read_client_tty(&t,1); // read 1 byte from client
+	if (t!=FDC_CMD_EOL) return; // if it's anything but CR, silently abort
+	write_client_tty(sb+PDD1_ID_HDR_LEN,r-PDD1_ID_HDR_LEN); // if it's CR, send data
+	(void)(close(disk_img_fd)+1);
+}
+
+// b[] = CPP,LL
+// C=cmd
+// PP 0 to 2 bytes ascii physical sector # null or 0-79
+// comma
+// LL 0 to 2 bytes ascii logical sector # null 1-20
+void req_fdc_read_sector(int tp,int tl) {
+	dbg(2,"%s(%d,%d)\n",__func__,tp,tl);
+	if (open_disk_image(tp,RD,ALLOW_RET)) return; // open & seek to tp
+	if (read(disk_img_fd,sb,il)!=il) { // read ID section
+		dbg(1,"failed read ID\n");
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_READ,tp,0);
+		return;
+	}
+	dbg_b(3,sb,il);
+
+	int l = get_logical_size(sb[PDD1_ID_HDR_LEN-1]); // get logical size from header
+
+	// seek to target_physical*(id_len+physical_len) + id_len + (target_logical-1)*logical_len
+	int s = (tp*(il+sl))+il+((tl-1)*l);
+	if (lseek(disk_img_fd,s,SEEK_SET)!=s) {
+		dbg(1,"failed seek %d : %s\n",s,strerror(errno));
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_READ,tp,0);
+		return;
+	}
+	memset(sb,0x00,l);
+	if (read(disk_img_fd,sb,l)!=l) { // read one logical sector of DATA
+		dbg(1,"failed logical sector read\n");
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_READ,tp,0);
+		return;
+	}
+	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // 1st stage response
+	char t=0x00;
+	read_client_tty(&t,1);   // read 1 byte from client
+	if (t!=0x0D) return;    // if it's anything but CR, silently abort
+	write_client_tty(sb,l); // if it's CR, send data
+	(void)(close(disk_img_fd)+1);
+}
+
+void req_fdc_search_id() {
+	dbg(2,"%s()\n",__func__);
+	// send OK to client
+	// read 12 bytes from client
+	// search all ID's for match
+	// return, what? Send another OK?
+	// manual says it's the same as write_sector, which
+	// sends an OK to tell client to send, and then
+	// another OK to ack. So perhaps we return
+	// just a status return that indicates if a match
+	// was found and probably which (first) sector in the len/addr field.
+	// Probably the response is always always success and the other bits
+	// indicate whether a match was found and where.
 	ret_fdc_std(ERR_FDC_SUCCESS,0,0);
 }
-void req_fdc_format_nv(char *b) {
-	dbg(2,"%s(%s)\n",__func__,b+1);
-	ret_fdc_std(ERR_FDC_SUCCESS,0,0);
+
+void req_fdc_write_id(uint16_t tp) {
+	dbg(2,"%s(%d)\n",__func__,tp);
+	int s = (tp*(il+sl));
+	if (open_disk_image(s,RW,ALLOW_RET)) return; // we need both read & write
+	uint8_t r = read(disk_img_fd,sb,il); // read ID
+	dbg_b(2,sb,r);
+	int l = get_logical_size(sb[PDD1_ID_HDR_LEN-1]); // get logical size from header
+
+	// seek file back to tp+5 (skip the ID header to the start of the 12 bytes of user ID data)
+	if (lseek(disk_img_fd,s+PDD1_ID_HDR_LEN,SEEK_SET)!=s+PDD1_ID_HDR_LEN) {
+		dbg(1,"failed seek %d : %s\n",s+PDD1_ID_HDR_LEN,strerror(errno));
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_READ,tp,0);
+		return;
+	}
+
+	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // tell client to send data
+
+	read_client_tty(sb,il-PDD1_ID_HDR_LEN); // read 12 bytes from client
+
+	// write those to the file
+	if (write(disk_img_fd,sb,il-PDD1_ID_HDR_LEN)<0) {
+		dbg(0,"%s\n",strerror(errno));
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_READ,tp,0);
+		return;
+	}
+
+	// close file
+	(void)(close(disk_img_fd)+1);
+
+	// send a final success response to the client
+	ret_fdc_std(ERR_FDC_SUCCESS,tp,l);
 }
-void req_fdc_read_id(char *b) {
-	dbg(2,"%s(%s)\n",__func__,b+1);
-	ret_fdc_std(ERR_FDC_COMMAND,0,0);
-}
-void req_fdc_read_sector(char *b) {
-	dbg(2,"%s(%s)\n",__func__,b+1);
-	ret_fdc_std(ERR_FDC_COMMAND,0,0);
-}
-void req_fdc_search_id(char *b) {
-	dbg(2,"%s(%s)\n",__func__,b+1);
-	ret_fdc_std(ERR_FDC_COMMAND,0,0);
-}
-void req_fdc_write_id(char *b) {
-	dbg(2,"%s(%s)\n",__func__,b+1);
-	ret_fdc_std(ERR_FDC_COMMAND,0,0);
-}
-void req_fdc_write_id_nv(char *b) {
-	dbg(2,"%s(%s)\n",__func__,b+1);
-	ret_fdc_std(ERR_FDC_COMMAND,0,0);
-}
-void req_fdc_write_sector(char *b) {
-	dbg(2,"%s(%s)\n",__func__,b+1);
-	ret_fdc_std(ERR_FDC_COMMAND,0,0);
-}
-void req_fdc_write_sector_nv(char *b) {
-	dbg(2,"%s(%s)\n",__func__,b+1);
-	ret_fdc_std(ERR_FDC_COMMAND,0,0);
+
+void req_fdc_write_sector(int tp,int tl) {
+	dbg(2,"%s(%d,%d)\n",__func__,tp,tl);
+	if (open_disk_image(tp,RW,ALLOW_RET)) return; // open & seek to tp
+	if (read(disk_img_fd,sb,il)!=il) { // read ID section
+		dbg(0,"failed read ID\n");
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_READ,tp,0);
+		return;
+	}
+
+	int l = get_logical_size(sb[PDD1_ID_HDR_LEN-1]); // get logical size from header
+
+	// seek to target_physical*full_sectors+ID+target_logical*logical_size
+	int s = (tp*(il+sl))+il+((tl-1)*l);
+	if (lseek(disk_img_fd,s,SEEK_SET)!=s) {
+		dbg(0,"failed seek %d : %s\n",s,strerror(errno));
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_READ,tp,0);
+		return;
+	}
+
+	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // tell client to send data
+
+	read_client_tty(sb,l); // read logical_size bytes from client
+
+	// write them to the file
+	if (write(disk_img_fd,sb,l)<0) {
+		dbg(0,"%s\n",strerror(errno));
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_READ,tp,0);
+		return;
+	}
+
+	// close file
+	(void)(close(disk_img_fd)+1);
+
+	// send a final success response to the client
+	ret_fdc_std(ERR_FDC_SUCCESS,tp,l);
 }
 
 // ref/fdc.txt
 void get_fdc_cmd(void) {
 	dbg(3,"%s()\n",__func__);
-	char b[TPDD_DATA_MAX] = {0x00};
+	char b[6] = {0x00};
 	unsigned i = 0;
 	bool eol = false;
+	char c = 0x00;
+	int p = -1;
+	int l = -1;
+
+	// all kind of inelegant, but the client & server get out of sync too easily
 
 	// see if the command byte was collected already by req_fdc()
-	if (gb[0]>0x00 && gb[0]!=FDC_CMD_EOL && gb[1]==0x00) {b[0]=gb[0];i=1;}
+	if (gb[0]>0x00 && gb[0]!=FDC_CMD_EOL && gb[1]==0x00) c=gb[0];
+	memset(gb,0x00,TPDD_DATA_MAX+3);
 
-	// TODO - this could be done in canonical/line mode
-	// read command
-	while (i<TPDD_DATA_MAX && !eol) {
+	// scan for a valid command byte first
+	while (!c) {
+		read_client_tty(&c,1);
+		if (c==FDC_CMD_EOL) return; // empty command, just restart
+		if (!strchr(valid_fdc_cmds,c)) c=0x00 ; // eat bytes until valid cmd or eol
+	}
+
+	// read params
+	while (i<6 && !eol) { // if we get out of sync (i>5), just fall through to restart
 		if (read_client_tty(&b[i],1)==1) {
+			dbg(3,"i:%d b:\"%s\"\n",i,b);
 			switch (b[i]) {
 				case FDC_CMD_EOL: eol=true;
 				case 0x20: b[i]=0x00; break;
@@ -1155,22 +1449,39 @@ void get_fdc_cmd(void) {
 		}
 	}
 
+	// We can pre-parse & validate the params since they take the same
+	// form (or a consistent subset) for all commands.
+	// Parameters, if they exist, are always one of:
+	//   P,L
+	//   P
+	//   <none>
+	// where:
+	// P = physical sector number 0-79 (decimal integer as 0-2 ascii characters)
+	// L = logical sector number 1-20 (decimal integer as 0-2 ascii characters)
+	// (format & condition have different meanings but the rule still holds)
+	p=0; // real drive uses physical sector 0 when omitted
+	l=1; // real drive uses logical sector 1 when omitted
+    char* t;
+    if ((t=strtok(b,","))!=NULL) p=atoi(t); // target physical sector number
+    if ((t=strtok(NULL,","))!=NULL) l=atoi(t); // target logical sector number
+	if (p<0 || p>79 || l<1 || l>20) {ret_fdc_std(ERR_FDC_PARAM,0,0); return;}
+
 	// debug
-	dbg(3,"\"%s\"\n",b);
+	dbg(3,"\"c:%c p:%d l:%d\"\n",c,p,l);
 
 	// dispatch
-	switch (b[0]) {
-		case FDC_SET_MODE:        req_fdc_set_mode(b);        break;
-		case FDC_CONDITION:       req_fdc_condition(b);       break;
-		case FDC_FORMAT:          req_fdc_format(b);          break;
-		case FDC_FORMAT_NV:       req_fdc_format_nv(b);       break;
-		case FDC_READ_ID:         req_fdc_read_id(b);         break;
-		case FDC_READ_SECTOR:     req_fdc_read_sector(b);     break;
-		case FDC_SEARCH_ID:       req_fdc_search_id(b);       break;
-		case FDC_WRITE_ID:        req_fdc_write_id(b);        break;
-		case FDC_WRITE_ID_NV:     req_fdc_write_id_nv(b);     break;
-		case FDC_WRITE_SECTOR:    req_fdc_write_sector(b);    break;
-		case FDC_WRITE_SECTOR_NV: req_fdc_write_sector_nv(b); break;
+	switch (c) {
+		case FDC_SET_MODE:        req_fdc_set_mode(p);        break;
+		case FDC_CONDITION:       req_fdc_condition();        break;
+		case FDC_FORMAT_NV:
+		case FDC_FORMAT:          req_fdc_format(p);          break;
+		case FDC_READ_ID:         req_fdc_read_id(p);         break;
+		case FDC_READ_SECTOR:     req_fdc_read_sector(p,l);   break;
+		case FDC_SEARCH_ID:       req_fdc_search_id();        break;
+		case FDC_WRITE_ID_NV:
+		case FDC_WRITE_ID:        req_fdc_write_id(p);        break;
+		case FDC_WRITE_SECTOR_NV:
+		case FDC_WRITE_SECTOR:    req_fdc_write_sector(p,l);  break;
 		case 0x00: if (!i) {dbg(2,"FDC: empty command\n");    break;}
 		default: dbg(1,"FDC: unknown cmd \"%s\"\n",b);
 		// local msg, nothing to client
@@ -1214,18 +1525,17 @@ void slowbyte(char b) {
 			if (b!=LOCAL_EOL && ch[0]==LOCAL_EOL) {ch[0]=0x00; dbg(0,"%c%c",LOCAL_EOL,b);}
 			else if (b==LOCAL_EOL || b==BASIC_EOL) ch[0]=LOCAL_EOL;
 			else if (isprint(b)) dbg(0,"%c",b);
-			else dbg(0,"\033[7m%02X\033[m",b);
+			else dbg(0,"\033[7m%02X\033[m",b); // hardcoded ansi/vt codes, sorry
 			break;
 	}
 }
 
-int send_BASIC(char *f)
-{
+int send_BASIC(char *f) {
 	int fd;
 	char b;
 
 	if ((fd=open(f,O_RDONLY))<0) {
-		dbg(1,"Could not open \"%s\"\n",f);
+		dbg(1,"Could not open \"%s\" : %s\n",f,errno);
 		return 9;
 	}
 
@@ -1243,40 +1553,18 @@ int send_BASIC(char *f)
 	return 0;
 }
 
-int bootstrap(char *f)
-{
-	int r = 0;
-	char loader[PATH_MAX]={0x00};
-	char prein[PATH_MAX]={0x00};
-	char postin[PATH_MAX]={0x00};
-
-	if (f[0]=='~' && f[1]=='/') {
-		strcpy(loader,getenv("HOME"));
-		strcat(loader,f+1);
-	} else strcpy(loader,f);
-
-	if (access(loader,F_OK)) memset(loader,0x00,PATH_MAX);
-
-	if (loader[0]==0) {
-		strcpy(loader,app_lib_dir);
-		strcat(loader,"/");
-		strcat(loader,f);
-	}
-
-	strcpy(prein,loader);
-	strcat(prein,".pre-install.txt");
-
-	strcpy(postin,loader);
-	strcat(postin,".post-install.txt");
-
-	dbg(0,"Bootstrap: Installing \"%s\"\n\n",loader);
-
-	if (access(loader,F_OK)==-1) {
+int bootstrap(char *f) {
+	dbg(0,"Bootstrap: Installing \"%s\"\n\n",f);
+	if (access(f,F_OK)==-1) {
 		dbg(0,"Not found.\n");
 		return 1;
 	}
 
-	if (!access(prein,F_OK)) dcat(prein);
+	char t[PATH_MAX]={0x00};
+
+	strcpy(t,f);
+	strcat(t,".pre-install.txt");
+	if (!access(t,F_OK)) dcat(t);
 	else dbg(0,"Prepare BASIC to receive:\n"
 		"\n"
 		"    RUN \"COM:98N1ENN\" [Enter]    <-- for TANDY/Olivetti/Kyotronic\n"
@@ -1285,9 +1573,11 @@ int bootstrap(char *f)
 	dbg(0,"\nPress [Enter] when ready...");
 	getchar();
 
-	if ((r=send_BASIC(loader))!=0) return r;
+	{ int r; if ((r=send_BASIC(f))!=0) return r; }
 
-	dcat(postin);
+	strcpy(t,f);
+	strcat(t,".post-install.txt");
+	dcat(t);
 
 	dbg(0,"\n\n\"%1$s -b\" will now exit.\n"
 	      "Re-run \"%1$s\" (without -b this time) to run the TPDD server.\n\n",args[0]);
@@ -1308,9 +1598,10 @@ void show_config () {
 	dbg(0,"dot_offset      : %d\n",dot_offset);
 	dbg(0,"BASIC_byte_ms   : %d\n",BASIC_byte_us/1000);
 	dbg(0,"bootstrap_mode  : %s\n",bootstrap_mode?"true":"false");
-	dbg(0,"bootstrap_file  : \"%s\"\n",bootstrap_file);
+	dbg(0,"bootstrap_fname : \"%s\"\n",bootstrap_fname);
 	dbg(0,"app_lib_dir     : \"%s\"\n",app_lib_dir);
 	dbg(0,"client_tty_name : \"%s\"\n",client_tty_name);
+	dbg(0,"disk_img_fname  : \"%s\"\n",disk_img_fname);
 	dbg(0,"share_path      : \"%s\"\n",cwd);
 	dbg(2,"opr_mode        : %d\n",opr_mode);
 	dbg(2,"baud            : %d\n",get_baud());
@@ -1353,8 +1644,9 @@ void show_main_help() {
 	,args[0],DEFAULT_TPDD_FILE_ATTR,DEFAULT_BASIC_BYTE_MS);
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
+	dbg(0,"DeskLink+ " APP_VERSION "\n");
+
 	int i;
 	bool x = false;
 	args = argv;
@@ -1372,14 +1664,15 @@ int main(int argc, char **argv)
 	if (getenv("ATTR")) default_attr = *getenv("ATTR");
 
 	// commandline
-	while ((i = getopt (argc, argv, ":0a:b:d:ghlp:rs:uvwz:^")) >=0)
+	while ((i = getopt (argc, argv, ":0a:b:d:ghi:lp:rs:uvwz:^")) >=0)
 		switch (i) {
 			case '0': dot_offset=0; upcase=false; default_attr=0x20;      break;
 			case 'a': default_attr=*strndup(optarg,1);                    break;
-			case 'b': bootstrap_mode=true; strcpy(bootstrap_file,optarg); break;
+			case 'b': bootstrap_mode=true; strcpy(bootstrap_fname,optarg);break;
 			case 'd': strcpy(client_tty_name,optarg);                     break;
 			case 'g': getty_mode = true; debug = 0;                       break;
 			case 'h': show_main_help(); exit(0);                          break;
+			case 'i': strcpy(disk_img_fname,optarg);                      break;
 			case 'l': show_bootstrap_help(); exit(0);                     break;
 			case 'p': (void)(chdir(optarg)+1);                            break;
 			case 'r': rtscts = true;                                      break;
@@ -1406,20 +1699,22 @@ int main(int argc, char **argv)
 		}
 	}
 
+	// convenience auto fixups for user supplied filenames
 	resolve_client_tty_name();
+	find_lib_file(disk_img_fname);
+	find_lib_file(bootstrap_fname);
 
 	(void)(getcwd(cwd,PATH_MAX-1)+1);
 
 	if (x) { show_config(); return 0; }
 
-	dbg(0,"DeskLink+ " APP_VERSION "\n"
-		  "Serial Device: %s\n"
+	dbg(0,"Serial Device: %s\n"
 		  "Working Dir  : %s\n",client_tty_name,cwd);
 
 	if ((i=open_client_tty())) return i;
 
 	// send loader and exit
-	if (bootstrap_mode) return (bootstrap(bootstrap_file));
+	if (bootstrap_mode) return (bootstrap(bootstrap_fname));
 
 	// initialize the file list
 	file_list_init();

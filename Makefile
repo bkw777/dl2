@@ -31,7 +31,7 @@ LIB_OTHER := \
 	clients/ts-dos/DOS100.CO \
 	clients/ts-dos/DOS200.CO \
 	clients/ts-dos/DOSNEC.CO \
-	clients/disk_power/Disk_Power_KC-85_Install_Disk.p1h
+	clients/disk_power/Disk_Power.K85.pdd1
 
 CLIENT_DOCS := \
 	clients/teeny/teenydoc.txt \

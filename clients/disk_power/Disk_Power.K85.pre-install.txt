@@ -1,7 +1,3 @@
-Installing Disk-Power requires a TPDD1 drive and the install disk. See
-/usr/local/share/doc/dl/clients/disk_power/Disk_Power.txt to make the disk.
-
-Hit Ctrl+C now to cancel this and go do that, or,
-type the following into BASIC on the Kyotronic KC-85:
+Type the following into BASIC on the Kyotronic KC-85:
 
   RUN "COM:98N1EN"

@@ -1,5 +1,5 @@
-#ifndef TPDD_CONSTANTS
-#define TPDD_CONSTANTS
+#ifndef PDD_CONSTANTS_H
+#define PDD_CONSTANTS_H
 
 // TPDD drive firmware/protocol constants
 
@@ -94,7 +94,6 @@
 #define FDC_WRITE_SECTOR    'W' // write sector data
 #define FDC_WRITE_SECTOR_NV 'X' // write sector data without verify
 
-
 // TPDD1 FDC-mode error codes
 // There is no documentation for FDC error codes.
 // These are guesses from experimenting.
@@ -112,14 +111,32 @@
 #define ERR_FDC_COMMAND       193 // 'Invalid Command'
 #define ERR_FDC_NO_DISK       209 // 'Disk Not Inserted'
 
+// TPDD1 FDC Condition bits
+#define FDC_COND_NOTINS       0x80 // bit 7: 1 = disk not inserted
+#define FDC_COND_REMOVED      0x40 // bit 6: 1 = disk removed
+#define FDC_COND_WP           0x20 // bit 5: 1 = disk write-protected
+#define FDC_COND_NONE         0x00 // no conditions
+
+// TPDD1 FDC Logical Sector Length Codes
+#define FDC_LS_64             0
+#define FDC_LS_80             1
+#define FDC_LS_128            2
+#define FDC_LS_256            3
+#define FDC_LS_512            4
+#define FDC_LS_1024           5
+#define FDC_LS_1280           6
+
 // fixed lengths
-#define TPDD_DATA_MAX      0x80
-#define TPDD_FREE_SECTORS  80 // max 80 for TPDD1, 160 for TPDD2
-#define LEN_RET_STD        0x01
-#define LEN_RET_DME        0x0B
-#define LEN_RET_DIRENT     0x1C
-#define TPDD_FILENAME_LEN  24
-#define LOCAL_FILENAME_MAX 256
+#define TPDD_DATA_MAX         0x80
+#define TPDD_FREE_SECTORS     80 // max 80 for TPDD1, 160 for TPDD2
+#define LEN_RET_STD           0x01
+#define LEN_RET_DME           0x0B
+#define LEN_RET_DIRENT        0x1C
+#define TPDD_FILENAME_LEN     24
+#define LOCAL_FILENAME_MAX    256
+#define PDD1_SECTOR_ID_LEN    17
+#define PDD1_ID_HDR_LEN       5
+#define PDD1_SECTOR_DATA_LEN  1280
 
 // KC-85 platform BASIC interpreter EOL & EOF bytes for bootstrap()
 #define BASIC_EOL 0x0D
@@ -131,8 +148,12 @@
 
 #define FE_FLAGS_NONE 0x00
 #define FE_FLAGS_DIR 0x01
+#define RD 0
+#define WR 1
+#define RW 2
+
 
 #define NO_RET 0
 #define ALLOW_RET 1
 
-#endif
+#endif // PDD_CONSTANTS_H
