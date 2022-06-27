@@ -134,8 +134,8 @@
 #define LEN_RET_DIRENT        0x1C
 #define TPDD_FILENAME_LEN     24
 #define LOCAL_FILENAME_MAX    256
-#define PDD1_SECTOR_ID_LEN    17
-#define PDD1_ID_HDR_LEN       5
+#define PDD1_SECTOR_ID_LEN    13
+#define PDD1_ID_HDR_LEN       1
 #define PDD1_SECTOR_DATA_LEN  1280
 
 // KC-85 platform BASIC interpreter EOL & EOF bytes for bootstrap()

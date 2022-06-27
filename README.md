@@ -41,6 +41,7 @@ options:
    -d tty   Serial device to client (ttyUSB0)
    -g       Getty mode - run as daemon
    -h       Print this help
+   -i file  Disk image file for raw sector access, TPDD1 only
    -l       List available loader files and bootstrap help
    -p dir   Share path - directory with files to be served (.)
    -r       RTS/CTS hardware flow control
@@ -116,9 +117,9 @@ The Disk Power installer actually uses only raw sector access commends to instal
 
 See [Disk_Power.txt](clients/disk_power/Disk_Power.txt)
 
-The disk image was created by using github.com/bkw777/pdd.sh to read the disk into it's own form of disk image file, then using pdd.sh to "restore" that disk image, but into dlplus instead of to a real drive.
+The disk image was created by using github.com/bkw777/pdd.sh to read the disk into it's own form of disk image file, then "restoring" that disk image into dlplus instead of to a real drive.
 
-To create an empty disk image, start dl with the -i option the name of a new file in a writable directory. IE: ```$ dl -vi ./newdiskimg.pdd1```, and then issue an FDC-mode format command from a client, ie for pdd.sh do  
+To create an empty disk image, start dl with the -i option the name of a new file. IE: ```$ dl -vi ./my_disk.pdd1```, and then issue an FDC-mode format command from a client. Example using pdd.sh as the client (connected with a 2nd usb-serial adapter and a null-modem serial cable):
 ```
 $ pdd1
 1) /dev/ttyUSB0
@@ -130,8 +131,10 @@ Formatting Disk, TPDD1 "FDC" mode, 64-Byte Logical Sectors
 [########################################] 100%                                
 PDD(fdc:6.2,F)>q
 $ ls -l *.pdd1
--rw-rw-r-- 1 bkw bkw 103760 Jun 24 19:05 new_disk.pdd1
+-rw-rw-r-- 1 bkw bkw 103440 Jun 24 19:05 new_disk.pdd1
 ```
+
+Disk image format [disk_images](ref/disk_images.txt)
 
 ## trivia
 The "ROOT  " and "PARENT" labels are not hard coded in TS-DOS. You can set them to other things. Sadly, this does not extend as far as being able to use ".." for "PARENT". TS-DOS thinks it's an invalid filename (even though it DISPLAYS it in the file list just fine. If it would just go ahead and send the command to "open" it, it would work.) However, plenty of other things that are all better than "ROOT  " and "PARENT" do work.

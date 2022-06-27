@@ -10,7 +10,8 @@
 /*
 DeskLink+
 2005     John R. Hogerhuis Extensions and enhancements
-2019     Brian K. White - repackaging, reorganizing, bootstrap function
+2019,2022 Brian K. White - repackaging, reorganizing, bootstrap function
+                           pdd1 disk image files, FDC-mode
          Kurt McCullum - TS-DOS loaders
 2022     Gabriele Gorla - Add support for TS-DOS subdirectories
 
@@ -183,8 +184,9 @@ bool dme_detected = false;
 bool dme_fdc = false;
 bool dme_disabled = false;
 char ch[2] = {0xFF};
-const uint8_t il = PDD1_SECTOR_ID_LEN;
-const uint16_t sl = PDD1_SECTOR_DATA_LEN;
+const uint8_t ilen = PDD1_SECTOR_ID_LEN;
+const uint16_t dlen = PDD1_SECTOR_DATA_LEN;
+//uint8_t llen = 0;
 unsigned char sb[(PDD1_SECTOR_ID_LEN+PDD1_SECTOR_DATA_LEN)]={0x00}; // avoid malloc/free
 
 FILE_ENTRY *cur_file;
@@ -821,17 +823,17 @@ int req_open(unsigned char *b)
 	case F_OPEN_WRITE:
 		dbg(3,"mode: write\n");
 		if (o_file_h >= 0) {
-			close (o_file_h);
+			close(o_file_h);
 			o_file_h=-1;
 		}
 		if (cur_file->flags&FE_FLAGS_DIR) {
-			if (mkdir(cur_file->local_fname,0775)==0) {
+			if (mkdir(cur_file->local_fname,0755)==0) {
 				ret_std(ERR_SUCCESS);
 			} else {
 				ret_std(ERR_FMT_MISMATCH);
 			}
 		} else {
-			o_file_h = open (cur_file->local_fname,O_CREAT|O_TRUNC|O_WRONLY|O_EXCL,0666);
+			o_file_h = open(cur_file->local_fname,O_CREAT|O_TRUNC|O_WRONLY|O_EXCL,0666);
 			if (o_file_h<0)
 				ret_std(ERR_FMT_MISMATCH);
 			else {
@@ -851,23 +853,23 @@ int req_open(unsigned char *b)
 			ret_std(ERR_FMT_MISMATCH);
 			return -1;
 		}
-		o_file_h = open (cur_file->local_fname, O_WRONLY | O_APPEND);
+		o_file_h = open(cur_file->local_fname, O_WRONLY | O_APPEND);
 		if (o_file_h < 0)
 			ret_std(ERR_FMT_MISMATCH);
 		else {
 			f_open_mode=omode;
 			dbg(1,"Open for append: \"%s\"\n",cur_file->local_fname);
-			ret_std (ERR_SUCCESS);
+			ret_std(ERR_SUCCESS);
 		}
 		break;
 	case F_OPEN_READ:
 		dbg(3,"mode: read\n");
 		if (o_file_h >= 0) {
-			close (o_file_h);
+			close(o_file_h);
 			o_file_h=-1;
 		}
 		if (cur_file==0) {
-			ret_std (ERR_NO_FILE);
+			ret_std(ERR_NO_FILE);
 			return -1;
 		}
 
@@ -877,7 +879,7 @@ int req_open(unsigned char *b)
 			if (cur_file->local_fname[0]=='.' && cur_file->local_fname[1]=='.') {
 				// parent dir
 				if (dir_depth>0) {
-					err=chdir (cur_file->local_fname);
+					err=chdir(cur_file->local_fname);
 					if (!err) dir_depth--;
 				}
 			} else {
@@ -886,17 +888,17 @@ int req_open(unsigned char *b)
 				if (!err) dir_depth++;
 			}
 			update_dme_cwd();
-			if (err) ret_std (ERR_FMT_MISMATCH);
-			else ret_std (ERR_SUCCESS);
+			if (err) ret_std(ERR_FMT_MISMATCH);
+			else ret_std(ERR_SUCCESS);
 		} else {
 			// regular file
 			o_file_h = open(cur_file->local_fname, O_RDONLY);
 			if (o_file_h<0)
-				ret_std (ERR_NO_FILE);
+				ret_std(ERR_NO_FILE);
 			else {
 				f_open_mode = omode;
 				dbg(1,"Open for read: \"%s\"\n",cur_file->local_fname);
-				ret_std (ERR_SUCCESS);
+				ret_std(ERR_SUCCESS);
 			}
 		}
 		break;
@@ -1116,26 +1118,12 @@ void get_opr_cmd(void)
 //
 
 /*
- * WIP:
- *   [*] set_mode
- *   [*] condition
- *   [*] format
- *   [*] read_id
- *   [ ] search_id
- *   [ ] write_id
- *   [*] read_sector
- *   [ ] write_sector
- */
-
-/*
 sectors: 0-79
-sector: 1297 bytes
-| ID 17 bytes | DATA 1280 bytes |
+sector: 1293 bytes
+| ID 13 bytes | DATA 1280 bytes |
 ---
- 2 sector len
- 2 sector num
- 1 logical sector length code
-12 reserved
+1    logical sector length code
+12   data
 ---
 1280 data
 ---
@@ -1150,42 +1138,52 @@ void ret_fdc_std(uint8_t e, uint8_t s, uint16_t l) {
 	dbg(2,"%s()\n",__func__);
 	char b[9] = { 0x00 };
 	snprintf(b,9,"%02X%02X%04X",e,s,l);
-	dbg(1,"FDC: response: \"%s\"\n",b);
+	dbg(2,"FDC: response: \"%s\"\n",b);
 	write_client_tty(b,8);
 }
 
+// takes logical size code (0-6), returns size in bytes
+// default 256 to match real drive
 int get_logical_size (int i) {
 	dbg(2,"%s(%d)\n",__func__,i);
 	return
 		i==FDC_LS_64?64:
 		i==FDC_LS_80?80:
 		i==FDC_LS_128?128:
-		//i==FDC_LS_256?256: // real drive default
+		//i==FDC_LS_256?256:
 		i==FDC_LS_512?512:
 		i==FDC_LS_1024?1024:
 		i==FDC_LS_1280?1280:
 		256;
 }
 
+/*
+int seek_disk_image (int p, int l, int r) {
+	int s = (p*(ilen+dlen));
+	if (l) s+=ilen+l*llen-l;
+	return lseek(disk_img_fd,s,SEEK_SET);
+}
+*/
+
 // p   : physical sector to seek to
-// wr  : read-only/write-only/read-write
-// ret : send or don't send response packet to client from here
-int open_disk_image (uint8_t p, int wr, int ret) {
+// m   : read-only / write-only / read-write
+// r   : send or don't send error response to client from here
+int open_disk_image (int p, int m, int r) {
 
 	if (!strcmp(disk_img_fname,"")) return ERR_FDC_NO_DISK;
 	int of; int e=ERR_FDC_SUCCESS;
 
-	switch (wr) {
-		case RW: of=O_RDWR; dbg(0,"edit\n");
+	switch (m) {
+		case RW: of=O_RDWR; dbg(2,"edit\n");
 			if (access(disk_img_fname,W_OK)) e=ERR_FDC_WRITE_PROTECT;
 			break;
 		case WR: of=O_WRONLY;
-			if (access(disk_img_fname,F_OK)) { of|=O_CREAT; dbg(0,"create\n");} else {
-				of|=O_TRUNC; dbg(0,"overwite\n");
+			if (access(disk_img_fname,F_OK)) { of|=O_CREAT; dbg(2,"create\n");} else {
+				of|=O_TRUNC; dbg(2,"overwite\n");
 				if (access(disk_img_fname,W_OK)) e=ERR_FDC_WRITE_PROTECT;
 			}
 			break;
-		default: of=O_RDONLY; dbg(0,"read\n"); break;
+		default: of=O_RDONLY; dbg(2,"read\n"); break;
 	}
 
 	if (!e) {
@@ -1194,11 +1192,11 @@ int open_disk_image (uint8_t p, int wr, int ret) {
 	}
 
 	if (!e) {
-		int s = (p*(il+sl)); // initial seek position to start of physical sector
+		int s = (p*(ilen+dlen)); // initial seek position to start of physical sector
 		if (lseek(disk_img_fd,s,SEEK_SET)!=s) e=ERR_FDC_READ;
 	}
 
-	if (ret && e) ret_fdc_std(e,0,0);
+	if (r && e) ret_fdc_std(e,0,0);
 	return e;
 }
 
@@ -1228,33 +1226,20 @@ void req_fdc_condition() {
 }
 
 // lc = logical sector size code
-void req_fdc_format(uint8_t lc) {
+void req_fdc_format(int lc) {
 	dbg(2,"%s(%d)\n",__func__,lc);
 	if (lc<0 || lc>6) {ret_fdc_std(ERR_FDC_PARAM,0,0); return;}
 	int ll = get_logical_size(lc); // logical sector length in bytes
-	int lw = sl/ll; // number of whole logical sectors
 	int pn = 0;     // physical sector number
-	int pl = il + (ll*lw); // physical sector length in bytes
-	int tl = il+sl; // total length
+	int tl = ilen+dlen; // total length
 
 	dbg(0,"Format: Logical sector size: %d = %d\n",lc,ll);
 
 	if (open_disk_image(0,WR,ALLOW_RET)) return;
 
-	memset(sb,0x00,tl); // despite pl, we always fill all 1280 bytes
+	memset(sb,0x00,tl);
+	sb[0]=lc;            // logical sector size code
 	for (pn=0;pn<80;pn++) {
-
-// The first 2 bytes in the ID section in the manual are not exposed over
-// the wire by a real drive. They *probably* tell the drive firmware
-// internally the bounds of the following physical sector within the full
-// physical 1280, independant of calculating from the logical size code.
-// We don't need that really but it's mimicked here anyway.
-
-		// 1st 5 bytes of the ID section.
-		memcpy(sb,&pl,2);      // sector length
-		memcpy(sb+2,&pn,2);    // sector number
-		sb[4]=lc;              // logical sector length code (0-6)
-
 		if (write(disk_img_fd,sb,tl)<0) {
 			dbg(0,"%s\n",strerror(errno));
 			(void)(close(disk_img_fd)+1);
@@ -1271,36 +1256,33 @@ void req_fdc_format(uint8_t lc) {
 void req_fdc_read_id(int p) {
 	dbg(2,"%s(%d)\n",__func__,p);
 	if (open_disk_image(p,RD,ALLOW_RET)) return; // open and seek
-	uint8_t r = read(disk_img_fd,sb,il); // read all 17 bytes of ID disk
-	dbg_b(2,sb,il);
-	int l = get_logical_size(sb[PDD1_ID_HDR_LEN-1]); // get logical size from header
-	ret_fdc_std(ERR_FDC_SUCCESS,p,l); // send OK
+	int r = read(disk_img_fd,sb,ilen);  // read ID section
+	dbg_b(2,sb,ilen);
+	int l = get_logical_size(sb[0]);    // get logical size from header
+	ret_fdc_std(ERR_FDC_SUCCESS,p,l);   // send OK
 	char t=0x00; read_client_tty(&t,1); // read 1 byte from client
 	if (t!=FDC_CMD_EOL) return; // if it's anything but CR, silently abort
-	write_client_tty(sb+PDD1_ID_HDR_LEN,r-PDD1_ID_HDR_LEN); // if it's CR, send data
+	write_client_tty(sb+PDD1_ID_HDR_LEN,r-PDD1_ID_HDR_LEN); // send data
 	(void)(close(disk_img_fd)+1);
 }
 
-// b[] = CPP,LL
-// C=cmd
-// PP 0 to 2 bytes ascii physical sector # null or 0-79
-// comma
-// LL 0 to 2 bytes ascii logical sector # null 1-20
+// tp = target physical sector
+// tl = target logical sector
 void req_fdc_read_sector(int tp,int tl) {
 	dbg(2,"%s(%d,%d)\n",__func__,tp,tl);
 	if (open_disk_image(tp,RD,ALLOW_RET)) return; // open & seek to tp
-	if (read(disk_img_fd,sb,il)!=il) { // read ID section
+	if (read(disk_img_fd,sb,ilen)!=ilen) { // read ID section
 		dbg(1,"failed read ID\n");
 		(void)(close(disk_img_fd)+1);
 		ret_fdc_std(ERR_FDC_READ,tp,0);
 		return;
 	}
-	dbg_b(3,sb,il);
+	dbg_b(3,sb,ilen);
 
 	int l = get_logical_size(sb[PDD1_ID_HDR_LEN-1]); // get logical size from header
 
 	// seek to target_physical*(id_len+physical_len) + id_len + (target_logical-1)*logical_len
-	int s = (tp*(il+sl))+il+((tl-1)*l);
+	int s = (tp*(ilen+dlen))+ilen+((tl-1)*l);
 	if (lseek(disk_img_fd,s,SEEK_SET)!=s) {
 		dbg(1,"failed seek %d : %s\n",s,strerror(errno));
 		(void)(close(disk_img_fd)+1);
@@ -1316,9 +1298,9 @@ void req_fdc_read_sector(int tp,int tl) {
 	}
 	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // 1st stage response
 	char t=0x00;
-	read_client_tty(&t,1);   // read 1 byte from client
+	read_client_tty(&t,1);  // read 1 byte from client
 	if (t!=0x0D) return;    // if it's anything but CR, silently abort
-	write_client_tty(sb,l); // if it's CR, send data
+	write_client_tty(sb,l); // send data
 	(void)(close(disk_img_fd)+1);
 }
 
@@ -1331,22 +1313,21 @@ void req_fdc_search_id() {
 	// manual says it's the same as write_sector, which
 	// sends an OK to tell client to send, and then
 	// another OK to ack. So perhaps we return
-	// just a status return that indicates if a match
-	// was found and probably which (first) sector in the len/addr field.
-	// Probably the response is always always success and the other bits
-	// indicate whether a match was found and where.
+	// just a status return that indicates if a match was found
+	// and probably the first matching sector number in the len/addr field.
+	// Probably the err field is always success.
 	ret_fdc_std(ERR_FDC_SUCCESS,0,0);
 }
 
 void req_fdc_write_id(uint16_t tp) {
 	dbg(2,"%s(%d)\n",__func__,tp);
-	int s = (tp*(il+sl));
+	int s = (tp*(ilen+dlen));
 	if (open_disk_image(s,RW,ALLOW_RET)) return; // we need both read & write
-	uint8_t r = read(disk_img_fd,sb,il); // read ID
+	uint8_t r = read(disk_img_fd,sb,ilen); // read ID
 	dbg_b(2,sb,r);
-	int l = get_logical_size(sb[PDD1_ID_HDR_LEN-1]); // get logical size from header
+	int l = get_logical_size(sb[0]); // get logical size from header
 
-	// seek file back to tp+5 (skip the ID header to the start of the 12 bytes of user ID data)
+	// seek file back to tp+hdr (skip the ID header to the start of the 12 bytes of user ID data)
 	if (lseek(disk_img_fd,s+PDD1_ID_HDR_LEN,SEEK_SET)!=s+PDD1_ID_HDR_LEN) {
 		dbg(1,"failed seek %d : %s\n",s+PDD1_ID_HDR_LEN,strerror(errno));
 		(void)(close(disk_img_fd)+1);
@@ -1356,10 +1337,10 @@ void req_fdc_write_id(uint16_t tp) {
 
 	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // tell client to send data
 
-	read_client_tty(sb,il-PDD1_ID_HDR_LEN); // read 12 bytes from client
+	read_client_tty(sb,ilen-PDD1_ID_HDR_LEN); // read 12 bytes from client
 
 	// write those to the file
-	if (write(disk_img_fd,sb,il-PDD1_ID_HDR_LEN)<0) {
+	if (write(disk_img_fd,sb,ilen-PDD1_ID_HDR_LEN)<0) {
 		dbg(0,"%s\n",strerror(errno));
 		(void)(close(disk_img_fd)+1);
 		ret_fdc_std(ERR_FDC_READ,tp,0);
@@ -1376,17 +1357,17 @@ void req_fdc_write_id(uint16_t tp) {
 void req_fdc_write_sector(int tp,int tl) {
 	dbg(2,"%s(%d,%d)\n",__func__,tp,tl);
 	if (open_disk_image(tp,RW,ALLOW_RET)) return; // open & seek to tp
-	if (read(disk_img_fd,sb,il)!=il) { // read ID section
+	if (read(disk_img_fd,sb,ilen)!=ilen) { // read ID section
 		dbg(0,"failed read ID\n");
 		(void)(close(disk_img_fd)+1);
 		ret_fdc_std(ERR_FDC_READ,tp,0);
 		return;
 	}
 
-	int l = get_logical_size(sb[PDD1_ID_HDR_LEN-1]); // get logical size from header
+	int l = get_logical_size(sb[0]); // get logical size from header
 
 	// seek to target_physical*full_sectors+ID+target_logical*logical_size
-	int s = (tp*(il+sl))+il+((tl-1)*l);
+	int s = (tp*(ilen+dlen))+ilen+((tl-1)*l);
 	if (lseek(disk_img_fd,s,SEEK_SET)!=s) {
 		dbg(0,"failed seek %d : %s\n",s,strerror(errno));
 		(void)(close(disk_img_fd)+1);
@@ -1624,6 +1605,7 @@ void show_main_help() {
 		"   -d tty   Serial device connected to client (" DEFAULT_CLIENT_TTY ")\n"
 		"   -g       Getty mode - run as daemon\n"
 		"   -h       Print this help\n"
+		"   -i file  Disk image file for raw sector access, TPDD1 only\n"
 		"   -l       List loader files and show bootstrap help\n"
 		"   -p dir   Share path - directory with files to be served (.)\n"
 		"   -r       RTS/CTS hardware flow control\n"
