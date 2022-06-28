@@ -99,42 +99,44 @@ $ unzip REXCPMV21_b19.ZIP
 $ dl -vb ./rxcini.DO ;dl -vu
 ```
 
-## FDC-mode sector access - disk images
+## Disk image files and FDC-mode sector access
 ```
 $ dl -vi tpdd1_disk_image.pdd1
 ```
-Initial support for raw disk image files that allow use of FDC-mode sector access commands on a virtual disk image file.
+Initial support for [disk image files](ref/disk_image_files.txt) that allow use of FDC-mode sector access commands on a virtual disk image file.
 
-This has not been tried with Sardine yet, but that is one of the intended uses.
+The feature does not support normal "Operation-mode" file access to the filesystem on a disk, just raw sector access. If you issue normal file access commands from a client, like load or save in TS-DOS, they operate on regular files in the share directory the same as if you had not included the -i option.
 
-TPDD1 and TPDD2 sector access methods are completely different from each other, and at this time only the TPDD1 / "FDC-mode" commands are supported.  
+The feature does not yet support TPDD2 disks or the TPDD2 version of sector access commands.
 
-Also this does not provide virtual filesystem access to the files on the disk, it provides raw sector access to the disk for programs that use sector access, like databases.
+What it does do is allow applications that use sector access commands like databases to work on a virtual disk image file.  
 
-The first real-world use of this is it allows fully virtualized installation of Disk Power, which normally requires the original physical distribution disk and a working TPDD1 drive.
+The most well known possible example would be [Sardine](https://ftp.whtech.com/club100/doc/sardine.pdf) and it's [dictionary disk](http://www.club100.org/memfiles/index.php?&direction=0&order=&directory=Kurt%20McCullum/Sardine), but that has not been tested yet. (the sector log needs to be converted to the .pdd1 format, and needs either a [Sardine ROM](http://www.club100.org/memfiles/index.php?&direction=0&order=&directory=Kurt%20McCullum/SARDOS) or RAM version of Sardine   
+It has been tested with a [Disk Power for KC-85](clients/disk_power/Disk_Power.txt) install disk.
 
-The Disk Power installer actually uses only raw sector access commends to install from it's disk.
+Disk images are currently only created by specifying a new image filename with `dl -i` ,and then issuing FDC-mode format and sector-write commands from a tpdd client.
 
-See [Disk_Power.txt](clients/disk_power/Disk_Power.txt)
-
-The disk image was created by using github.com/bkw777/pdd.sh to read the disk into it's own form of disk image file, then "restoring" that disk image into dlplus instead of to a real drive.
-
-To create an empty disk image, start dl with the -i option the name of a new file. IE: ```$ dl -vi ./my_disk.pdd1```, and then issue an FDC-mode format command from a client. Example using pdd.sh as the client (connected with a 2nd usb-serial adapter and a null-modem serial cable):
+Example:  
+ using pdd.sh as the client,  
+ (connected with a 2nd usb-serial adapter and a null-modem cable)  
+ to create a disk image of the TPDD1 Utility Disk from pdd.sh's existing image of that disk,  
+ using pdd.sh's "restore_disk" command to read the .p1h disk image and write it's sectors into dlplus,  
+ which writes them into a .pdd1 file.  
 ```
-$ pdd1
-1) /dev/ttyUSB0
-2) /dev/ttyUSB1
-Which serial port is the TPDD drive on? 2
-PDD(opr:6.2,F)> fdc
-PDD(fdc:6.2,F)> F 0
-Formatting Disk, TPDD1 "FDC" mode, 64-Byte Logical Sectors
+$ dl -vi ./new_disk.pdd1 ttyUSB0
+```
+
+```
+$ pdd1 ttyUSB1
+PDD(opr:6.2,F)> rd TPDD1_26-3808_Utility_Disk.p1h
+Formatting Disk, TPDD1 "FDC" mode, 1280-Byte Logical Sectors
 [########################################] 100%                                
+Restoring Disk from TPDD1_26-3808_Utility_Disk.p1h
+[########################################] 100% (80/80 P:79 L:-/-)
 PDD(fdc:6.2,F)>q
 $ ls -l *.pdd1
 -rw-rw-r-- 1 bkw bkw 103440 Jun 24 19:05 new_disk.pdd1
 ```
-
-Disk image format [disk_images](ref/disk_images.txt)
 
 ## trivia
 The "ROOT  " and "PARENT" labels are not hard coded in TS-DOS. You can set them to other things. Sadly, this does not extend as far as being able to use ".." for "PARENT". TS-DOS thinks it's an invalid filename (even though it DISPLAYS it in the file list just fine. If it would just go ahead and send the command to "open" it, it would work.) However, plenty of other things that are all better than "ROOT  " and "PARENT" do work.
