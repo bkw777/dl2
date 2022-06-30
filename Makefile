@@ -31,6 +31,9 @@ LIB_OTHER := \
 	clients/ts-dos/DOS100.CO \
 	clients/ts-dos/DOS200.CO \
 	clients/ts-dos/DOSNEC.CO \
+	clients/ts-dos/SAR100.CO \
+	clients/ts-dos/SAR200.CO \
+	clients/ts-dos/Sardine_American.pdd1 \
 	clients/disk_power/Disk_Power.K85.pdd1
 
 CLIENT_DOCS := \

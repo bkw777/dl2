@@ -39,10 +39,12 @@ options:
    -a c     Attr - attribute used for all files (F)
    -b file  Bootstrap: Send loader file to client
    -d tty   Serial device to client (ttyUSB0)
+   -e       Disable TS-DOS directory extension (enabled)
    -g       Getty mode - run as daemon
    -h       Print this help
    -i file  Disk image file for raw sector access, TPDD1 only
    -l       List available loader files and bootstrap help
+   -m #     TPDD Model - 1 or 2 (2)
    -p dir   Share path - directory with files to be served (.)
    -r       RTS/CTS hardware flow control
    -s #     Speed - serial port baud rate 9600 or 19200 (19200)
@@ -69,7 +71,7 @@ Available loader files (in /usr/local/lib/dl):
 TRS-80 Model 100 & 102 : TEENY.100 TINY.100 TS-DOS.100 DSKMGR.100
 TANDY Model 200        : TEENY.200 TS-DOS.200 DSKMGR.200
 NEC PC-8201(a)/PC-8300 : TEENY.NEC TS-DOS.NEC
-Kyotronic KC-85        : DSKMGR.K85
+Kyotronic KC-85        : DSKMGR.K85 Disk_Power.K85
 Olivetti M-10          : DSKMGR.M10 TEENY.M10
 
 Filenames without any leading path are searched from above
@@ -99,43 +101,6 @@ $ unzip REXCPMV21_b19.ZIP
 $ dl -vb ./rxcini.DO ;dl -vu
 ```
 
-## FDC-mode sector access - disk images
-```
-$ dl -vi tpdd1_disk_image.pdd1
-```
-Initial support for raw disk image files that allow use of FDC-mode sector access commands on a virtual disk image file.
-
-This has not been tried with Sardine yet, but that is one of the intended uses.
-
-TPDD1 and TPDD2 sector access methods are completely different from each other, and at this time only the TPDD1 / "FDC-mode" commands are supported.  
-
-Also this does not provide virtual filesystem access to the files on the disk, it provides raw sector access to the disk for programs that use sector access, like databases.
-
-The first real-world use of this is it allows fully virtualized installation of Disk Power, which normally requires the original physical distribution disk and a working TPDD1 drive.
-
-The Disk Power installer actually uses only raw sector access commends to install from it's disk.
-
-See [Disk_Power.txt](clients/disk_power/Disk_Power.txt)
-
-The disk image was created by using github.com/bkw777/pdd.sh to read the disk into it's own form of disk image file, then "restoring" that disk image into dlplus instead of to a real drive.
-
-To create an empty disk image, start dl with the -i option the name of a new file. IE: ```$ dl -vi ./my_disk.pdd1```, and then issue an FDC-mode format command from a client. Example using pdd.sh as the client (connected with a 2nd usb-serial adapter and a null-modem serial cable):
-```
-$ pdd1
-1) /dev/ttyUSB0
-2) /dev/ttyUSB1
-Which serial port is the TPDD drive on? 2
-PDD(opr:6.2,F)> fdc
-PDD(fdc:6.2,F)> F 0
-Formatting Disk, TPDD1 "FDC" mode, 64-Byte Logical Sectors
-[########################################] 100%                                
-PDD(fdc:6.2,F)>q
-$ ls -l *.pdd1
--rw-rw-r-- 1 bkw bkw 103440 Jun 24 19:05 new_disk.pdd1
-```
-
-Disk image format [disk_images](ref/disk_images.txt)
-
 ## trivia
 The "ROOT  " and "PARENT" labels are not hard coded in TS-DOS. You can set them to other things. Sadly, this does not extend as far as being able to use ".." for "PARENT". TS-DOS thinks it's an invalid filename (even though it DISPLAYS it in the file list just fine. If it would just go ahead and send the command to "open" it, it would work.) However, plenty of other things that are all better than "ROOT  " and "PARENT" do work.
 ```
@@ -158,6 +123,46 @@ When the client machine requests any of these files, dlplus first looks in the c
 Failing that, then it looks in the root share dir. Failing that, finally it gets the file from /usr/local/lib/dl. This way the TS-DOS button in Ultimate ROM II just always works by magic.
 
 [More details](ref/ur2.txt)
+
+## FDC-mode sector access - disk images
+```
+$ dl -vi tpdd1_disk_image.pdd1
+```
+Support for raw disk image files that allow use of FDC-mode sector access commands on a virtual disk image file.  
+Limitations: Only TPDD1 disks, only sector access. You can't access the files on a disk as files, just as raw sectors, and TPDD2 disks and TPDD2 sector/cache commands aren't supported.
+
+Working examples: Sardine_American.pdd1, Disk_Power_KC-85.pdd1
+
+Example, using Sardine with a Model 100 with [Ultimate ROM II rom](http://www.club100.org/library/librom.html) (or [REX](http://bitchin100.com/wiki/index.php?title=Rex) with UR-II loaded):  
+Firast, run dl with the following commandline arguments to force TPDD1 emulation, disable TS-DOS directory support, and load the Sardine American dictionary disk:  
+```
+$ dl -vue -m 1 -i Sardine_American.pdd1
+```
+This provides both SAR100.CO and the dictionary disk. SAR100.CO (and SAR200.CO) are installed in /usr/local/lib/dl, and are "magic" files that are always found when the client tries to load them, even if they aren't in the directory being shared. Similarly, Sardine_American.pdd1 is in the same lib directory and is found when you specify the filename without any path.  
+Enter the UR-2 menu. Notice the SARDIN entry with the word OFF under it. Hit enter on SORDIN and say Y to any prompts if you get any (about himem).  
+This loads SAR100.CO into ram, and now the SARDIN entry says ON under it.  
+Now enter T-Word and start a new document and type some text.  
+Finally hit Graph+F to invoke Sardine to spell-check the document.
+
+Example, installing Disk_Power for KC-85
+See [Disk_Power.txt](clients/disk_power/Disk_Power.txt)
+
+To create a disk image, start dl with the -i option the name of a new file. IE: ```$ dl -vi ./my_disk.pdd1```, and then issue an FDC-mode format command from a client. Example using pdd.sh as the client (connected with a 2nd usb-serial adapter and a null-modem serial cable):
+```
+$ pdd1
+1) /dev/ttyUSB0
+2) /dev/ttyUSB1
+Which serial port is the TPDD drive on? 2
+PDD(opr:6.2,F)> fdc
+PDD(fdc:6.2,F)> F 0
+Formatting Disk, TPDD1 "FDC" mode, 64-Byte Logical Sectors
+[########################################] 100%                                
+PDD(fdc:6.2,F)>q
+$ ls -l *.pdd1
+-rw-rw-r-- 1 bkw bkw 103440 Jun 24 19:05 new_disk.pdd1
+```
+
+Disk image format [disk_images](ref/disk_images.txt)
 
 ## OS Compatibility
 Tested on Linux, Macos, FreeBSD

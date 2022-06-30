@@ -165,9 +165,10 @@ char dme_root_label[7] = DEFAULT_DME_ROOT_LABEL;
 char dme_parent_label[7] = DEFAULT_DME_PARENT_LABEL;
 char dme_dir_label[3] = DEFAULT_DME_DIR_LABEL;
 char default_attr = DEFAULT_TPDD_FILE_ATTR;
-bool enable_ur2_dos_hack = true;
+bool enable_magic_files = true;
 bool getty_mode = false;
 bool bootstrap_mode = false;
+int model = 2;
 
 char **args;
 int f_open_mode = F_OPEN_NONE;
@@ -186,27 +187,14 @@ bool dme_disabled = false;
 char ch[2] = {0xFF};
 const uint8_t ilen = PDD1_SECTOR_ID_LEN;
 const uint16_t dlen = PDD1_SECTOR_DATA_LEN;
-//uint8_t llen = 0;
 unsigned char sb[(PDD1_SECTOR_ID_LEN+PDD1_SECTOR_DATA_LEN)]={0x00}; // avoid malloc/free
+const int fdc_logical_size_codes[] = FDC_LOGICAL_SIZE_CODES;
+const char fdc_cmds[] = FDC_CMDS;
 
 FILE_ENTRY *cur_file;
 int dir_depth=0;
 
 // blarghamagargles
-const char valid_fdc_cmds[]={
-	FDC_SET_MODE,
-	FDC_CONDITION,
-	FDC_FORMAT,
-	FDC_FORMAT_NV,
-	FDC_READ_ID,
-	FDC_READ_SECTOR,
-	FDC_SEARCH_ID,
-	FDC_WRITE_ID,
-	FDC_WRITE_ID_NV,
-	FDC_WRITE_SECTOR,
-	FDC_WRITE_SECTOR_NV,
-	0x00
-};
 void show_main_help();
 void ret_std(unsigned char err);
 
@@ -477,15 +465,14 @@ void lsx (char *path,char *match) {
 
 int check_magic_file(char *b) {
 	dbg(3,"%s(\"%s\")\n",__func__,b);
-	if (!enable_ur2_dos_hack) return 1;
-	if (dot_offset!=6) return 1; // UR2 is only on the KC-85 platform
+	if (!enable_magic_files) return 1;
+	if (dot_offset!=6) return 1; // UR2 only exists on the KC-85 clones
 	int l = sizeof(magic_files)/sizeof(magic_files[0]);
 	for (int i=0;i<l;++i) if (!strcmp(magic_files[i],b)) return 0;
 	return 1;
 }
 
-FILE_ENTRY *make_file_entry(char *namep, uint16_t len, char flags)
-{
+FILE_ENTRY *make_file_entry(char *namep, uint16_t len, char flags) {
 	dbg(3,"%s(\"%s\")\n",__func__,namep);
 	static FILE_ENTRY f;
 	int i;
@@ -608,8 +595,7 @@ void update_file_list(int m) {
 //
 
 // standard return - return for: error open close delete status write
-void ret_std(unsigned char err)
-{
+void ret_std(unsigned char err) {
 	dbg(3,"%s()\n",__func__);
 	gb[0]=RET_STD;
 	gb[1]=0x01;
@@ -621,8 +607,7 @@ void ret_std(unsigned char err)
 }
 
 // return for dirent
-int ret_dirent(FILE_ENTRY *ep)
-{
+int ret_dirent(FILE_ENTRY *ep) {
 	dbg(2,"%s(\"%s\")\n",__func__,ep->client_fname);
 	int i;
 
@@ -783,7 +768,6 @@ void ret_dme_cwd() {
 // dme_detected is retained forever
 void req_fdc() {
 	dbg(2,"%s()\n",__func__);
-
 	dbg(3,"dme detection %s\n",dme_disabled?"disabled":"allowed");
 	dbg(3,"dme %spreviously detected\n",dme_fdc?"":"not ");
 
@@ -800,6 +784,7 @@ void req_fdc() {
 		dbg(3,"dme detected\n");
 		ret_dme_cwd();
 	} else {
+		if (model==2) { ret_std(ERR_PARAM); return; } // real tpdd2 returns
 		opr_mode = 0;
 		dbg(1,"Switching to \"FDC\" mode\n");
 	}
@@ -811,8 +796,7 @@ void req_fdc() {
 //             0x02 write append
 //             0x03 read
 // b[3] = chk
-int req_open(unsigned char *b)
-{
+int req_open(unsigned char *b) {
 	dbg(2,"%s(\"%s\")\n",__func__,cur_file->client_fname);
 	dbg(5,"b[]\n"); dbg_b(5,b,-1);
 	dbg_p(4,b);
@@ -973,6 +957,27 @@ void req_delete(void) {
 	ret_std (ERR_SUCCESS);
 }
 
+void ret_cache_std(int e) {
+	dbg(3,"%s()\n",__func__);
+	gb[0]=RET_CACHE_STD;
+	gb[1]=0x01;
+	gb[2]=e;
+	gb[3]=checksum(gb);
+	write_client_tty(gb,4);
+}
+
+void req_cache_load() {
+	dbg(3,"%s()\n",__func__);
+	if (model==1) return;
+	ret_cache_std(ERR_PARAM);
+}
+
+void req_cache_read() {
+	dbg(3,"%s()\n",__func__);
+	if (model==1) return;
+	ret_cache_std(ERR_PARAM);
+}
+
 /*
  * TPDD2 sector cache write - but not really doing it.
  * Previously called "TS-DOS mystery command 1"
@@ -984,13 +989,10 @@ void req_delete(void) {
  * FIXME: We should really only respond success if the payload exactly
  * matches TS-DOS's, and error any other attempt to use this function.
  */
-void ret_cache_write() {
+void req_cache_write() {
 	dbg(3,"%s()\n",__func__);
-	gb[0]=RET_CACHE_STD;
-	gb[1]=0x01;
-	gb[2]=ERR_SUCCESS;
-	gb[3]=checksum(gb);
-	write_client_tty(gb,4);
+	if (model==1) return;
+	ret_cache_std(ERR_SUCCESS);
 }
 
 /*
@@ -1007,6 +1009,7 @@ void ret_cache_write() {
  */
 void ret_pdd2_unk23() {
 	dbg(3,"%s()\n",__func__);
+	if (model==1) return;
 	static unsigned char canned[] = {RET_PDD2_UNK23, 0x0F, 0x41, 0x10, 0x01, 0x00, 0x50, 0x05, 0x00, 0x02, 0x00, 0x28, 0x00, 0xE1, 0x00, 0x00, 0x00};
 	memcpy(gb, canned, canned[1]+2);
 	gb[canned[1]+2] = checksum(gb);
@@ -1027,6 +1030,7 @@ void ret_pdd2_unk23() {
  */
 void ret_pdd2_unk11() {
 	dbg(3,"%s()\n",__func__);
+	if (model==2) return;
 	static unsigned char canned[] = {RET_PDD2_UNK11, 0x06, 0x80, 0x13, 0x05, 0x00, 0x10, 0xE1};
 	memcpy(gb, canned, canned[1]+2);
 	gb[canned[1]+2] = checksum(gb);
@@ -1035,6 +1039,7 @@ void ret_pdd2_unk11() {
 
 void req_rename(unsigned char *b) {
 	dbg(3,"%s(%-24.24s)\n",__func__,b+2);
+	if (model==1) return;
 	char *t = (char *)b + 2;
 	memcpy(t,collapse_padded_name(t),TPDD_FILENAME_LEN);
 	if (rename(cur_file->local_fname,t))
@@ -1067,8 +1072,7 @@ void req_format() {
 	ret_std(ERR_SUCCESS);
 }
 
-void get_opr_cmd(void)
-{
+void get_opr_cmd(void) {
 	dbg(3,"%s()\n",__func__);
 	unsigned char b[TPDD_DATA_MAX+3] = {0x00};
 	unsigned i = 0;
@@ -1104,7 +1108,9 @@ void get_opr_cmd(void)
 		case REQ_CONDITION:     req_condition();     break;
 		case REQ_RENAME:        req_rename(b);       break;
 		case REQ_PDD2_UNK23:    ret_pdd2_unk23();    break;
-		case REQ_CACHE_WRITE:   ret_cache_write();   break;
+		case REQ_CACHE_LOAD:    req_cache_load();    break;
+		case REQ_CACHE_READ:    req_cache_read();    break;
+		case REQ_CACHE_WRITE:   req_cache_write();   break;
 		case REQ_PDD2_UNK11:    ret_pdd2_unk11();    break;
 		case REQ_PDD2_UNK33:    ret_pdd2_unk11();    break;
 		default: dbg(1,"OPR: unknown cmd \"%02X\"\n",b[0]); if (debug<3) dbg_p(2,b);
@@ -1129,6 +1135,11 @@ sector: 1293 bytes
 ---
 */
 
+int lsc_to_len(int l) {
+	if (l<0||l>6) l=3;
+	return fdc_logical_size_codes[l];
+}
+
 // standard fdc-mode 8-byte response
 // e = error code ERR_FDC_* -> ascii hex pair
 // s = status or data       -> ascii hex pair
@@ -1140,21 +1151,6 @@ void ret_fdc_std(uint8_t e, uint8_t s, uint16_t l) {
 	snprintf(b,9,"%02X%02X%04X",e,s,l);
 	dbg(2,"FDC: response: \"%s\"\n",b);
 	write_client_tty(b,8);
-}
-
-// takes logical size code (0-6), returns size in bytes
-// default 256 to match real drive
-int get_logical_size (int i) {
-	dbg(2,"%s(%d)\n",__func__,i);
-	return
-		i==FDC_LS_64?64:
-		i==FDC_LS_80?80:
-		i==FDC_LS_128?128:
-		//i==FDC_LS_256?256:
-		i==FDC_LS_512?512:
-		i==FDC_LS_1024?1024:
-		i==FDC_LS_1280?1280:
-		256;
 }
 
 /*
@@ -1169,6 +1165,7 @@ int seek_disk_image (int p, int l, int r) {
 // m   : read-only / write-only / read-write
 // r   : send or don't send error response to client from here
 int open_disk_image (int p, int m, int r) {
+	dbg(2,"%s(%d,%d,%d)\n",__func__,p,m,r);
 
 	if (!strcmp(disk_img_fname,"")) return ERR_FDC_NO_DISK;
 	int of; int e=ERR_FDC_SUCCESS;
@@ -1211,25 +1208,24 @@ void req_fdc_set_mode(int m) {
 // e = ERR_FDC_SUCCESS
 // s = bit flags:
 //   7: 1 = disk not inserted     FDC_COND_NOTINS
-//   6: 1 = disk removed          FDC_COND_REMOVED
-//   5: 1 = disk write-protected  FDC_COND_WP
+//   6: 1 = disk changed          FDC_COND_CHANGED
+//   5: 1 = disk write-protected  FDC_COND_WPROT
 // l = 0
 // examples
-// ret_fdc_std(ERR_FDC_SUCCESS,FDC_COND_WP,0)
-// ret_fdc_std(ERR_FDC_SUCCESS,FDC_COND_NOTINS|FDC_COND_REMOVED,0)
+// ret_fdc_std(ERR_FDC_SUCCESS,FDC_COND_WPROT,0)
+// ret_fdc_std(ERR_FDC_SUCCESS,FDC_COND_NOTINS|FDC_COND_CHANGED,0)
 void req_fdc_condition() {
 	dbg(2,"%s()\n",__func__);
 	int s=FDC_COND_NONE;
 	if (access(disk_img_fname,F_OK)) s=FDC_COND_NOTINS;
-	else if (access(disk_img_fname,W_OK)) s=FDC_COND_WP;
+	else if (access(disk_img_fname,W_OK)) s=FDC_COND_WPROT;
 	ret_fdc_std(ERR_FDC_SUCCESS,s,0);
 }
 
 // lc = logical sector size code
 void req_fdc_format(int lc) {
 	dbg(2,"%s(%d)\n",__func__,lc);
-	if (lc<0 || lc>6) {ret_fdc_std(ERR_FDC_PARAM,0,0); return;}
-	int ll = get_logical_size(lc); // logical sector length in bytes
+	int ll = lsc_to_len(lc);
 	int pn = 0;     // physical sector number
 	int tl = ilen+dlen; // total length
 
@@ -1258,7 +1254,7 @@ void req_fdc_read_id(int p) {
 	if (open_disk_image(p,RD,ALLOW_RET)) return; // open and seek
 	int r = read(disk_img_fd,sb,ilen);  // read ID section
 	dbg_b(2,sb,ilen);
-	int l = get_logical_size(sb[0]);    // get logical size from header
+	int l = lsc_to_len(sb[0]);          // get logical size from header
 	ret_fdc_std(ERR_FDC_SUCCESS,p,l);   // send OK
 	char t=0x00; read_client_tty(&t,1); // read 1 byte from client
 	if (t!=FDC_CMD_EOL) return; // if it's anything but CR, silently abort
@@ -1279,7 +1275,7 @@ void req_fdc_read_sector(int tp,int tl) {
 	}
 	dbg_b(3,sb,ilen);
 
-	int l = get_logical_size(sb[PDD1_ID_HDR_LEN-1]); // get logical size from header
+	int l = lsc_to_len(sb[PDD1_ID_HDR_LEN-1]); // get logical size from header
 
 	// seek to target_physical*(id_len+physical_len) + id_len + (target_logical-1)*logical_len
 	int s = (tp*(ilen+dlen))+ilen+((tl-1)*l);
@@ -1325,7 +1321,7 @@ void req_fdc_write_id(uint16_t tp) {
 	if (open_disk_image(s,RW,ALLOW_RET)) return; // we need both read & write
 	uint8_t r = read(disk_img_fd,sb,ilen); // read ID
 	dbg_b(2,sb,r);
-	int l = get_logical_size(sb[0]); // get logical size from header
+	int l = lsc_to_len(sb[0]); // get logical size from header
 
 	// seek file back to tp+hdr (skip the ID header to the start of the 12 bytes of user ID data)
 	if (lseek(disk_img_fd,s+PDD1_ID_HDR_LEN,SEEK_SET)!=s+PDD1_ID_HDR_LEN) {
@@ -1364,7 +1360,7 @@ void req_fdc_write_sector(int tp,int tl) {
 		return;
 	}
 
-	int l = get_logical_size(sb[0]); // get logical size from header
+	int l = lsc_to_len(sb[0]); // get logical size from header
 
 	// seek to target_physical*full_sectors+ID+target_logical*logical_size
 	int s = (tp*(ilen+dlen))+ilen+((tl-1)*l);
@@ -1413,8 +1409,8 @@ void get_fdc_cmd(void) {
 	// scan for a valid command byte first
 	while (!c) {
 		read_client_tty(&c,1);
-		if (c==FDC_CMD_EOL) return; // empty command, just restart
-		if (!strchr(valid_fdc_cmds,c)) c=0x00 ; // eat bytes until valid cmd or eol
+		if (c==FDC_CMD_EOL) { eol=true; c=0x20; break; } // empty command
+		if (!strchr(fdc_cmds,c)) c=0x20 ; // eat bytes until valid cmd or eol
 	}
 
 	// read params
@@ -1462,9 +1458,8 @@ void get_fdc_cmd(void) {
 		case FDC_WRITE_ID:        req_fdc_write_id(p);        break;
 		case FDC_WRITE_SECTOR_NV:
 		case FDC_WRITE_SECTOR:    req_fdc_write_sector(p,l);  break;
-		case 0x00: if (!i) {dbg(2,"FDC: empty command\n");    break;}
-		default: dbg(1,"FDC: unknown cmd \"%s\"\n",b);
-		// local msg, nothing to client
+		default: dbg(3,"FDC: invalid cmd \"%s\"\n",b);
+			ret_fdc_std(ERR_FDC_COMMAND,0,0); // required for model detection
 	}
 }
 
@@ -1575,6 +1570,7 @@ void show_config () {
 	dbg(0,"upcase          : %s\n",upcase?"true":"false");
 	dbg(0,"rtscts          : %s\n",rtscts?"true":"false");
 	dbg(0,"verbosity       : %d\n",debug);
+	dbg(0,"model           : %d\n",model);
 	dbg(0,"dot_offset      : %d\n",dot_offset);
 	dbg(0,"BASIC_byte_ms   : %d\n",BASIC_byte_us/1000);
 	dbg(0,"bootstrap_mode  : %s\n",bootstrap_mode?"true":"false");
@@ -1589,7 +1585,7 @@ void show_config () {
 	dbg(2,"dme_root_label  : \"%-6.6s\"\n",dme_root_label);
 	dbg(2,"dme_parent_label: \"%-6.6s\"\n",dme_parent_label);
 	dbg(2,"dme_dir_label   : \"%-2.2s\"\n",dme_dir_label);
-	dbg(0,"ur2_dos_hack    : %s\n",enable_ur2_dos_hack?"enabled":"disabled");
+	dbg(0,"magic_files     : %s\n",enable_magic_files?"enabled":"disabled");
 	dbg(2,"default_attr    : '%c'\n",default_attr);
 }
 
@@ -1603,10 +1599,12 @@ void show_main_help() {
 		"   -a c     Attr - attribute used for all files (%2$c)\n"
 		"   -b file  Bootstrap - send loader file to client\n"
 		"   -d tty   Serial device connected to client (" DEFAULT_CLIENT_TTY ")\n"
+		"   -e       Disable TS-DOS directory extension (enabled)\n"
 		"   -g       Getty mode - run as daemon\n"
 		"   -h       Print this help\n"
 		"   -i file  Disk image file for raw sector access, TPDD1 only\n"
 		"   -l       List loader files and show bootstrap help\n"
+		"   -m model Model: 1 for TPDD1, 2 for TPDD2 (2)\n"
 		"   -p dir   Share path - directory with files to be served (.)\n"
 		"   -r       RTS/CTS hardware flow control\n"
 		"   -s #     Speed - serial port baud rate 9600 or 19200 (19200)\n"
@@ -1635,7 +1633,7 @@ int main(int argc, char **argv) {
 	// environment
 	if (getenv("OPR_MODE")) opr_mode = atoi(getenv("OPR_MODE"));
 	if (getenv("DISABLE_DME")) dme_disabled = true;
-	if (getenv("DISABLE_UR2_DOS_HACK")) enable_ur2_dos_hack = false;
+	if (getenv("DISABLE_MAGIC_FILES")) enable_magic_files = false;
 	if (getenv("DOT_OFFSET")) dot_offset = atoi(getenv("DOT_OFFSET"));
 	if (getenv("BAUD")) set_baud(getenv("BAUD"));
 	if (getenv("ROOT_LABEL")) {snprintf(dme_root_label,7,"%-6.6s",getenv("ROOT_LABEL"));
@@ -1645,16 +1643,18 @@ int main(int argc, char **argv) {
 	if (getenv("ATTR")) default_attr = *getenv("ATTR");
 
 	// commandline
-	while ((i = getopt (argc, argv, ":0a:b:d:ghi:lp:rs:uvwz:^")) >=0)
+	while ((i = getopt (argc, argv, ":0a:b:d:eghi:lm:p:rs:uvwz:^")) >=0)
 		switch (i) {
 			case '0': dot_offset=0; upcase=false; default_attr=0x20;      break;
 			case 'a': default_attr=*strndup(optarg,1);                    break;
 			case 'b': bootstrap_mode=true; strcpy(bootstrap_fname,optarg);break;
 			case 'd': strcpy(client_tty_name,optarg);                     break;
+			case 'e': dme_disabled = true;                                break;
 			case 'g': getty_mode = true; debug = 0;                       break;
 			case 'h': show_main_help(); exit(0);                          break;
 			case 'i': strcpy(disk_img_fname,optarg);                      break;
 			case 'l': show_bootstrap_help(); exit(0);                     break;
+			case 'm': model=atoi(optarg);                                 break;
 			case 'p': (void)(chdir(optarg)+1);                            break;
 			case 'r': rtscts = true;                                      break;
 			case 's': set_baud(optarg);                                   break;
@@ -1680,10 +1680,11 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	// convenience auto fixups for user supplied filenames
+	// convenience auto completes and fixups
 	resolve_client_tty_name();
 	find_lib_file(disk_img_fname);
 	find_lib_file(bootstrap_fname);
+	if (model<1||model>2) model=2;
 
 	(void)(getcwd(cwd,PATH_MAX-1)+1);
 
