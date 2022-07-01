@@ -196,7 +196,7 @@ int dir_depth=0;
 
 // blarghamagargles
 void show_main_help();
-void ret_std(unsigned char err);
+
 
 /* primitives and utilities */
 
@@ -472,6 +472,367 @@ int check_magic_file(char *b) {
 	return 1;
 }
 
+////////////////////////////////////////////////////////////////////////
+//
+//  FDC MODE
+//
+
+/*
+sectors: 0-79
+sector: 1293 bytes
+| ID 13 bytes | DATA 1280 bytes |
+---
+1    logical sector length code
+12   data
+---
+1280 data
+---
+*/
+
+// return the length in bytes for a given logical size code
+int lsc_to_len(int l) {
+	if (l<0||l>6) l=3;
+	return fdc_logical_size_codes[l];
+}
+
+// standard fdc-mode 8-byte response
+// e = error code ERR_FDC_* -> ascii hex pair
+// s = status or data       -> ascii hex pair
+// l = length or address    -> 2 ascii hex pairs
+// TODO - don't assume endianness
+void ret_fdc_std(uint8_t e, uint8_t s, uint16_t l) {
+	dbg(2,"%s()\n",__func__);
+	char b[9] = { 0x00 };
+	snprintf(b,9,"%02X%02X%04X",e,s,l);
+	dbg(2,"FDC: response: \"%s\"\n",b);
+	write_client_tty(b,8);
+}
+
+/*
+int seek_disk_image (int p, int l, int r) {
+	int s = (p*(ilen+dlen));
+	if (l) s+=ilen+l*llen-l;
+	return lseek(disk_img_fd,s,SEEK_SET);
+}
+*/
+
+// p   : physical sector to seek to
+// m   : read-only / write-only / read-write
+// r   : send or don't send error response to client from here
+int open_disk_image (int p, int m, int r) {
+	dbg(2,"%s(%d,%d,%d)\n",__func__,p,m,r);
+
+	if (!strcmp(disk_img_fname,"")) return ERR_FDC_NO_DISK;
+	int of; int e=ERR_FDC_SUCCESS;
+
+	switch (m) {
+		case RW: of=O_RDWR; dbg(2,"edit\n");
+			if (access(disk_img_fname,W_OK)) e=ERR_FDC_WRITE_PROTECT;
+			break;
+		case WR: of=O_WRONLY;
+			if (access(disk_img_fname,F_OK)) { of|=O_CREAT; dbg(2,"create\n");} else {
+				of|=O_TRUNC; dbg(2,"overwite\n");
+				if (access(disk_img_fname,W_OK)) e=ERR_FDC_WRITE_PROTECT;
+			}
+			break;
+		default: of=O_RDONLY; dbg(2,"read\n"); break;
+	}
+
+	if (!e) {
+		disk_img_fd=open(disk_img_fname,of|O_EXCL,0666);
+		if (disk_img_fd<0) { dbg(0,"%s\n",strerror(errno)) ;e=ERR_FDC_READ;}
+	}
+
+	if (!e) {
+		int s = (p*(ilen+dlen)); // initial seek position to start of physical sector
+		if (lseek(disk_img_fd,s,SEEK_SET)!=s) e=ERR_FDC_READ;
+	}
+
+	if (r && e) ret_fdc_std(e,0,0);
+	return e;
+}
+
+void req_fdc_set_mode(int m) {
+	dbg(2,"%s(%d)\n",__func__,m);
+	dbg(1,"FDC: Switching to \"%s\" mode\n",m==0?"FDC":m==1?"Operation":"-invalid-");
+	opr_mode=m; // no response, just switch modes
+}
+
+// disk not-ready conditions
+// ret_fdc_std(e,s,l)
+// e = ERR_FDC_SUCCESS
+// s = bit flags:
+//   7: 1 = disk not inserted     FDC_COND_NOTINS
+//   6: 1 = disk changed          FDC_COND_CHANGED
+//   5: 1 = disk write-protected  FDC_COND_WPROT
+// l = 0
+// examples
+// ret_fdc_std(ERR_FDC_SUCCESS,FDC_COND_WPROT,0)
+// ret_fdc_std(ERR_FDC_SUCCESS,FDC_COND_NOTINS|FDC_COND_CHANGED,0)
+void req_fdc_condition() {
+	dbg(2,"%s()\n",__func__);
+	int s=FDC_COND_NONE;
+	if (access(disk_img_fname,F_OK)) s=FDC_COND_NOTINS;
+	else if (access(disk_img_fname,W_OK)) s=FDC_COND_WPROT;
+	ret_fdc_std(ERR_FDC_SUCCESS,s,0);
+}
+
+// lc = logical sector size code
+void req_fdc_format(int lc) {
+	dbg(2,"%s(%d)\n",__func__,lc);
+	int ll = lsc_to_len(lc);
+	int pn = 0;     // physical sector number
+	int tl = ilen+dlen; // total length
+	int sc = (PDD1_TRACKS*PDD1_SECTORS);
+
+	dbg(0,"Format: Logical sector size: %d = %d\n",lc,ll);
+
+	if (open_disk_image(0,WR,ALLOW_RET)) return;
+
+	memset(sb,0x00,tl);
+	sb[0]=lc;            // logical sector size code
+	for (pn=0;pn<sc;pn++) {
+		if (write(disk_img_fd,sb,tl)<0) {
+			dbg(0,"%s\n",strerror(errno));
+			(void)(close(disk_img_fd)+1);
+			ret_fdc_std(ERR_FDC_READ,pn,0);
+			return;
+		}
+	}
+
+	(void)(close(disk_img_fd)+1);
+	ret_fdc_std(ERR_FDC_SUCCESS,0,0);
+}
+
+// p = physical sector number
+void req_fdc_read_id(int p) {
+	dbg(2,"%s(%d)\n",__func__,p);
+	if (open_disk_image(p,RD,ALLOW_RET)) return; // open and seek
+	int r = read(disk_img_fd,sb,ilen);  // read ID section
+	dbg_b(2,sb,ilen);
+	int l = lsc_to_len(sb[0]);          // get logical size from header
+	ret_fdc_std(ERR_FDC_SUCCESS,p,l);   // send OK
+	char t=0x00; read_client_tty(&t,1); // read 1 byte from client
+	if (t!=FDC_CMD_EOL) return; // if it's anything but CR, silently abort
+	write_client_tty(sb+PDD1_ID_HDR_LEN,r-PDD1_ID_HDR_LEN); // send data
+	(void)(close(disk_img_fd)+1);
+}
+
+// tp = target physical sector
+// tl = target logical sector
+void req_fdc_read_sector(int tp,int tl) {
+	dbg(2,"%s(%d,%d)\n",__func__,tp,tl);
+	if (open_disk_image(tp,RD,ALLOW_RET)) return; // open & seek to tp
+	if (read(disk_img_fd,sb,ilen)!=ilen) { // read ID section
+		dbg(1,"failed read ID\n");
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_READ,tp,0);
+		return;
+	}
+	dbg_b(3,sb,ilen);
+
+	int l = lsc_to_len(sb[PDD1_ID_HDR_LEN-1]); // get logical size from header
+
+	// seek to target_physical*(id_len+physical_len) + id_len + (target_logical-1)*logical_len
+	int s = (tp*(ilen+dlen))+ilen+((tl-1)*l);
+	if (lseek(disk_img_fd,s,SEEK_SET)!=s) {
+		dbg(1,"failed seek %d : %s\n",s,strerror(errno));
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_READ,tp,0);
+		return;
+	}
+	memset(sb,0x00,l);
+	if (read(disk_img_fd,sb,l)!=l) { // read one logical sector of DATA
+		dbg(1,"failed logical sector read\n");
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_READ,tp,0);
+		return;
+	}
+	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // 1st stage response
+	char t=0x00;
+	read_client_tty(&t,1);  // read 1 byte from client
+	if (t!=0x0D) return;    // if it's anything but CR, silently abort
+	write_client_tty(sb,l); // send data
+	(void)(close(disk_img_fd)+1);
+}
+
+void req_fdc_search_id() {
+	dbg(2,"%s()\n",__func__);
+	// send OK to client
+	// read 12 bytes from client
+	// search all ID's for match
+	// return, what? Send another OK?
+	// manual says it's the same as write_sector, which
+	// sends an OK to tell client to send, and then
+	// another OK to ack. So perhaps we return
+	// just a status return that indicates if a match was found
+	// and probably the first matching sector number in the len/addr field.
+	// Probably the err field is always success.
+	ret_fdc_std(ERR_FDC_SUCCESS,0,0);
+}
+
+void req_fdc_write_id(uint16_t tp) {
+	dbg(2,"%s(%d)\n",__func__,tp);
+	int s = (tp*(ilen+dlen));
+	if (open_disk_image(s,RW,ALLOW_RET)) return; // we need both read & write
+	uint8_t r = read(disk_img_fd,sb,ilen); // read ID
+	dbg_b(2,sb,r);
+	int l = lsc_to_len(sb[0]); // get logical size from header
+
+	// seek file back to tp+hdr (skip the ID header to the start of the 12 bytes of user ID data)
+	if (lseek(disk_img_fd,s+PDD1_ID_HDR_LEN,SEEK_SET)!=s+PDD1_ID_HDR_LEN) {
+		dbg(1,"failed seek %d : %s\n",s+PDD1_ID_HDR_LEN,strerror(errno));
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_READ,tp,0);
+		return;
+	}
+
+	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // tell client to send data
+
+	read_client_tty(sb,ilen-PDD1_ID_HDR_LEN); // read 12 bytes from client
+
+	// write those to the file
+	if (write(disk_img_fd,sb,ilen-PDD1_ID_HDR_LEN)<0) {
+		dbg(0,"%s\n",strerror(errno));
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_READ,tp,0);
+		return;
+	}
+
+	// close file
+	(void)(close(disk_img_fd)+1);
+
+	// send a final success response to the client
+	ret_fdc_std(ERR_FDC_SUCCESS,tp,l);
+}
+
+void req_fdc_write_sector(int tp,int tl) {
+	dbg(2,"%s(%d,%d)\n",__func__,tp,tl);
+	if (open_disk_image(tp,RW,ALLOW_RET)) return; // open & seek to tp
+	if (read(disk_img_fd,sb,ilen)!=ilen) { // read ID section
+		dbg(0,"failed read ID\n");
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_READ,tp,0);
+		return;
+	}
+
+	int l = lsc_to_len(sb[0]); // get logical size from header
+
+	// seek to target_physical*full_sectors+ID+target_logical*logical_size
+	int s = (tp*(ilen+dlen))+ilen+((tl-1)*l);
+	if (lseek(disk_img_fd,s,SEEK_SET)!=s) {
+		dbg(0,"failed seek %d : %s\n",s,strerror(errno));
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_READ,tp,0);
+		return;
+	}
+
+	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // tell client to send data
+
+	read_client_tty(sb,l); // read logical_size bytes from client
+
+	// write them to the file
+	if (write(disk_img_fd,sb,l)<0) {
+		dbg(0,"%s\n",strerror(errno));
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_READ,tp,0);
+		return;
+	}
+
+	// close file
+	(void)(close(disk_img_fd)+1);
+
+	// send a final success response to the client
+	ret_fdc_std(ERR_FDC_SUCCESS,tp,l);
+}
+
+// ref/fdc.txt
+void get_fdc_cmd(void) {
+	dbg(3,"%s()\n",__func__);
+	char b[6] = {0x00};
+	unsigned i = 0;
+	bool eol = false;
+	char c = 0x00;
+	int p = -1;
+	int l = -1;
+
+	// Somewhat inelegant, but the client & server get out of sync too easily.
+	// The various error responses are important for model detection.
+	// TS-DOS, Sardine, etc all send bad commands intentionally to detect
+	// the difference between TPDD2 and TPDD1 and the original Desk-Link
+	// So the breaks and error returns below, and the particular conditions
+	// that cause them, are not random guesses, they are from testing with
+	// TS-DOS, Sardine, & other clients, and real drives.
+
+	// see if the command byte was collected already by req_fdc()
+	if (gb[0]>0x00 && gb[0]!=FDC_CMD_EOL && gb[1]==0x00) c=gb[0];
+	memset(gb,0x00,TPDD_DATA_MAX+3);
+
+	// scan for a valid command byte first
+	while (!c) {
+		read_client_tty(&c,1);
+		if (c==FDC_CMD_EOL) { eol=true; c=0x20; break; } // fall through to ERR_FDC_COMMAND, important for Sardine
+		if (!strchr(fdc_cmds,c)) c=0x20 ; // eat bytes until valid cmd or eol
+	}
+
+	// read params
+	while (i<6 && !eol) { // if we get out of sync (i>5), just fall through to restart
+		if (read_client_tty(&b[i],1)==1) {
+			dbg(3,"i:%d b:\"%s\"\n",i,b);
+			switch (b[i]) {
+				case FDC_CMD_EOL: eol=true;
+				case 0x20: b[i]=0x00; break;
+				default: i++;
+			}
+		}
+	}
+
+	// We can pre-parse & validate the params since they take the same
+	// form (or a consistent subset) for all commands.
+	// Parameters, if they exist, are always one of:
+	//   P,L
+	//   P
+	//   <none>
+	// where:
+	// P = physical sector number 0-79 (decimal integer as 0-2 ascii characters)
+	// L = logical sector number 1-20 (decimal integer as 0-2 ascii characters)
+	// (format & condition have different meanings but the rule still holds)
+	p=0; // real drive uses physical sector 0 when omitted
+	l=1; // real drive uses logical sector 1 when omitted
+    char* t;
+    if ((t=strtok(b,","))!=NULL) p=atoi(t); // target physical sector number
+    if ((t=strtok(NULL,","))!=NULL) l=atoi(t); // target logical sector number
+	if (p<0 || p>79 || l<1 || l>20) {ret_fdc_std(ERR_FDC_PARAM,0,0); return;}
+
+	// debug
+	dbg(3,"\"c:%c p:%d l:%d\"\n",c,p,l);
+
+	// dispatch
+	switch (c) {
+		case FDC_SET_MODE:        req_fdc_set_mode(p);        break;
+		case FDC_CONDITION:       req_fdc_condition();        break;
+		case FDC_FORMAT_NV:
+		case FDC_FORMAT:          req_fdc_format(p);          break;
+		case FDC_READ_ID:         req_fdc_read_id(p);         break;
+		case FDC_READ_SECTOR:     req_fdc_read_sector(p,l);   break;
+		case FDC_SEARCH_ID:       req_fdc_search_id();        break;
+		case FDC_WRITE_ID_NV:
+		case FDC_WRITE_ID:        req_fdc_write_id(p);        break;
+		case FDC_WRITE_SECTOR_NV:
+		case FDC_WRITE_SECTOR:    req_fdc_write_sector(p,l);  break;
+		default: dbg(3,"FDC: invalid cmd \"%s\"\n",b);
+			ret_fdc_std(ERR_FDC_COMMAND,0,0); // required for model detection
+	}
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////
+//
+//  OPERATION MODE
+//
+
 FILE_ENTRY *make_file_entry(char *namep, uint16_t len, char flags) {
 	dbg(3,"%s(\"%s\")\n",__func__,namep);
 	static FILE_ENTRY f;
@@ -530,6 +891,18 @@ FILE_ENTRY *make_file_entry(char *namep, uint16_t len, char flags) {
 	return &f;
 }
 
+// standard return - return for: error open close delete status write
+void ret_std(unsigned char err) {
+	dbg(3,"%s()\n",__func__);
+	gb[0]=RET_STD;
+	gb[1]=0x01;
+	gb[2]=err;
+	gb[3]=checksum(gb);
+	dbg(3,"Response: %02X\n",err);
+	write_client_tty(gb,4);
+	if (gb[2]!=ERR_SUCCESS) dbg(2,"ERROR RESPONSE TO CLIENT\n");
+}
+
 int read_next_dirent(DIR *dir,int m) {
 	dbg(3,"%s()\n",__func__);
 	struct stat st;
@@ -576,6 +949,7 @@ int read_next_dirent(DIR *dir,int m) {
 	return 1;
 }
 
+// read the current share directory
 void update_file_list(int m) {
 	dbg(3,"%s()\n",__func__);
 	DIR * dir;
@@ -587,23 +961,6 @@ void update_file_list(int m) {
 	while (read_next_dirent(dir,m));
 	dbg(1,"-------------------------------------------------------------------------------\n");
 	closedir(dir);
-}
-
-////////////////////////////////////////////////////////////////////////
-//
-//  OPERATION MODE
-//
-
-// standard return - return for: error open close delete status write
-void ret_std(unsigned char err) {
-	dbg(3,"%s()\n",__func__);
-	gb[0]=RET_STD;
-	gb[1]=0x01;
-	gb[2]=err;
-	gb[3]=checksum(gb);
-	dbg(3,"Response: %02X\n",err);
-	write_client_tty(gb,4);
-	if (gb[2]!=ERR_SUCCESS) dbg(2,"ERROR RESPONSE TO CLIENT\n");
 }
 
 // return for dirent
@@ -632,7 +989,9 @@ int ret_dirent(FILE_ENTRY *ep) {
 
 	dbg(3,"\"%24.24s\"\n",gb+2);
 
-	gb[29] = TPDD_FREE_SECTORS;
+	// free sectors
+	gb[29] = model==1?(PDD1_TRACKS*PDD1_SECTORS):(PDD2_TRACKS*PDD2_SECTORS);
+
 	gb[30] = checksum (gb);
 
 	return (write_client_tty(gb,31) == 31);
@@ -1067,8 +1426,67 @@ void req_condition() {
 	ret_std(ERR_SUCCESS);
 }
 
+// opr-format - this creates a disk that can load & save files
+// the only difference from fdc-format is a single byte, the first byte of the SMT
+// opr-format is just this:
+//   start with: fdc-format 0    (0=64-byte logical sector size)
+//   then: sector 0, byte 1240, write 0x80 (or physical:0 logical:20 byte:25 counting from 1
 void req_format() {
 	dbg(2,"%s()\n",__func__);
+	const int lc = 0;    // logical size code
+	const int ll = lsc_to_len(lc);   // logical sector length
+	//const int mp = 0;    // smt physical sector
+	const int ml = 20;   // smt logical sector
+	const int ms = 24;   // smt first byte (from 0)
+	const int md = 0x80; // smt first byte data (bit flag first sector used)
+	const int fsl = ilen+dlen; // full sector length
+	const int sc = (PDD1_TRACKS*PDD1_SECTORS); // sectors count
+
+	int pn = 0;          // physical sector number
+
+	dbg(0,"Operation-mode Format (make a filesystem)\n");
+
+	int e = open_disk_image(0,WR,NO_RET);
+	// convert the FDC error codes to equivalent OPR error codes
+	switch (e) {
+		case ERR_FDC_NO_DISK: e=ERR_NO_DISK; break;
+		case ERR_FDC_WRITE_PROTECT: e=ERR_WRITE_PROTECT; break;
+		case ERR_FDC_READ: e=ERR_FMT_INTERRUPT; break;
+		case ERR_FDC_SUCCESS: e=0;
+	}
+	if (e) { ret_std(e); return; }
+
+	// create the blank space
+	memset(sb,0x00,fsl); // one full sector including size code, ID, & DATA
+	sb[0]=lc; // logical size code
+	for (pn=0;pn<sc;pn++) if (write(disk_img_fd,sb,fsl)<0) break;
+	if ((pn<sc)) {
+		dbg(0,"%s\n",strerror(errno));
+		(void)(close(disk_img_fd)+1);
+		ret_std(ERR_FMT_INTERRUPT);
+		return;
+	}
+
+	// write the SMT
+	memset(sb,0x00,ll);
+	sb[ms]=md;
+	const int s=ilen+ll*(ml-1);
+	if (lseek(disk_img_fd,s,SEEK_SET)!=s) {
+		dbg(0,"failed seek %d : %s\n",s,strerror(errno));
+		(void)(close(disk_img_fd)+1);
+		ret_std(ERR_FMT_INTERRUPT);
+		return;
+	}
+
+	if (write(disk_img_fd,sb,ll)<0) {
+		dbg(0,"%s\n",strerror(errno));
+		(void)(close(disk_img_fd)+1);
+		ret_std(ERR_FMT_INTERRUPT);
+		return;
+	}
+
+	(void)(close(disk_img_fd)+1);
+
 	ret_std(ERR_SUCCESS);
 }
 
@@ -1115,351 +1533,6 @@ void get_opr_cmd(void) {
 		case REQ_PDD2_UNK33:    ret_pdd2_unk11();    break;
 		default: dbg(1,"OPR: unknown cmd \"%02X\"\n",b[0]); if (debug<3) dbg_p(2,b);
 		// local msg, nothing to client
-	}
-}
-
-////////////////////////////////////////////////////////////////////////
-//
-//  FDC MODE
-//
-
-/*
-sectors: 0-79
-sector: 1293 bytes
-| ID 13 bytes | DATA 1280 bytes |
----
-1    logical sector length code
-12   data
----
-1280 data
----
-*/
-
-int lsc_to_len(int l) {
-	if (l<0||l>6) l=3;
-	return fdc_logical_size_codes[l];
-}
-
-// standard fdc-mode 8-byte response
-// e = error code ERR_FDC_* -> ascii hex pair
-// s = status or data       -> ascii hex pair
-// l = length or address    -> 2 ascii hex pairs
-// TODO - don't assume endianness
-void ret_fdc_std(uint8_t e, uint8_t s, uint16_t l) {
-	dbg(2,"%s()\n",__func__);
-	char b[9] = { 0x00 };
-	snprintf(b,9,"%02X%02X%04X",e,s,l);
-	dbg(2,"FDC: response: \"%s\"\n",b);
-	write_client_tty(b,8);
-}
-
-/*
-int seek_disk_image (int p, int l, int r) {
-	int s = (p*(ilen+dlen));
-	if (l) s+=ilen+l*llen-l;
-	return lseek(disk_img_fd,s,SEEK_SET);
-}
-*/
-
-// p   : physical sector to seek to
-// m   : read-only / write-only / read-write
-// r   : send or don't send error response to client from here
-int open_disk_image (int p, int m, int r) {
-	dbg(2,"%s(%d,%d,%d)\n",__func__,p,m,r);
-
-	if (!strcmp(disk_img_fname,"")) return ERR_FDC_NO_DISK;
-	int of; int e=ERR_FDC_SUCCESS;
-
-	switch (m) {
-		case RW: of=O_RDWR; dbg(2,"edit\n");
-			if (access(disk_img_fname,W_OK)) e=ERR_FDC_WRITE_PROTECT;
-			break;
-		case WR: of=O_WRONLY;
-			if (access(disk_img_fname,F_OK)) { of|=O_CREAT; dbg(2,"create\n");} else {
-				of|=O_TRUNC; dbg(2,"overwite\n");
-				if (access(disk_img_fname,W_OK)) e=ERR_FDC_WRITE_PROTECT;
-			}
-			break;
-		default: of=O_RDONLY; dbg(2,"read\n"); break;
-	}
-
-	if (!e) {
-		disk_img_fd=open(disk_img_fname,of|O_EXCL,0666);
-		if (disk_img_fd<0) { dbg(0,"%s\n",strerror(errno)) ;e=ERR_FDC_READ;}
-	}
-
-	if (!e) {
-		int s = (p*(ilen+dlen)); // initial seek position to start of physical sector
-		if (lseek(disk_img_fd,s,SEEK_SET)!=s) e=ERR_FDC_READ;
-	}
-
-	if (r && e) ret_fdc_std(e,0,0);
-	return e;
-}
-
-void req_fdc_set_mode(int m) {
-	dbg(2,"%s(%d)\n",__func__,m);
-	dbg(1,"FDC: Switching to \"%s\" mode\n",m==0?"FDC":m==1?"Operation":"-invalid-");
-	opr_mode=m; // no response, just switch modes
-}
-
-// disk not-ready conditions
-// ret_fdc_std(e,s,l)
-// e = ERR_FDC_SUCCESS
-// s = bit flags:
-//   7: 1 = disk not inserted     FDC_COND_NOTINS
-//   6: 1 = disk changed          FDC_COND_CHANGED
-//   5: 1 = disk write-protected  FDC_COND_WPROT
-// l = 0
-// examples
-// ret_fdc_std(ERR_FDC_SUCCESS,FDC_COND_WPROT,0)
-// ret_fdc_std(ERR_FDC_SUCCESS,FDC_COND_NOTINS|FDC_COND_CHANGED,0)
-void req_fdc_condition() {
-	dbg(2,"%s()\n",__func__);
-	int s=FDC_COND_NONE;
-	if (access(disk_img_fname,F_OK)) s=FDC_COND_NOTINS;
-	else if (access(disk_img_fname,W_OK)) s=FDC_COND_WPROT;
-	ret_fdc_std(ERR_FDC_SUCCESS,s,0);
-}
-
-// lc = logical sector size code
-void req_fdc_format(int lc) {
-	dbg(2,"%s(%d)\n",__func__,lc);
-	int ll = lsc_to_len(lc);
-	int pn = 0;     // physical sector number
-	int tl = ilen+dlen; // total length
-
-	dbg(0,"Format: Logical sector size: %d = %d\n",lc,ll);
-
-	if (open_disk_image(0,WR,ALLOW_RET)) return;
-
-	memset(sb,0x00,tl);
-	sb[0]=lc;            // logical sector size code
-	for (pn=0;pn<80;pn++) {
-		if (write(disk_img_fd,sb,tl)<0) {
-			dbg(0,"%s\n",strerror(errno));
-			(void)(close(disk_img_fd)+1);
-			ret_fdc_std(ERR_FDC_READ,pn,0);
-			return;
-		}
-	}
-
-	(void)(close(disk_img_fd)+1);
-	ret_fdc_std(ERR_FDC_SUCCESS,0,0);
-}
-
-// p = physical sector number
-void req_fdc_read_id(int p) {
-	dbg(2,"%s(%d)\n",__func__,p);
-	if (open_disk_image(p,RD,ALLOW_RET)) return; // open and seek
-	int r = read(disk_img_fd,sb,ilen);  // read ID section
-	dbg_b(2,sb,ilen);
-	int l = lsc_to_len(sb[0]);          // get logical size from header
-	ret_fdc_std(ERR_FDC_SUCCESS,p,l);   // send OK
-	char t=0x00; read_client_tty(&t,1); // read 1 byte from client
-	if (t!=FDC_CMD_EOL) return; // if it's anything but CR, silently abort
-	write_client_tty(sb+PDD1_ID_HDR_LEN,r-PDD1_ID_HDR_LEN); // send data
-	(void)(close(disk_img_fd)+1);
-}
-
-// tp = target physical sector
-// tl = target logical sector
-void req_fdc_read_sector(int tp,int tl) {
-	dbg(2,"%s(%d,%d)\n",__func__,tp,tl);
-	if (open_disk_image(tp,RD,ALLOW_RET)) return; // open & seek to tp
-	if (read(disk_img_fd,sb,ilen)!=ilen) { // read ID section
-		dbg(1,"failed read ID\n");
-		(void)(close(disk_img_fd)+1);
-		ret_fdc_std(ERR_FDC_READ,tp,0);
-		return;
-	}
-	dbg_b(3,sb,ilen);
-
-	int l = lsc_to_len(sb[PDD1_ID_HDR_LEN-1]); // get logical size from header
-
-	// seek to target_physical*(id_len+physical_len) + id_len + (target_logical-1)*logical_len
-	int s = (tp*(ilen+dlen))+ilen+((tl-1)*l);
-	if (lseek(disk_img_fd,s,SEEK_SET)!=s) {
-		dbg(1,"failed seek %d : %s\n",s,strerror(errno));
-		(void)(close(disk_img_fd)+1);
-		ret_fdc_std(ERR_FDC_READ,tp,0);
-		return;
-	}
-	memset(sb,0x00,l);
-	if (read(disk_img_fd,sb,l)!=l) { // read one logical sector of DATA
-		dbg(1,"failed logical sector read\n");
-		(void)(close(disk_img_fd)+1);
-		ret_fdc_std(ERR_FDC_READ,tp,0);
-		return;
-	}
-	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // 1st stage response
-	char t=0x00;
-	read_client_tty(&t,1);  // read 1 byte from client
-	if (t!=0x0D) return;    // if it's anything but CR, silently abort
-	write_client_tty(sb,l); // send data
-	(void)(close(disk_img_fd)+1);
-}
-
-void req_fdc_search_id() {
-	dbg(2,"%s()\n",__func__);
-	// send OK to client
-	// read 12 bytes from client
-	// search all ID's for match
-	// return, what? Send another OK?
-	// manual says it's the same as write_sector, which
-	// sends an OK to tell client to send, and then
-	// another OK to ack. So perhaps we return
-	// just a status return that indicates if a match was found
-	// and probably the first matching sector number in the len/addr field.
-	// Probably the err field is always success.
-	ret_fdc_std(ERR_FDC_SUCCESS,0,0);
-}
-
-void req_fdc_write_id(uint16_t tp) {
-	dbg(2,"%s(%d)\n",__func__,tp);
-	int s = (tp*(ilen+dlen));
-	if (open_disk_image(s,RW,ALLOW_RET)) return; // we need both read & write
-	uint8_t r = read(disk_img_fd,sb,ilen); // read ID
-	dbg_b(2,sb,r);
-	int l = lsc_to_len(sb[0]); // get logical size from header
-
-	// seek file back to tp+hdr (skip the ID header to the start of the 12 bytes of user ID data)
-	if (lseek(disk_img_fd,s+PDD1_ID_HDR_LEN,SEEK_SET)!=s+PDD1_ID_HDR_LEN) {
-		dbg(1,"failed seek %d : %s\n",s+PDD1_ID_HDR_LEN,strerror(errno));
-		(void)(close(disk_img_fd)+1);
-		ret_fdc_std(ERR_FDC_READ,tp,0);
-		return;
-	}
-
-	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // tell client to send data
-
-	read_client_tty(sb,ilen-PDD1_ID_HDR_LEN); // read 12 bytes from client
-
-	// write those to the file
-	if (write(disk_img_fd,sb,ilen-PDD1_ID_HDR_LEN)<0) {
-		dbg(0,"%s\n",strerror(errno));
-		(void)(close(disk_img_fd)+1);
-		ret_fdc_std(ERR_FDC_READ,tp,0);
-		return;
-	}
-
-	// close file
-	(void)(close(disk_img_fd)+1);
-
-	// send a final success response to the client
-	ret_fdc_std(ERR_FDC_SUCCESS,tp,l);
-}
-
-void req_fdc_write_sector(int tp,int tl) {
-	dbg(2,"%s(%d,%d)\n",__func__,tp,tl);
-	if (open_disk_image(tp,RW,ALLOW_RET)) return; // open & seek to tp
-	if (read(disk_img_fd,sb,ilen)!=ilen) { // read ID section
-		dbg(0,"failed read ID\n");
-		(void)(close(disk_img_fd)+1);
-		ret_fdc_std(ERR_FDC_READ,tp,0);
-		return;
-	}
-
-	int l = lsc_to_len(sb[0]); // get logical size from header
-
-	// seek to target_physical*full_sectors+ID+target_logical*logical_size
-	int s = (tp*(ilen+dlen))+ilen+((tl-1)*l);
-	if (lseek(disk_img_fd,s,SEEK_SET)!=s) {
-		dbg(0,"failed seek %d : %s\n",s,strerror(errno));
-		(void)(close(disk_img_fd)+1);
-		ret_fdc_std(ERR_FDC_READ,tp,0);
-		return;
-	}
-
-	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // tell client to send data
-
-	read_client_tty(sb,l); // read logical_size bytes from client
-
-	// write them to the file
-	if (write(disk_img_fd,sb,l)<0) {
-		dbg(0,"%s\n",strerror(errno));
-		(void)(close(disk_img_fd)+1);
-		ret_fdc_std(ERR_FDC_READ,tp,0);
-		return;
-	}
-
-	// close file
-	(void)(close(disk_img_fd)+1);
-
-	// send a final success response to the client
-	ret_fdc_std(ERR_FDC_SUCCESS,tp,l);
-}
-
-// ref/fdc.txt
-void get_fdc_cmd(void) {
-	dbg(3,"%s()\n",__func__);
-	char b[6] = {0x00};
-	unsigned i = 0;
-	bool eol = false;
-	char c = 0x00;
-	int p = -1;
-	int l = -1;
-
-	// all kind of inelegant, but the client & server get out of sync too easily
-
-	// see if the command byte was collected already by req_fdc()
-	if (gb[0]>0x00 && gb[0]!=FDC_CMD_EOL && gb[1]==0x00) c=gb[0];
-	memset(gb,0x00,TPDD_DATA_MAX+3);
-
-	// scan for a valid command byte first
-	while (!c) {
-		read_client_tty(&c,1);
-		if (c==FDC_CMD_EOL) { eol=true; c=0x20; break; } // empty command
-		if (!strchr(fdc_cmds,c)) c=0x20 ; // eat bytes until valid cmd or eol
-	}
-
-	// read params
-	while (i<6 && !eol) { // if we get out of sync (i>5), just fall through to restart
-		if (read_client_tty(&b[i],1)==1) {
-			dbg(3,"i:%d b:\"%s\"\n",i,b);
-			switch (b[i]) {
-				case FDC_CMD_EOL: eol=true;
-				case 0x20: b[i]=0x00; break;
-				default: i++;
-			}
-		}
-	}
-
-	// We can pre-parse & validate the params since they take the same
-	// form (or a consistent subset) for all commands.
-	// Parameters, if they exist, are always one of:
-	//   P,L
-	//   P
-	//   <none>
-	// where:
-	// P = physical sector number 0-79 (decimal integer as 0-2 ascii characters)
-	// L = logical sector number 1-20 (decimal integer as 0-2 ascii characters)
-	// (format & condition have different meanings but the rule still holds)
-	p=0; // real drive uses physical sector 0 when omitted
-	l=1; // real drive uses logical sector 1 when omitted
-    char* t;
-    if ((t=strtok(b,","))!=NULL) p=atoi(t); // target physical sector number
-    if ((t=strtok(NULL,","))!=NULL) l=atoi(t); // target logical sector number
-	if (p<0 || p>79 || l<1 || l>20) {ret_fdc_std(ERR_FDC_PARAM,0,0); return;}
-
-	// debug
-	dbg(3,"\"c:%c p:%d l:%d\"\n",c,p,l);
-
-	// dispatch
-	switch (c) {
-		case FDC_SET_MODE:        req_fdc_set_mode(p);        break;
-		case FDC_CONDITION:       req_fdc_condition();        break;
-		case FDC_FORMAT_NV:
-		case FDC_FORMAT:          req_fdc_format(p);          break;
-		case FDC_READ_ID:         req_fdc_read_id(p);         break;
-		case FDC_READ_SECTOR:     req_fdc_read_sector(p,l);   break;
-		case FDC_SEARCH_ID:       req_fdc_search_id();        break;
-		case FDC_WRITE_ID_NV:
-		case FDC_WRITE_ID:        req_fdc_write_id(p);        break;
-		case FDC_WRITE_SECTOR_NV:
-		case FDC_WRITE_SECTOR:    req_fdc_write_sector(p,l);  break;
-		default: dbg(3,"FDC: invalid cmd \"%s\"\n",b);
-			ret_fdc_std(ERR_FDC_COMMAND,0,0); // required for model detection
 	}
 }
 

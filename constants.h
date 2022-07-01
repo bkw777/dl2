@@ -138,8 +138,11 @@
 #define PDD2_COND_NONE        0x00 // no conditions
 
 // fixed lengths
+#define PDD1_TRACKS           40
+#define PDD1_SECTORS          2
+#define PDD2_TRACKS           80
+#define PDD2_SECTORS          2
 #define TPDD_DATA_MAX         0x80
-#define TPDD_FREE_SECTORS     80 // max 80 for TPDD1, 160 for TPDD2
 #define LEN_RET_STD           0x01
 #define LEN_RET_DME           0x0B
 #define LEN_RET_DIRENT        0x1C
