@@ -134,35 +134,24 @@ Limitations: Only TPDD1 disks, only sector access. You can't access the files on
 Working examples: Sardine_American.pdd1, Disk_Power_KC-85.pdd1
 
 Example, using Sardine with a Model 100 with [Ultimate ROM II rom](http://www.club100.org/library/librom.html) (or [REX](http://bitchin100.com/wiki/index.php?title=Rex) with UR-II loaded):  
-Firast, run dl with the following commandline arguments to force TPDD1 emulation, disable TS-DOS directory support, and load the Sardine American dictionary disk:  
+First, run dl with the following commandline arguments to force TPDD1 emulation, disable TS-DOS directory support, and load the Sardine American dictionary disk:  
 ```
 $ dl -vue -m 1 -i Sardine_American.pdd1
 ```
 This provides both SAR100.CO and the dictionary disk. SAR100.CO (and SAR200.CO) are installed in /usr/local/lib/dl, and are "magic" files that are always found when the client tries to load them, even if they aren't in the directory being shared. Similarly, Sardine_American.pdd1 is in the same lib directory and is found when you specify the filename without any path.  
-Enter the UR-2 menu. Notice the SARDIN entry with the word OFF under it. Hit enter on SORDIN and say Y to any prompts if you get any (about himem).  
+Enter the UR-2 menu. Notice the SARDIN entry with the word OFF under it. Hit enter on SARDIN. Say Y if you get a prompt about HIMEM.  
 This loads SAR100.CO into ram, and now the SARDIN entry says ON under it.  
 Now enter T-Word and start a new document and type some text.  
-Finally hit Graph+F to invoke Sardine to spell-check the document.
+Finally, hit Graph+F to invoke Sardine to spell-check the document.
 
 Example, installing Disk_Power for KC-85
 See [Disk_Power.txt](clients/disk_power/Disk_Power.txt)
 
-To create a disk image, start dl with the -i option the name of a new file. IE: ```$ dl -vi ./my_disk.pdd1```, and then issue an FDC-mode format command from a client. Example using pdd.sh as the client (connected with a 2nd usb-serial adapter and a null-modem serial cable):
-```
-$ pdd1
-1) /dev/ttyUSB0
-2) /dev/ttyUSB1
-Which serial port is the TPDD drive on? 2
-PDD(opr:6.2,F)> fdc
-PDD(fdc:6.2,F)> F 0
-Formatting Disk, TPDD1 "FDC" mode, 64-Byte Logical Sectors
-[########################################] 100%                                
-PDD(fdc:6.2,F)>q
-$ ls -l *.pdd1
--rw-rw-r-- 1 bkw bkw 103440 Jun 24 19:05 new_disk.pdd1
-```
+Disk image files may be created 2 ways:  
+* Run `dl -i ./filename` with a non-existing or empty file (include the ./ to prevent it from trying to find a file in /usr/local/ib/dl), and then issue a format command from a client. "client" may be TS-DOS or Floppy on a M100, or pdd.sh or PDD.EXE or TpddTool.py etc connected by a null-modem cable, or even a WP-2 or Z88, etc.)
+* Use [pdd.sh](https://github.com/bkw777/pdd.sh) "dump disk" command to read a real disk from a real drive into a disk image file. pdd.sh now uses the same binary disk image file format as dlplus.
 
-Disk image format [disk_images](ref/disk_images.txt)
+Disk image format [disk_image_files.txt](ref/disk_image_files.txt)
 
 ## OS Compatibility
 Tested on Linux, Macos, FreeBSD

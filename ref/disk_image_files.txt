@@ -41,14 +41,6 @@ This is a subset of the fields on a real disk, but it's everything
 needed to duplicate a disk. The other fields are just things a
 real drive uses internally.
 
-Currently the only way to create and populate a disk image file is by
-issuing format, write_id, and write_sector commands from a client.
-
-github.com/bkw777/pdd.sh can do this. It's dump_disk command can read an
-entire disk from a real drive into it's own form of disk image file, and
-then it's restore_disk command can restore that image into dlplus,
-creating a dlplud disk image file.
-
 Currently, disk image files are only usable for the FDC-mode sector access
 commands. Meaning you can not use dlplus to access the files within a disk
 image, only read and write the raw sectors. It's useful for cloning whole
@@ -58,6 +50,8 @@ The included Disk_Power.K85.pdd1 disk image is a normal disk with a
 filesystem and files, but the Disk_Power installer actually only uses
 sector-access commands to install itself.
 
-The file format is new and still subject to change. It may gain a metadata
-header to make the file self-documenting and to support TPDD2.
+https://github.co/bkw777/pdd.sh now uses the same image file format, so
+you can use pdd.sh to create disk images from real disks or create real
+dusks from image files.
+
 
