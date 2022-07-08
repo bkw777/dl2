@@ -1,6 +1,6 @@
-Next, while the KC-85 is busy loading, run this command:
+Next, if you haven't already, run this command:
 
-    dl -vui Disk_Power.K85.pdd1
+    dl -vue -m 1 -i Disk_Power.K85.pdd1
 
 This loads an image of the install disk, and dlplus will act as a
 virtual drive with that disk inserted, which the installer requires.
