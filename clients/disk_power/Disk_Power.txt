@@ -3,19 +3,17 @@ Disk Power for KC-85
 Excerpt, more info here:
 http://tandy.wiki/TPDD_client:Disk_Power:KC-85
 
-Disk Power originally required both the INSTAL.CO program from the cassette
-(not the one from the disk), AND the original disk (not a copy) to install.
-Which means also needing a cassette player, and a TPDD1 drive (not TPDD2).
+Disk Power requires both INSTAL.CO and the distribution disk to install.
 
-Here, INSTAL.CO from the cassette has been repackaged into a BASIC loader which
-can be bootstrapped over a serial cable, and the disk has been imaged with
+Here, INSTAL.CO has been repackaged into a BASIC loader which can be
+bootstrapped over a serial cable, and the disk has been imaged with
 pdd.sh so that dlplus can act as a virtual drive for sector access to it.
 
 ---------------------------------------------------------------------------
 
 Installation: Just run the following command:
 
- $ dl -vb Disk_Power.K85 && dl -vue -m 1 -i Disk_Power.K85.pdd1
+ $ dl -vvb Disk_Power.K85 && dl -vue -m 1 -i Disk_Power.K85.pdd1
 
 (dlplus will get both files from /usr/local/lib/dl)
 

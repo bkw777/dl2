@@ -1,57 +1,83 @@
 Disk Image Files
 
-This feature is new, crude, and limited at present.
+This feature is new and limited at present.
 
 The -i option takes a filename of a disk image file of a TPDD1/FB-100
-disk (no TPDD2).
+disk (no TPDD2 support yet).
 
 If the file does not already exist, and the client issues a format command,
 the file will be created and filled with nulls and sector headers.
 
-A disk image file is composed of 80 1293-byte records.
+Both TPDD1 and TPDD2 are described here but only TPDD1 is actually supported
+yet. The TPDD2 image file format is just already known because pdd.sh already
+uses it, and dlplus will eventually use the same thing.
 
-Each record is one full physical sector,
-composed of an ID section and a DATA section:
+A *.pdd1 TPDD1 disk image file is composed of 80 records.
+Each record is composed of 3 fields: Logical Size Code, ID, DATA
 
-   +-----------------------------------------------------------+
-   |                   FULL PHYSICAL SECTOR                    |
-   +----------+------------------------------------------------+
-   |    ID    |                     DATA                       |
-   +----------+------------------------------------------------+
-   | 13 bytes |                  1280 bytes                    |
-   +----------+------------------------------------------------+
+   +--------+----------+---------------------------------------+
+   |  LSC   |    ID    |                DATA                   |
+   +--------+----------+---------------------------------------+
+   | 1 byte | 12 bytes |             1280 bytes                |
+   +--------+----------+---------------------------------------+
 
-The ID section is composed of the logical block size code
-and 12 bytes of ID data
-   +-----------------------------------------------------------+
-   |                            ID                             |
-   +-----------+-----------------------------------------------+
-   |  logical  |                                               |
-   | size code |                   ID data                     |
-   +-----------+-----------------------------------------------+
-   |  1 byte   |                   12 bytes                    |
-   +-----------+-----------------------------------------------+
+A *.pdd2 TPDD2 disk image is composed of 160 records.
+Each record is composed of 2 fields: METADATA, DATA
+
+   +----------+------------------------------------------------+
+   |   META   |                    DATA                        |
+   +----------+------------------------------------------------+
+   | 4 bytes  |                 1280 bytes                     |
+   +----------+------------------------------------------------+
 
 There are no delimiters or other formatting bytes anywhere.
 
-See the software manual in the ref/ directory for the info about
-the contents of the fields and how they are accessed.
+See the software manual in the ref/ directory and github.com/bkw777/pdd.sh
+for the info about the contents of the fields and how they are accessed.
 
 This is a subset of the fields on a real disk, but it's everything
 needed to duplicate a disk. The other fields are just things a
 real drive uses internally.
 
-Currently, disk image files are only usable for the FDC-mode sector access
+Currently, disk image files are only usable for TPDD1 FDC-mode sector access
 commands. Meaning you can not use dlplus to access the files within a disk
 image, only read and write the raw sectors. It's useful for cloning whole
 disks that are otherwise impossible to copy by normal file-access commands,
-and for applications that only use FDC-mode commands like databases.
-The included Disk_Power.K85.pdd1 disk image is a normal disk with a
-filesystem and files, but the Disk_Power installer actually only uses
-sector-access commands to install itself.
+and useful for applications that only use FDC-mode commands like databases.
 
-https://github.co/bkw777/pdd.sh now uses the same image file format, so
-you can use pdd.sh to create disk images from real disks or create real
-dusks from image files.
+Two examples so far are a dictionary disk for Sardine,
+and the install disk for Disk Power KC-85.
 
+Sardine's dictionary disk is a pure data disk with no filesystem.
 
+Disk Power's install disk is a normal disk with a filesystem and files,
+but the installer uses sector-access commands to read 4 64-byte chunks
+of raw data from an unmarked sector.
+
+Generally, you also need to use some extra commandline options to disable
+TS-DOS DME support: "-e" , and to force TPDD1-only emulation: "-m 1" .
+Ex: $ dl -vue -m 1 -i Sardine_American_English.pdd1
+It's not a requirement of using disk images in general, it's just that in both
+real example uses so far, the client software triggers unexpected responses
+that a real drive wouldn't do. Disabling TPDD2 and DME makes dlplus act more
+like a real TPDD1 drive, and allows the client software to work.
+
+https://github.co/bkw777/pdd.sh creates disk image files from real disks,
+and re-creates real disks from disk image files of this same format.
+
+dlplus can also create new disk images from client-issued format and sector
+access commands. Ex: run "$ dl -vve -m 1 -i ./newdisk.pdd1"
+and then use a client to "format" and write data with sector access commands.
+
+For TPDD1, both the fdc-mode the opr-mode format commands do what a real drive
+does. The fdc-mode format just generates all nulls and the one logical size
+code byte per record, which creates a raw data disk with no filesystem like the
+Sardine dictionary disk. The opr-mode format command does the same as fdc-mode
+format with logical size code 0 (64-byte logical sectors) and then writes the
+single byte of non-null data at the right address to create a valid Space
+Management Table, which makes the disk into a filesystem disk.
+
+Real disks can only be dumped or restored using the matching type of drive.
+IE, although a TPDD2 drive is partly backwards compatible enough to read a
+TPDD1 disk, you must use a TPDD1 drive to dump a TPDD1 disk to a .pdd1 file
+or to restore a .pdd1 image to a real disk, and the same for TPDD2 & .pdd2

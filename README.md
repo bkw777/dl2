@@ -131,14 +131,14 @@ $ dl -vi tpdd1_disk_image.pdd1
 Support for raw disk image files that allow use of FDC-mode sector access commands on a virtual disk image file.  
 Limitations: Only TPDD1 disks, only sector access. You can't access the files on a disk as files, just as raw sectors, and TPDD2 disks and TPDD2 sector/cache commands aren't supported.
 
-Working examples: Sardine_American.pdd1, Disk_Power_KC-85.pdd1
+Working examples: Sardine_American_English.pdd1, Disk_Power_KC-85.pdd1
 
 Example, using Sardine with a Model 100 with [Ultimate ROM II rom](http://www.club100.org/library/librom.html) (or [REX](http://bitchin100.com/wiki/index.php?title=Rex) with UR-II loaded):  
-First, run dl with the following commandline arguments to force TPDD1 emulation, disable TS-DOS directory support, and load the Sardine American dictionary disk:  
+First, run dl with the following commandline arguments to force TPDD1 emulation, disable TS-DOS directory support, and load the Sardine American English dictionary disk:  
 ```
-$ dl -vue -m 1 -i Sardine_American.pdd1
+$ dl -vue -m 1 -i Sardine_American_English.pdd1
 ```
-This provides both SAR100.CO and the dictionary disk. SAR100.CO (and SAR200.CO) are installed in /usr/local/lib/dl, and are "magic" files that are always found when the client tries to load them, even if they aren't in the directory being shared. Similarly, Sardine_American.pdd1 is in the same lib directory and is found when you specify the filename without any path.  
+This provides both SAR100.CO and the dictionary disk. SAR100.CO (and SAR200.CO) are installed in /usr/local/lib/dl, and are "magic" files that are always found when the client tries to load them, even if they aren't in the directory being shared. Similarly, Sardine_American_English.pdd1 is in the same lib directory and is found when you specify the filename without any path.  
 Enter the UR-2 menu. Notice the SARDIN entry with the word OFF under it. Hit enter on SARDIN. Say Y if you get a prompt about HIMEM.  
 This loads SAR100.CO into ram, and now the SARDIN entry says ON under it.  
 Now enter T-Word and start a new document and type some text.  

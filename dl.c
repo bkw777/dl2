@@ -1145,7 +1145,7 @@ void req_fdc() {
 	} else {
 		if (model==2) { ret_std(ERR_PARAM); return; } // real tpdd2 returns
 		opr_mode = 0;
-		dbg(1,"Switching to \"FDC\" mode\n");
+		dbg(1,"Switching to \"FDC\" mode\n"); // no response to client, just switch modes
 	}
 }
 
