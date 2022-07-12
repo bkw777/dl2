@@ -34,7 +34,7 @@
 #define RET_PDD2_UNK23    0x14 // TPDD2 unknown function - "TS-DOS mystery" TS-DOS uses to detect TPDD2
 #define RET_CONDITION     0x15 // TPDD2
 #define RET_CACHE_STD     0x38 // TPDD2 shared return format for: cache_load cache_write cond_list
-#define RET_READ_CACHE    0x39 // TPDD2
+#define RET_CACHE_READ    0x39 // TPDD2
 #define RET_PDD2_UNK11    0x3A // TPDD2 unknown function
 #define RET_PDD2_UNK33    0x3A // TPDD2 same as UNK11
 
@@ -137,20 +137,39 @@
 #define PDD2_COND_POWER       0x01 // bit 0 : low power
 #define PDD2_COND_NONE        0x00 // no conditions
 
-// fixed lengths
+// lengths & addresses
 #define PDD1_TRACKS           40
 #define PDD1_SECTORS          2
 #define PDD2_TRACKS           80
 #define PDD2_SECTORS          2
-#define TPDD_DATA_MAX         0x80
+#define TPDD_DATA_MAX         260  // largest packet is cache_read can be 256+3
+#define REQ_RW_DATA_MAX       128  // largest chunk size in req_read() req_write()
 #define LEN_RET_STD           0x01
 #define LEN_RET_DME           0x0B
 #define LEN_RET_DIRENT        0x1C
 #define TPDD_FILENAME_LEN     24
 #define LOCAL_FILENAME_MAX    256
-#define PDD1_SECTOR_ID_LEN    13
-#define PDD1_ID_HDR_LEN       1
-#define PDD1_SECTOR_DATA_LEN  1280
+#define SECTOR_DATA_LEN       1280
+#define PDD1_SECTOR_LSC_LEN   1
+#define PDD1_SECTOR_ID_LEN    12
+#define PDD1_SECTOR_META_LEN  (PDD1_SECTOR_LSC_LEN+PDD1_SECTOR_ID_LEN)
+#define PDD2_SECTOR_META_LEN  4
+#define SMT_OFFSET            1240
+#define PDD1_SMT              0x80
+#define PDD2_SMT              0xC0
+#define PDD2_META_ADDR        32772
+#define PDD2_CACHE_READ_MAX   252
+#define PDD2_CACHE_WRITE_MAX  127
+
+// flags
+#define FE_FLAGS_NONE 0x00
+#define FE_FLAGS_DIR  0x01
+#define NO_RET        0
+#define ALLOW_RET     1
+#define CACHE_LOAD    0
+#define CACHE_UNLOAD  2
+#define CACHE_AREA_DATA 0
+#define CACHE_AREA_META 1
 
 // KC-85 platform BASIC interpreter EOL & EOF bytes for bootstrap()
 #define BASIC_EOL 0x0D
@@ -160,14 +179,5 @@
 #define OPR_CMD_SYNC 0x5A
 #define FDC_CMD_EOL 0x0D
 
-#define FE_FLAGS_NONE 0x00
-#define FE_FLAGS_DIR 0x01
-#define RD 0
-#define WR 1
-#define RW 2
-
-
-#define NO_RET 0
-#define ALLOW_RET 1
 
 #endif // PDD_CONSTANTS_H

@@ -49,6 +49,7 @@ CLIENT_DOCS := \
 
 DOCS := dl.do README.txt README.md LICENSE $(CLIENT_DOCS)
 SOURCES := dl.c dir_list.c
+HEADERS := dir_list.h constants.h
 
 ifeq ($(OS),Darwin)
  #DEFAULT_CLIENT_TTY := cu.*
@@ -75,7 +76,7 @@ endif
 .PHONY: all
 all: $(APP_NAME)
 
-$(APP_NAME): $(SOURCES)
+$(APP_NAME): $(SOURCES) $(HEADERS)
 	$(CC) $(CFLAGS) $(DEFINES) $(SOURCES) $(LDLIBS) -o $(@)
 
 install: $(APP_NAME) $(CLIENT_LOADERS) $(LIB_OTHER) $(DOCS)

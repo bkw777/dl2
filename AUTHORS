@@ -1,11 +1,11 @@
 dlplus:
 Stephen Hurd        Initial versions 1.0-1.3
 John R. Hogerhuis   Enhancements including WP-2 support
-Brian K. White      Bootstrap function and loaders library
+Brian K. White      Bootstrap function and loader collection
                     main cmd scanner, serial tty handling
-                    FDC-mode disk image sector access support
-                    magic files for UR-II
-Gabriele Gorla      Support for TS-DOS subdirectories
+                    magic files for UR-II ts-dos & sardine
+                    pdd1 & pdd2 disk image sector access
+Gabriele Gorla      TS-DOS subdirectories
 
 TPDD Clients & loaders:
 Kurt McCullum       TS-DOS loaders

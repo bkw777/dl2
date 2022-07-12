@@ -33,7 +33,7 @@ static FILE_ENTRY *tblp = 0;
 static FILE_ENTRY * current_record (void);
 
 int file_list_init () {
-	tblp = malloc (sizeof (FILE_ENTRY) * FEQ );
+	tblp = malloc(sizeof (FILE_ENTRY) * FEQ );
 	if (!tblp) return -1;
 	allocated = FEQ;
 	ndx = 0;
@@ -45,7 +45,7 @@ int file_list_cleanup() {
 	allocated = 0;
 	ndx = 0;
 	cur = 0;
-	if (tblp) free (tblp);
+	if (tblp) free(tblp);
 	tblp = NULL;
 	return 0;
 }
@@ -58,7 +58,7 @@ int add_file (FILE_ENTRY *fe) {
 	/** allocate FEQ more records if out of space */
 	if (ndx >= allocated) {
 		/** resize the array */
-		tblp = realloc (tblp, (allocated + FEQ) * sizeof (FILE_ENTRY) );
+		tblp = realloc(tblp, (allocated + FEQ) * sizeof (FILE_ENTRY) );
 		if (!tblp) return -1;
 		allocated += FEQ;
 	}
@@ -66,7 +66,7 @@ int add_file (FILE_ENTRY *fe) {
 	/** reference the entry */
 	if (!tblp) return -1;
 
-	memcpy (tblp+ndx, fe, sizeof(FILE_ENTRY));
+	memcpy(tblp+ndx, fe, sizeof(FILE_ENTRY));
 	/** adjust cur to address this record, ndx to next avail */
 	cur = ndx;
 	ndx++;
@@ -96,7 +96,7 @@ FILE_ENTRY * get_next_file (void) {
 FILE_ENTRY * get_prev_file (void) {
 	if (cur==0) return NULL;
 	cur--;
-	return current_record ();
+	return current_record();
 }
 
 static FILE_ENTRY * current_record (void) {

@@ -176,7 +176,7 @@ int client_tty_fd = -1;
 int disk_img_fd = -1;
 struct termios client_termios;
 int o_file_h = -1;
-unsigned char gb[TPDD_DATA_MAX+3];
+unsigned char gb[TPDD_DATA_MAX];
 char cwd[PATH_MAX] = {0x00};
 char dme_cwd[7] = DEFAULT_DME_ROOT_LABEL;
 char bootstrap_fname[PATH_MAX] = {0x00};
@@ -185,11 +185,11 @@ bool dme_detected = false;
 bool dme_fdc = false;
 bool dme_disabled = false;
 char ch[2] = {0xFF};
-const uint8_t ilen = PDD1_SECTOR_ID_LEN;
-const uint16_t dlen = PDD1_SECTOR_DATA_LEN;
-unsigned char sb[(PDD1_SECTOR_ID_LEN+PDD1_SECTOR_DATA_LEN)]={0x00}; // avoid malloc/free
+uint8_t mlen = PDD2_SECTOR_META_LEN;
+const uint16_t dlen = SECTOR_DATA_LEN;
 const int fdc_logical_size_codes[] = FDC_LOGICAL_SIZE_CODES;
 const char fdc_cmds[] = FDC_CMDS;
+unsigned char * rb = 0x00;
 
 FILE_ENTRY *cur_file;
 int dir_depth=0;
@@ -214,11 +214,11 @@ void dbg( const int v, const char* format, ... ) {
 // (verbosity_threshold, buffer , len)
 // dbg_b(3, b , 24); // like dbg() except
 // print the buffer as hex pairs with a single trailing newline
-// if len<0, then assume the max tpdd buffer TPDD_DATA_MAX+3 (131)
+// if len<0, then assume the max tpdd buffer TPDD_DATA_MAX
 void dbg_b(const int v, unsigned char *b, int n) {
 	if (debug<v) return;
 	unsigned i;
-	if (n<0) n = TPDD_DATA_MAX+3;
+	if (n<0) n = TPDD_DATA_MAX;
 	for (i=0;i<n;i++) fprintf (stderr,"%02X ",b[i]);
 	fprintf (stderr, "\n");
 	fflush(stderr);
@@ -433,7 +433,7 @@ unsigned char checksum(unsigned char *b) {
 	return ~(s&0xFF);
 }
 
-char *collapse_padded_name(char *fname) {
+char *collapse_padded_fname(char *fname) {
 	dbg(3,"%s(\"%s\")\n",__func__,fname);
 	if (!dot_offset) return fname;
 
@@ -510,8 +510,8 @@ void ret_fdc_std(uint8_t e, uint8_t s, uint16_t l) {
 
 /*
 int seek_disk_image (int p, int l, int r) {
-	int s = (p*(ilen+dlen));
-	if (l) s+=ilen+l*llen-l;
+	int s = (p*(mlen+dlen));
+	if (l) s+=mlen+l*llen-l;
 	return lseek(disk_img_fd,s,SEEK_SET);
 }
 */
@@ -526,12 +526,12 @@ int open_disk_image (int p, int m, int r) {
 	int of; int e=ERR_FDC_SUCCESS;
 
 	switch (m) {
-		case RW: of=O_RDWR; dbg(2,"edit\n");
+		case O_RDWR: of=O_RDWR; dbg(2,"edit rw\n");
 			if (access(disk_img_fname,W_OK)) e=ERR_FDC_WRITE_PROTECT;
 			break;
-		case WR: of=O_WRONLY;
+		case O_WRONLY: of=O_WRONLY;
 			if (access(disk_img_fname,F_OK)) { of|=O_CREAT; dbg(2,"create\n");} else {
-				of|=O_TRUNC; dbg(2,"overwite\n");
+				dbg(2,"edit wo\n");
 				if (access(disk_img_fname,W_OK)) e=ERR_FDC_WRITE_PROTECT;
 			}
 			break;
@@ -544,7 +544,7 @@ int open_disk_image (int p, int m, int r) {
 	}
 
 	if (!e) {
-		int s = (p*(ilen+dlen)); // initial seek position to start of physical sector
+		int s = (p*(mlen+dlen)); // initial seek position to start of physical sector
 		if (lseek(disk_img_fd,s,SEEK_SET)!=s) e=ERR_FDC_READ;
 	}
 
@@ -581,21 +581,21 @@ void req_fdc_condition() {
 void req_fdc_format(int lc) {
 	dbg(2,"%s(%d)\n",__func__,lc);
 	int ll = lsc_to_len(lc);
-	int pn = 0;     // physical sector number
-	int tl = ilen+dlen; // total length
-	int sc = (PDD1_TRACKS*PDD1_SECTORS);
+	int rn = 0;     // physical sector number
+	int rl = mlen+dlen; // total length
+	int rc = (PDD1_TRACKS*PDD1_SECTORS);
 
 	dbg(0,"Format: Logical sector size: %d = %d\n",lc,ll);
 
-	if (open_disk_image(0,WR,ALLOW_RET)) return;
+	if (open_disk_image(0,O_RDWR,ALLOW_RET)) return;
 
-	memset(sb,0x00,tl);
-	sb[0]=lc;            // logical sector size code
-	for (pn=0;pn<sc;pn++) {
-		if (write(disk_img_fd,sb,tl)<0) {
+	memset(rb,0x00,rl);
+	rb[0]=lc;            // logical sector size code
+	for (rn=0;rn<rc;rn++) {
+		if (write(disk_img_fd,rb,rl)<0) {
 			dbg(0,"%s\n",strerror(errno));
 			(void)(close(disk_img_fd)+1);
-			ret_fdc_std(ERR_FDC_READ,pn,0);
+			ret_fdc_std(ERR_FDC_READ,rn,0);
 			return;
 		}
 	}
@@ -607,14 +607,14 @@ void req_fdc_format(int lc) {
 // p = physical sector number
 void req_fdc_read_id(int p) {
 	dbg(2,"%s(%d)\n",__func__,p);
-	if (open_disk_image(p,RD,ALLOW_RET)) return; // open and seek
-	int r = read(disk_img_fd,sb,ilen);  // read ID section
-	dbg_b(2,sb,ilen);
-	int l = lsc_to_len(sb[0]);          // get logical size from header
+	if (open_disk_image(p,O_RDONLY,ALLOW_RET)) return; // open and seek
+	int r = read(disk_img_fd,rb,mlen);  // read ID section
+	dbg_b(2,rb,mlen);
+	int l = lsc_to_len(rb[0]);          // get logical size from header
 	ret_fdc_std(ERR_FDC_SUCCESS,p,l);   // send OK
 	char t=0x00; read_client_tty(&t,1); // read 1 byte from client
 	if (t!=FDC_CMD_EOL) return; // if it's anything but CR, silently abort
-	write_client_tty(sb+PDD1_ID_HDR_LEN,r-PDD1_ID_HDR_LEN); // send data
+	write_client_tty(rb+1,r-1); // send data
 	(void)(close(disk_img_fd)+1);
 }
 
@@ -622,27 +622,27 @@ void req_fdc_read_id(int p) {
 // tl = target logical sector
 void req_fdc_read_sector(int tp,int tl) {
 	dbg(2,"%s(%d,%d)\n",__func__,tp,tl);
-	if (open_disk_image(tp,RD,ALLOW_RET)) return; // open & seek to tp
-	if (read(disk_img_fd,sb,ilen)!=ilen) { // read ID section
+	if (open_disk_image(tp,O_RDONLY,ALLOW_RET)) return; // open & seek to tp
+	if (read(disk_img_fd,rb,mlen)!=mlen) { // read ID section
 		dbg(1,"failed read ID\n");
 		(void)(close(disk_img_fd)+1);
 		ret_fdc_std(ERR_FDC_READ,tp,0);
 		return;
 	}
-	dbg_b(3,sb,ilen);
+	dbg_b(3,rb,mlen);
 
-	int l = lsc_to_len(sb[PDD1_ID_HDR_LEN-1]); // get logical size from header
+	int l = lsc_to_len(rb[0]); // get logical size from header
 
 	// seek to target_physical*(id_len+physical_len) + id_len + (target_logical-1)*logical_len
-	int s = (tp*(ilen+dlen))+ilen+((tl-1)*l);
+	int s = (tp*(mlen+dlen))+mlen+((tl-1)*l);
 	if (lseek(disk_img_fd,s,SEEK_SET)!=s) {
 		dbg(1,"failed seek %d : %s\n",s,strerror(errno));
 		(void)(close(disk_img_fd)+1);
 		ret_fdc_std(ERR_FDC_READ,tp,0);
 		return;
 	}
-	memset(sb,0x00,l);
-	if (read(disk_img_fd,sb,l)!=l) { // read one logical sector of DATA
+	memset(rb,0x00,l);
+	if (read(disk_img_fd,rb,l)!=l) { // read one logical sector of DATA
 		dbg(1,"failed logical sector read\n");
 		(void)(close(disk_img_fd)+1);
 		ret_fdc_std(ERR_FDC_READ,tp,0);
@@ -652,7 +652,7 @@ void req_fdc_read_sector(int tp,int tl) {
 	char t=0x00;
 	read_client_tty(&t,1);  // read 1 byte from client
 	if (t!=0x0D) return;    // if it's anything but CR, silently abort
-	write_client_tty(sb,l); // send data
+	write_client_tty(rb,l); // send data
 	(void)(close(disk_img_fd)+1);
 }
 
@@ -673,15 +673,15 @@ void req_fdc_search_id() {
 
 void req_fdc_write_id(uint16_t tp) {
 	dbg(2,"%s(%d)\n",__func__,tp);
-	int s = (tp*(ilen+dlen));
-	if (open_disk_image(s,RW,ALLOW_RET)) return; // we need both read & write
-	uint8_t r = read(disk_img_fd,sb,ilen); // read ID
-	dbg_b(2,sb,r);
-	int l = lsc_to_len(sb[0]); // get logical size from header
+	int s = (tp*(mlen+dlen));
+	if (open_disk_image(s,O_RDWR,ALLOW_RET)) return; // we need both read & write
+	uint8_t r = read(disk_img_fd,rb,mlen); // read ID
+	dbg_b(2,rb,r);
+	int l = lsc_to_len(rb[0]); // get logical size from header
 
 	// seek file back to tp+hdr (skip the ID header to the start of the 12 bytes of user ID data)
-	if (lseek(disk_img_fd,s+PDD1_ID_HDR_LEN,SEEK_SET)!=s+PDD1_ID_HDR_LEN) {
-		dbg(1,"failed seek %d : %s\n",s+PDD1_ID_HDR_LEN,strerror(errno));
+	if (lseek(disk_img_fd,s+1,SEEK_SET)!=s+1) {
+		dbg(1,"failed seek %d : %s\n",s+1,strerror(errno));
 		(void)(close(disk_img_fd)+1);
 		ret_fdc_std(ERR_FDC_READ,tp,0);
 		return;
@@ -689,10 +689,10 @@ void req_fdc_write_id(uint16_t tp) {
 
 	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // tell client to send data
 
-	read_client_tty(sb,ilen-PDD1_ID_HDR_LEN); // read 12 bytes from client
+	read_client_tty(rb,PDD1_SECTOR_ID_LEN); // read 12 bytes from client
 
 	// write those to the file
-	if (write(disk_img_fd,sb,ilen-PDD1_ID_HDR_LEN)<0) {
+	if (write(disk_img_fd,rb,PDD1_SECTOR_ID_LEN)<0) {
 		dbg(0,"%s\n",strerror(errno));
 		(void)(close(disk_img_fd)+1);
 		ret_fdc_std(ERR_FDC_READ,tp,0);
@@ -708,18 +708,18 @@ void req_fdc_write_id(uint16_t tp) {
 
 void req_fdc_write_sector(int tp,int tl) {
 	dbg(2,"%s(%d,%d)\n",__func__,tp,tl);
-	if (open_disk_image(tp,RW,ALLOW_RET)) return; // open & seek to tp
-	if (read(disk_img_fd,sb,ilen)!=ilen) { // read ID section
+	if (open_disk_image(tp,O_RDWR,ALLOW_RET)) return; // open & seek to tp
+	if (read(disk_img_fd,rb,mlen)!=mlen) { // read ID section
 		dbg(0,"failed read ID\n");
 		(void)(close(disk_img_fd)+1);
 		ret_fdc_std(ERR_FDC_READ,tp,0);
 		return;
 	}
 
-	int l = lsc_to_len(sb[0]); // get logical size from header
+	int l = lsc_to_len(rb[0]); // get logical size from header
 
 	// seek to target_physical*full_sectors+ID+target_logical*logical_size
-	int s = (tp*(ilen+dlen))+ilen+((tl-1)*l);
+	int s = (tp*(mlen+dlen))+mlen+((tl-1)*l);
 	if (lseek(disk_img_fd,s,SEEK_SET)!=s) {
 		dbg(0,"failed seek %d : %s\n",s,strerror(errno));
 		(void)(close(disk_img_fd)+1);
@@ -729,10 +729,10 @@ void req_fdc_write_sector(int tp,int tl) {
 
 	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // tell client to send data
 
-	read_client_tty(sb,l); // read logical_size bytes from client
+	read_client_tty(rb,l); // read logical_size bytes from client
 
 	// write them to the file
-	if (write(disk_img_fd,sb,l)<0) {
+	if (write(disk_img_fd,rb,l)<0) {
 		dbg(0,"%s\n",strerror(errno));
 		(void)(close(disk_img_fd)+1);
 		ret_fdc_std(ERR_FDC_READ,tp,0);
@@ -756,17 +756,9 @@ void get_fdc_cmd(void) {
 	int p = -1;
 	int l = -1;
 
-	// Somewhat inelegant, but the client & server get out of sync too easily.
-	// The various error responses are important for model detection.
-	// TS-DOS, Sardine, etc all send bad commands intentionally to detect
-	// the difference between TPDD2 and TPDD1 and the original Desk-Link
-	// So the breaks and error returns below, and the particular conditions
-	// that cause them, are not random guesses, they are from testing with
-	// TS-DOS, Sardine, & other clients, and real drives.
-
 	// see if the command byte was collected already by req_fdc()
 	if (gb[0]>0x00 && gb[0]!=FDC_CMD_EOL && gb[1]==0x00) c=gb[0];
-	memset(gb,0x00,TPDD_DATA_MAX+3);
+	memset(gb,0x00,TPDD_DATA_MAX);
 
 	// scan for a valid command byte first
 	while (!c) {
@@ -799,9 +791,9 @@ void get_fdc_cmd(void) {
 	// (format & condition have different meanings but the rule still holds)
 	p=0; // real drive uses physical sector 0 when omitted
 	l=1; // real drive uses logical sector 1 when omitted
-    char* t;
-    if ((t=strtok(b,","))!=NULL) p=atoi(t); // target physical sector number
-    if ((t=strtok(NULL,","))!=NULL) l=atoi(t); // target logical sector number
+	char* t;
+	if ((t=strtok(b,","))!=NULL) p=atoi(t); // target physical sector number
+	if ((t=strtok(NULL,","))!=NULL) l=atoi(t); // target logical sector number
 	if (p<0 || p>79 || l<1 || l>20) {ret_fdc_std(ERR_FDC_PARAM,0,0); return;}
 
 	// debug
@@ -824,9 +816,6 @@ void get_fdc_cmd(void) {
 			ret_fdc_std(ERR_FDC_COMMAND,0,0); // required for model detection
 	}
 }
-
-
-
 
 ////////////////////////////////////////////////////////////////////////
 //
@@ -895,7 +884,7 @@ FILE_ENTRY *make_file_entry(char *namep, uint16_t len, char flags) {
 void ret_std(unsigned char err) {
 	dbg(3,"%s()\n",__func__);
 	gb[0]=RET_STD;
-	gb[1]=0x01;
+	gb[1]=1;
 	gb[2]=err;
 	gb[3]=checksum(gb);
 	dbg(3,"Response: %02X\n",err);
@@ -968,7 +957,7 @@ int ret_dirent(FILE_ENTRY *ep) {
 	dbg(2,"%s(\"%s\")\n",__func__,ep->client_fname);
 	int i;
 
-	memset(gb,0x00,TPDD_DATA_MAX+3);
+	memset(gb,0x00,TPDD_DATA_MAX);
 	gb[0]=RET_DIRENT;
 	gb[1]=LEN_RET_DIRENT;
 
@@ -1040,7 +1029,7 @@ void dirent_set_name(unsigned char *b) {
 		}
 	} else {
 		if (!strncmp(filename+dot_offset+1,dme_dir_label,2)) f = FE_FLAGS_DIR;
-		cur_file=make_file_entry(collapse_padded_name(filename), 0, f);
+		cur_file=make_file_entry(collapse_padded_fname(filename), 0, f);
 		dbg(3,"New %s: \"%s\"\n",f==FE_FLAGS_DIR?"Directory":"File",cur_file->local_fname);
 		ret_dirent(NULL);
 	}
@@ -1143,7 +1132,7 @@ void req_fdc() {
 		dbg(3,"dme detected\n");
 		ret_dme_cwd();
 	} else {
-		if (model==2) { ret_std(ERR_PARAM); return; } // real tpdd2 returns
+		//if (model==2) { ret_std(ERR_PARAM); return; } // real tpdd2 returns
 		opr_mode = 0;
 		dbg(1,"Switching to \"FDC\" mode\n"); // no response to client, just switch modes
 	}
@@ -1262,7 +1251,7 @@ void req_read(void) {
 		return;
 	}
 
-	i = read(o_file_h, gb+2, TPDD_DATA_MAX);
+	i = read(o_file_h, gb+2, REQ_RW_DATA_MAX);
 
 	gb[0]=RET_READ;
 	gb[1] = (unsigned char) i;
@@ -1270,7 +1259,7 @@ void req_read(void) {
 
 	if (debug<4) {
 		dbg(1,".");
-		if (i<TPDD_DATA_MAX) dbg(1,"\n");
+		if (i<REQ_RW_DATA_MAX) dbg(1,"\n");
 	}
 
 	dbg(4,"...outgoing packet...\n");
@@ -1301,7 +1290,7 @@ void req_write(unsigned char *b) {
 
 	if (debug<4) {
 		dbg(1,".",b[1]);
-		if (b[1]<TPDD_DATA_MAX) dbg(1,"\n");
+		if (b[1]<REQ_RW_DATA_MAX) dbg(1,"\n");
 	}
 
 	if (write (o_file_h,b+2,b[1]) != b[1]) ret_std (ERR_SECTOR_NUM);
@@ -1325,32 +1314,196 @@ void ret_cache_std(int e) {
 	write_client_tty(gb,4);
 }
 
-void req_cache_load() {
-	dbg(3,"%s()\n",__func__);
+
+/*
+ * Load a sector from disk into rb[], or unload rb[] to a sector on the disk,
+ * and like a real drive, flushing the cache to disk does not clear the cache.
+ *
+ * rb[] (record buffer) is the drive cache
+ *
+ * Load/Unload Cache
+ * b[0] fmt 0x30
+ * b[1] len 0x05
+ *   b[2] action 0=load (cache<disk) 2=unload (cache>disk)
+ *   b[3] -
+ *   b[4] track 0-79
+ *   b[5] -
+ *   b[6] sector 0-1
+ */
+void req_cache_load(unsigned char *b) {
+	dbg(3,"%s(action=%u track=%u sector=%u)\n",__func__,b[2],b[4],b[6]);
 	if (model==1) return;
-	ret_cache_std(ERR_PARAM);
+	int a=b[2];
+	int t=b[4];
+	int s=b[6];
+	if ((a!=0 && a!=2) || t>79 || s>1) { ret_cache_std(ERR_PARAM); return; }
+	int rn = t*2 + s; // convert track#:sector# to linear record#
+	int rl = mlen+dlen;
+	int e;
+
+	switch (a) {
+		case CACHE_LOAD:
+			dbg(2,"cache load: track:%u  sector:%u\n",t,s);
+			e = open_disk_image (rn, O_RDONLY, NO_RET );
+			switch (e) { // convert the FDC error codes to equivalent OPR error codes
+				case ERR_FDC_NO_DISK: e=ERR_NO_DISK; break;
+				case ERR_FDC_WRITE_PROTECT: e=ERR_WRITE_PROTECT; break;
+				case ERR_FDC_READ: e=ERR_FMT_INTERRUPT; break;
+				case ERR_FDC_SUCCESS: e=ERR_SUCCESS;
+			}
+			if (e) { ret_cache_std(e); return; }
+			memset(rb,0x00,rl);
+			if (read(disk_img_fd,rb,rl)!=rl) {
+				dbg(2,"failed cache load\n");
+				(void)(close(disk_img_fd)+1);
+				ret_cache_std(ERR_DEFECTIVE);
+				return;
+			}
+			break;
+		case CACHE_UNLOAD:
+			dbg(2,"cache unload: track:%u  sector:%u\n",t,s);
+			e = open_disk_image (rn, O_WRONLY, NO_RET );
+			switch (e) { // convert the FDC error codes to equivalent OPR error codes
+				case ERR_FDC_NO_DISK: e=ERR_NO_DISK; break;
+				case ERR_FDC_WRITE_PROTECT: e=ERR_WRITE_PROTECT; break;
+				case ERR_FDC_READ: e=ERR_FMT_INTERRUPT; break;
+				case ERR_FDC_SUCCESS: e=ERR_SUCCESS;
+			}
+			if (e) { ret_cache_std(e); return; }
+			if (write(disk_img_fd,rb,rl)!=rl) {
+				dbg(2,"failed cache unload\n");
+				(void)(close(disk_img_fd)+1);
+				ret_cache_std(ERR_DEFECTIVE);
+				return;
+			}
+	}
+	(void)(close(disk_img_fd)+1);
+	dbg_b(3,rb,rl);
+	ret_cache_std(ERR_SUCCESS);
 }
 
-void req_cache_read() {
+/* Emulating access to the main data area is pretty straightforward, but the
+ * metadata area (or maybe it should be called a mode?) is mostly a mystery.
+ * So we aren't really implementing the full whatever a real drive does for
+ * metadata read/write, because we don't know what a real drive does. We just
+ * recognize one magic value for "offset" (which is probably not actually an
+ * offset while in metadata mode, but just 2 bytes with some other meaning),
+ * and treat that as an otherwise ordinary access but to the 4-byte metadata
+ * field instead of the main data field, and just return "success" for all
+ * other access to the metadata area without actually doing anything.
+ * Since all other observed accesses to the metadata area are always just writes
+ * without matching reads, and the data is always the same, it suggests these
+ * other writes are not storing data but issuing commands to control the drive.
+ *
+ * Some metadata accesses from common clients, not including ZZ or checksum:
+ * "metadatat access" = command 0x31 or 0x32, area/mode 0x01
+ *
+ * BACKUP.BA  len    area   offset      data
+ * 0x31,      0x04,  0x01,  0x00,0x83,  0x00,
+ * 0x31,      0x04,  0x01,  0x00,0x96,  0x00,
+ * 0x31,      0x07,  0x01,  0x80,0x04,  0x16,0x00,0x00,0x00    (data varies) this is the only one we actually do anything
+ *
+ * TS-DOS
+ * 0x31,      0x04,  0x01,  0x00,0x84,  0xFF,
+ * 0x31,      0x04,  0x01,  0x00,0x96,  0x0F,
+ * 0x31,      0x04,  0x01,  0x00,0x94,  0x0F,
+ */
+
+/*
+ * req:
+ * b[0] fmt
+ * b[1] len 4
+ *      b[2] area        0=data 1=meta
+ *      b[3] offset msb  0000-0500
+ *      b[4] offset lsb
+ *      b[5] dlen        00-FC
+ * b[6] chk
+ *
+ * ret:
+ * b[0] fmt ret_cache_read
+ * b[1] len
+ *      b[2] area        0=data 1=meta
+ *      b[3] offset msb
+ *      b[4] offset lsb
+ *      b[5+] data       dlen bytes
+ * b[#] chk
+ */
+void req_cache_read(unsigned char *b) {
 	dbg(3,"%s()\n",__func__);
 	if (model==1) return;
-	ret_cache_std(ERR_PARAM);
+	int a = b[2];
+	int o = b[3]*256+b[4];
+	int l = b[5];
+	int e = -1;
+	dbg(2,"cache_read: area:%u  offset:%u  len:%u\n",a,o,l);
+	switch (a) {
+		case CACHE_AREA_DATA:
+			if (o+l>SECTOR_DATA_LEN || l>PDD2_CACHE_READ_MAX) e=ERR_PARAM;
+			o+=PDD2_SECTOR_META_LEN; // shift offset past metadata field
+			break;
+		case CACHE_AREA_META:
+			if (o==PDD2_META_ADDR) { o=0; if (l>PDD2_SECTOR_META_LEN) e=ERR_PARAM; } // set offset to start of metadata field
+			else e=ERR_PARAM; // this is wrong, real drive returns all kinds of data
+			break;
+		default: e=ERR_PARAM;
+	}
+	if (e!=-1) { ret_cache_std(e); return; }
+	dbg(3,"offset:%u  len:%u\n",o,l);
+
+	// copy some data from rb[] and return to client
+	gb[0]=RET_CACHE_READ;
+	gb[1]=3+l;  // len = area + omsb + olsb + data
+	gb[2]=b[2]; // area
+	gb[3]=b[3]; // offset msb
+	gb[4]=b[4]; // offset lsb
+	memcpy(gb+5,rb+o,l); // data
+	gb[2+gb[1]]=checksum(gb); // chk
+	dbg_b(3,gb,-1);
+	write_client_tty(gb,2+gb[1]+1);
 }
 
 /*
- * TPDD2 sector cache write - but not really doing it.
- * Previously called "TS-DOS mystery command 1"
- * This is just something TS-DOS does to detect TPDD2. Respond just enough
- * to satisfy TS-DOS that it may use TPDD2 features like dirent(get-prev).
- * Just return a canned packet that means "cache write suceeded".
- * http://bitchin100.com/wiki/index.php?title=TPDD-2_Sector_Access_Protocol
- * https://github.com/bkw777/pdd.sh search for "pdd2_write_cache
- * FIXME: We should really only respond success if the payload exactly
- * matches TS-DOS's, and error any other attempt to use this function.
+ * TPDD2 sector cache write
+ * Previously called "TS-DOS mystery command 1" and had a canned response,
+ * now actually implements the function. Aside from being a normal PDD2 sector
+ * access command, TS-DOS uses it just to detect TPDD2
+ * 
+ * b[0] fmt
+ * b[1] len
+ *      b[2] area
+ *      b[3] offset msb
+ *      b[4] offset lsb
+ *      b[5+] data
+ * b[#] chk
  */
-void req_cache_write() {
+void req_cache_write(unsigned char *b) {
 	dbg(3,"%s()\n",__func__);
 	if (model==1) return;
+	int a = b[2];
+	int o = b[3]*256+b[4];
+	int s = 5; // start of data
+	int l = b[1]-3; // length of data = length of packet - area - omsb - olsb
+	int e = -1;
+	dbg(2,"cache_write: area:%u  offset:%u  len:%u\n",a,o,l);
+	switch (a) {
+		case CACHE_AREA_DATA:
+			if (o+l>SECTOR_DATA_LEN || l>PDD2_CACHE_WRITE_MAX) e=ERR_PARAM;
+			o+=PDD2_SECTOR_META_LEN; // shift offset past metadata field
+			break;
+		case CACHE_AREA_META:
+			if (o==PDD2_META_ADDR) { o=0 ;if (l>PDD2_SECTOR_META_LEN) e=ERR_PARAM; } // set offset to start of metadata field
+			else e=ERR_SUCCESS; // thumbs-up but don't actually do anything
+			break;
+		default: e=ERR_PARAM;
+	}
+	if (e!=-1) { ret_cache_std(e); return; }
+	dbg(3,"offset:%u  len:%u\n",o,l);
+
+	// copy data from client over part of rb[]
+	dbg_b(3,b+s,l);
+	dbg_b(3,rb,mlen+dlen);
+	memcpy(rb+o,b+s,l);
+	dbg_b(3,rb,mlen+dlen);
 	ret_cache_std(ERR_SUCCESS);
 }
 
@@ -1400,7 +1553,7 @@ void req_rename(unsigned char *b) {
 	dbg(3,"%s(%-24.24s)\n",__func__,b+2);
 	if (model==1) return;
 	char *t = (char *)b + 2;
-	memcpy(t,collapse_padded_name(t),TPDD_FILENAME_LEN);
+	memcpy(t,collapse_padded_fname(t),TPDD_FILENAME_LEN);
 	if (rename(cur_file->local_fname,t))
 		ret_std(ERR_SECTOR_NUM);
 	else {
@@ -1433,22 +1586,14 @@ void req_condition() {
 //   then: sector 0, byte 1240, write 0x80 (or physical:0 logical:20 byte:25 counting from 1
 void req_format() {
 	dbg(2,"%s()\n",__func__);
-	const int lc = 0;    // logical size code
-	const int ll = lsc_to_len(lc);   // logical sector length
-	//const int mp = 0;    // smt physical sector
-	const int ml = 20;   // smt logical sector
-	const int ms = 24;   // smt first byte (from 0)
-	const int md = 0x80; // smt first byte data (bit flag first sector used)
-	const int fsl = ilen+dlen; // full sector length
-	const int sc = (PDD1_TRACKS*PDD1_SECTORS); // sectors count
-
-	int pn = 0;          // physical sector number
+	const int rl = mlen+dlen; // img file record length
+	const int rc = model==1?(PDD1_TRACKS*PDD1_SECTORS):(PDD2_TRACKS*PDD2_SECTORS); // records count
+	int rn = 0;          // record number
 
 	dbg(0,"Operation-mode Format (make a filesystem)\n");
 
-	int e = open_disk_image(0,WR,NO_RET);
-	// convert the FDC error codes to equivalent OPR error codes
-	switch (e) {
+	int e = open_disk_image(0,O_WRONLY,NO_RET);
+	switch (e) { // convert the FDC error codes to equivalent OPR error codes
 		case ERR_FDC_NO_DISK: e=ERR_NO_DISK; break;
 		case ERR_FDC_WRITE_PROTECT: e=ERR_WRITE_PROTECT; break;
 		case ERR_FDC_READ: e=ERR_FMT_INTERRUPT; break;
@@ -1456,29 +1601,17 @@ void req_format() {
 	}
 	if (e) { ret_std(e); return; }
 
-	// create the blank space
-	memset(sb,0x00,fsl); // one full sector including size code, ID, & DATA
-	sb[0]=lc; // logical size code
-	for (pn=0;pn<sc;pn++) if (write(disk_img_fd,sb,fsl)<0) break;
-	if ((pn<sc)) {
-		dbg(0,"%s\n",strerror(errno));
-		(void)(close(disk_img_fd)+1);
-		ret_std(ERR_FMT_INTERRUPT);
-		return;
+	// write the image
+	for (rn=0;rn<rc;rn++) {
+		memset(rb,0x00,rl);
+		switch (model) {
+			case 1: if (rn==0) rb[SMT_OFFSET]=PDD1_SMT; break;
+			default: rb[0]=0x16; if (rn<2) { rb[1]=0xFF; rb[SMT_OFFSET]=PDD2_SMT; }
+		}
+		if (write(disk_img_fd,rb,rl)<0) break;
 	}
 
-	// write the SMT
-	memset(sb,0x00,ll);
-	sb[ms]=md;
-	const int s=ilen+ll*(ml-1);
-	if (lseek(disk_img_fd,s,SEEK_SET)!=s) {
-		dbg(0,"failed seek %d : %s\n",s,strerror(errno));
-		(void)(close(disk_img_fd)+1);
-		ret_std(ERR_FMT_INTERRUPT);
-		return;
-	}
-
-	if (write(disk_img_fd,sb,ll)<0) {
+	if (rn<rc) {
 		dbg(0,"%s\n",strerror(errno));
 		(void)(close(disk_img_fd)+1);
 		ret_std(ERR_FMT_INTERRUPT);
@@ -1492,15 +1625,15 @@ void req_format() {
 
 void get_opr_cmd(void) {
 	dbg(3,"%s()\n",__func__);
-	unsigned char b[TPDD_DATA_MAX+3] = {0x00};
+	unsigned char b[TPDD_DATA_MAX] = {0x00};
 	unsigned i = 0;
-	memset(gb,0x00,TPDD_DATA_MAX+3);
+	memset(gb,0x00,TPDD_DATA_MAX);
 
 	while (read_client_tty(&b,1) == 1) {
 		if (b[0]==OPR_CMD_SYNC) i++; else { i=0; b[0]=0x00; continue; }
 		if (i<2) { b[0]=0x00; continue; }
 		if (read_client_tty(&b,2) == 2) if (read_client_tty(&b[2],b[1]+1) == b[1]+1) break;
-		i=0; memset(b,0x00,TPDD_DATA_MAX+3);
+		i=0; memset(b,0x00,TPDD_DATA_MAX	);
 	}
 
 	dbg_p(3,b);
@@ -1526,9 +1659,9 @@ void get_opr_cmd(void) {
 		case REQ_CONDITION:     req_condition();     break;
 		case REQ_RENAME:        req_rename(b);       break;
 		case REQ_PDD2_UNK23:    ret_pdd2_unk23();    break;
-		case REQ_CACHE_LOAD:    req_cache_load();    break;
-		case REQ_CACHE_READ:    req_cache_read();    break;
-		case REQ_CACHE_WRITE:   req_cache_write();   break;
+		case REQ_CACHE_LOAD:    req_cache_load(b);   break;
+		case REQ_CACHE_READ:    req_cache_read(b);   break;
+		case REQ_CACHE_WRITE:   req_cache_write(b);  break;
 		case REQ_PDD2_UNK11:    ret_pdd2_unk11();    break;
 		case REQ_PDD2_UNK33:    ret_pdd2_unk11();    break;
 		default: dbg(1,"OPR: unknown cmd \"%02X\"\n",b[0]); if (debug<3) dbg_p(2,b);
@@ -1753,12 +1886,13 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	// convenience auto completes and fixups
+	// auto-completes & fixups
+	if (model<1||model>2) model=2;
+	if (model==1) mlen = PDD1_SECTOR_META_LEN;
 	resolve_client_tty_name();
 	find_lib_file(disk_img_fname);
+	if (disk_img_fname[0]) rb = malloc(mlen+dlen);
 	find_lib_file(bootstrap_fname);
-	if (model<1||model>2) model=2;
-
 	(void)(getcwd(cwd,PATH_MAX-1)+1);
 
 	if (x) { show_config(); return 0; }

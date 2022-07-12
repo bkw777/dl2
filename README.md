@@ -101,15 +101,6 @@ $ unzip REXCPMV21_b19.ZIP
 $ dl -vb ./rxcini.DO ;dl -vu
 ```
 
-## trivia
-The "ROOT  " and "PARENT" labels are not hard coded in TS-DOS. You can set them to other things. Sadly, this does not extend as far as being able to use ".." for "PARENT". TS-DOS thinks it's an invalid filename (even though it DISPLAYS it in the file list just fine. If it would just go ahead and send the command to "open" it, it would work.) However, plenty of other things that are all better than "ROOT  " and "PARENT" do work.
-```
-$ ROOT_LABEL=/ PARENT_LABEL=^ dl
-$ ROOT_LABEL='-root-' PARENT_LABEL='-back-' dl
-$ ROOT_LABEL='0:' PARENT_LABEL='^:' dl
-or you can confuse someone...  
-$ ROOT_LABEL='C:\' PARENT_LABEL='UP:' dl
-```
 ## UR-II
 Ultimate ROM II ([docs](http://www.club100.org/library/libdoc.html)) ([roms](https://bitchin100.com/wiki/index.php?title=REXsharp#Option_ROM_Images_for_Download)) has a feature where it can load a RAM version of TS-DOS from disk on-the-fly.  
 This allows you to keep the TS-DOS executable on the disk instead of in ram, and it is loaded and then discarded on-demand by selecting the TS-DOS menu entry from inside UR2.
@@ -124,16 +115,26 @@ Failing that, then it looks in the root share dir. Failing that, finally it gets
 
 [More details](ref/ur2.txt)
 
-## FDC-mode sector access - disk images
+## sector access - disk images
+For a TPDD1 disk image
 ```
-$ dl -vi tpdd1_disk_image.pdd1
+$ dl -v -m 1 -i disk_image.pdd1
+```  
+
+For a TPDD2 disk image
 ```
-Support for raw disk image files that allow use of FDC-mode sector access commands on a virtual disk image file.  
-Limitations: Only TPDD1 disks, only sector access. You can't access the files on a disk as files, just as raw sectors, and TPDD2 disks and TPDD2 sector/cache commands aren't supported.
+$ dl -v -m 2 -i disk_image.pdd2
+```
 
-Working examples: Sardine_American_English.pdd1, Disk_Power_KC-85.pdd1
+Support for disk image files that allow use of raw sector access commands on a virtual disk image file.  
+Limitations: Only supports sector access to the disk image. You can't "mount" the disk image and access the files on a disk as files, just as raw sectors.
 
-Example, using Sardine with a Model 100 with [Ultimate ROM II rom](http://www.club100.org/library/librom.html) (or [REX](http://bitchin100.com/wiki/index.php?title=Rex) with UR-II loaded):  
+Useful working examples: Sardine_American_English.pdd1, Disk_Power_KC-85.pdd1
+
+Those examples are both TPDD1, but both TPDD1 and TPDD2 are supported. Merely there are no known database application disks like Sardine on TPDD2 media to make a good TPDD2 example. You can load up the image of the TPDD2 Utility Disk included with pdd.sh just to see that it works, but that isn't useful for anything.  
+
+Example, using Sardine with a Model 100 with [Ultimate ROM II rom](http://www.club100.org/library/librom.html) (or [REX](http://bitchin100.com/wiki/index.php?title=Rex) with UR-II loaded):
+
 First, run dl with the following commandline arguments to force TPDD1 emulation, disable TS-DOS directory support, and load the Sardine American English dictionary disk:  
 ```
 $ dl -vue -m 1 -i Sardine_American_English.pdd1
@@ -153,6 +154,15 @@ Disk image files may be created 2 ways:
 
 Disk image format [disk_image_files.txt](ref/disk_image_files.txt)
 
+## trivia
+The "ROOT  " and "PARENT" labels are not hard coded in TS-DOS. You can set them to other things. Sadly, this does not extend as far as being able to use ".." for "PARENT", but many other things work. The ROOT label allows almost anything, the PARENT label is only limited by what TS-DOS thinks is a valid filename. Here are a few examples that do work.
+```
+$ ROOT_LABEL=/ PARENT_LABEL=^ dl
+$ ROOT_LABEL='-root-' PARENT_LABEL='-back-' dl
+$ ROOT_LABEL='0:' PARENT_LABEL='^:' dl
+or you can confuse someone...  
+$ ROOT_LABEL='C:\' PARENT_LABEL='UP:' dl
+```
 ## OS Compatibility
 Tested on Linux, Macos, FreeBSD
 

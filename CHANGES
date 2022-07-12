@@ -1,3 +1,7 @@
+20220712
+ Add sector access commands and disk image support for pdd1 & pdd2
+ Magic ts-dos & sardine files for UR-II
+
 20220530
  Replace main cmd parser. Improve tty efficiency.
 
