@@ -26,25 +26,22 @@ $ dl -h
 
 ```
 $ dl -h
-dl - DeskLink+ v1.5.010-47-g93f3db4 - help
+DeskLink+ v1.5.010-90-gf089dd1
+dl - DeskLink+ v1.5.010-90-gf089dd1 - main help
 
 usage: dl [options] [tty_device] [share_path]
 
 options:
-   -0       Raw mode. Do not munge filenames in any way.
-            Disables 6.2 or 8.2 filename trucating & padding
-            Changes the attribute byte to ' ' instead of 'F'
-            Disables adding the TS-DOS ".<>" extension for directories
-            The entire 24 bytes of the filename field on a real drive is used.
+   -0       Raw mode - no filename munging, attr = ' '
    -a c     Attr - attribute used for all files (F)
-   -b file  Bootstrap: Send loader file to client
-   -d tty   Serial device to client (ttyUSB0)
+   -b file  Bootstrap - send loader file to client
+   -d tty   Serial device connected to client (ttyUSB0)
    -e       Disable TS-DOS directory extension (enabled)
    -g       Getty mode - run as daemon
    -h       Print this help
    -i file  Disk image file for raw sector access, TPDD1 only
-   -l       List available loader files and bootstrap help
-   -m #     TPDD Model - 1 or 2 (2)
+   -l       List loader files and show bootstrap help
+   -m model Model: 1 for TPDD1, 2 for TPDD2 (2)
    -p dir   Share path - directory with files to be served (.)
    -r       RTS/CTS hardware flow control
    -s #     Speed - serial port baud rate 9600 or 19200 (19200)
@@ -53,14 +50,14 @@ options:
    -w       WP-2 mode - 8.2 filenames
    -z #     Milliseconds per byte for bootstrap (7)
 
-Alternative to the -d and -p options,
 The 1st non-option argument is another way to specify the tty device.
 The 2nd non-option argument is another way to specify the share path.
 
    dl
-   dl -vv /dev/ttyS0
-   dl ttyUSB1 -v -w ~/Documents/wp2files
+   dl -vvvu -p ~Downloads/REX/ROMS
+   dl -vw ttyUSB1 ~/Documents/wp2files
 
+$ 
 ```
 ```
 $ dl -l
@@ -79,8 +76,8 @@ if not found in the current directory.
 Examples:
 
    dl -b TS-DOS.100
-   dl -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
-   dl -b ./rxcini.DO
+   dl -vb ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
+   dl -vb rxcini.DO
 
 ```
 
@@ -98,7 +95,7 @@ $ dl -vb TS-DOS.100
 ## bootstrap a [REXCPM](http://bitchin100.com/wiki/index.php?title=REXCPM)
 ```
 $ unzip REXCPMV21_b19.ZIP
-$ dl -vb ./rxcini.DO ;dl -vu
+$ dl -vb rxcini.DO && dl -vu
 ```
 
 ## UR-II
@@ -131,26 +128,39 @@ Limitations: Only supports sector access to the disk image. You can't "mount" th
 
 Useful working examples: Sardine_American_English.pdd1, Disk_Power_KC-85.pdd1
 
-Those examples are both TPDD1, but both TPDD1 and TPDD2 are supported. Merely there are no known database application disks like Sardine on TPDD2 media to make a good TPDD2 example. You can load up the image of the TPDD2 Utility Disk included with pdd.sh just to see that it works, but that isn't useful for anything.  
+Those examples are both TPDD1, but both TPDD1 and TPDD2 are supported. There just are no known database application disks like Sardine on TPDD2 media to make a good TPDD2 example. You can load up the image of the TPDD2 Utility Disk included with pdd.sh just to see that it works, but that isn't useful for anything.  
 
-Example, using Sardine with a Model 100 with [Ultimate ROM II rom](http://www.club100.org/library/librom.html) (or [REX](http://bitchin100.com/wiki/index.php?title=Rex) with UR-II loaded):
+Example, using Sardine with a Model 100 with an [Ultimate ROM II rom](http://www.club100.org/library/librom.html) installed (or loaded in a [REX](http://bitchin100.com/wiki/index.php?title=Rex)):  
+One way to use Sardine is to let UR-II load/unload the program (SAR100.CO for model 100, or SAR200.CO for model 200) from disk into ram on the fly instead of installing permanently in ram normally, and then the program accesses a special dictionary data disk with sector access commands.  
+So for this to work, UR-II has to be able to load SAR100.CO from disk, and then SAR100.CO needs to be able to read raw sectors from the dictionary disk.  
+This involves two features of dlplus. First, magic files. SAR100.CO is one of the "magic" files bundled with the app, which are always loadable from a client even if there is no such file in the share directory. When UR-II tries to load a file by that name, if there is a file by that name in the current working directory it is used, but even if there is no such file, the file access still works because then it just comes from /usr/local/lib/dl .  
+Second, disk image files and sector-access commands. If a disk image file is loaded with the -i option, then when a client tries to use sector-access commands, they work, and the data reads from / writes to the image file. If the given filename does not exist it will be created if the client issues a format command. If the given filename does not exist and is not given with any leading path, then it is searched for in /usr/local/lib/dl, as a few special disks are bundled with the app, and the Sardine dictionary is one.  
 
-First, run dl with the following commandline arguments to force TPDD1 emulation, disable TS-DOS directory support, and load the Sardine American English dictionary disk:  
+To try it out,  
+
+1: Run dl with the following commandline arguments,
 ```
 $ dl -vue -m 1 -i Sardine_American_English.pdd1
 ```
-This provides both SAR100.CO and the dictionary disk. SAR100.CO (and SAR200.CO) are installed in /usr/local/lib/dl, and are "magic" files that are always found when the client tries to load them, even if they aren't in the directory being shared. Similarly, Sardine_American_English.pdd1 is in the same lib directory and is found when you specify the filename without any path.  
-Enter the UR-2 menu. Notice the SARDIN entry with the word OFF under it. Hit enter on SARDIN. Say Y if you get a prompt about HIMEM.  
-This loads SAR100.CO into ram, and now the SARDIN entry says ON under it.  
-Now enter T-Word and start a new document and type some text.  
-Finally, hit Graph+F to invoke Sardine to spell-check the document.
+This tells dlplus to strictly emulate a TPDD1, disable some TPDD2 features and TS-DOS directory support which confuses SAR100.CO, and load the Sardine American English dictionary disk for sector-access commands.  
+SAR100.CO is always being provided automatically regardless of any commandline options, and "-i Sardine_American_English.pdd1" will get "Sardine_American_English.pdd1" from /usr/local/lib/dl.  
 
-Example, installing Disk_Power for KC-85
-See [Disk_Power.txt](clients/disk_power/Disk_Power.txt)
+2: Enter the UR-2 menu.  
+Notice the SARDIN entry with the word OFF under it.  
+Hit enter on SARDIN.  
+Say Y if you get a prompt about HIMEM.  
+This loads SAR100.CO into ram, and now the SARDIN entry says ON under it.
+
+3: Enter T-Word and start a new document and type some text.  
+
+4: Press GRPH+F to invoke Sardine to spell-check the document.  
+This will invoke the SAR100.CO previously loaded, which will try to do TPDD1 FDC-mode sector access, wich dlplus will respond to with data from the .pdd1 file.  
+
+Another example, [installing Disk Power for Kyotronic KC-85](clients/disk_power/Disk_Power.txt)
 
 Disk image files may be created 2 ways:  
-* Run `dl -i ./filename` with a non-existing or empty file (include the ./ to prevent it from trying to find a file in /usr/local/ib/dl), and then issue a format command from a client. "client" may be TS-DOS or Floppy on a M100, or pdd.sh or PDD.EXE or TpddTool.py etc connected by a null-modem cable, or even a WP-2 or Z88, etc.)
-* Use [pdd.sh](https://github.com/bkw777/pdd.sh) "dump disk" command to read a real disk from a real drive into a disk image file. pdd.sh now uses the same binary disk image file format as dlplus.
+* Use [pdd.sh](https://github.com/bkw777/pdd.sh) **dd** command to read a real disk from a real drive into a disk image file.  
+* Run `dl -v -m 1 -i filename.pdd1` or `dl -v -m 2 -i filename.pdd2` with a non-existing or empty file, and then use a client to format disk and write sectors.
 
 Disk image format [disk_image_files.txt](ref/disk_image_files.txt)
 
@@ -164,6 +174,4 @@ or you can confuse someone...
 $ ROOT_LABEL='C:\' PARENT_LABEL='UP:' dl
 ```
 ## OS Compatibility
-Tested on Linux, Macos, FreeBSD
-
-Notes for [FreeBSD](ref/freebsd.txt)
+Tested on Linux, Macos, [FreeBSD](ref/freebsd.txt)

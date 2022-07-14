@@ -139,11 +139,11 @@ char * magic_files [] = {
 	"DOSNEC.CO",
 	"SAR100.CO",
 	"SAR200.CO",
-	"SARNEC.CO",
-	"DOSM10.CO", // these probably never existed
-	"DOSK85.CO",
-	"SARM10.CO",
-	"SARK85.CO"
+	"SARNEC.CO", // This is known to have existed, but is currently lost.
+	"DOSM10.CO", // The rest may have never existed,
+	"DOSK85.CO", // and the filenames are just guesses.
+	"SARM10.CO", //
+	"SARK85.CO"  //
 };
 
 // termios VMIN & VTIME
@@ -194,9 +194,7 @@ unsigned char * rb = 0x00;
 FILE_ENTRY *cur_file;
 int dir_depth=0;
 
-// blarghamagargles
 void show_main_help();
-
 
 /* primitives and utilities */
 
@@ -287,28 +285,24 @@ void find_lib_file (char *f) {
 	char t[PATH_MAX]={0x00};
 
 	if (f[0]=='~' && f[1]=='/') {
-		strcpy(t,getenv("HOME"));
-		strcat(t,f+1);
-	} else strcpy(t,f);
+		strcpy(t,f);
+		memset(f,0x00,PATH_MAX);
+		strcpy(f,getenv("HOME"));
+		strcat(f,t+1);
+	}
 
-	if (f[0]!='/' && !(f[0]=='.' && f[1]=='/')) {
-		if (access(t,F_OK)) memset(t,0x00,PATH_MAX);
-		if (t[0]==0) {
-			strcpy(t,app_lib_dir);
-			strcat(t,"/");
-			strcat(t,f);
+	if (f[0]!='/' && f[0]!='.' && f[1]!='/' && access(f,F_OK)) {
+		memset(t,0x00,PATH_MAX);
+		strcpy(t,app_lib_dir);
+		strcat(t,"/");
+		strcat(t,f);
+		if (!access(t,F_OK)) {
+			memset(f,0x00,PATH_MAX);
+			strcpy(f,t);
 		}
 	}
 
-	dbg(0,"Loading: \"%s\"\n",t);
-
-	if (access(t,F_OK)==-1) {
-		dbg(0,"Not found.\n");
-		return;
-	}
-
-	memset(f,0x00,PATH_MAX);
-	strcpy(f,t);
+	dbg(0,"Loading: \"%s\"\n",f);
 }
 
 void resolve_client_tty_name () {
@@ -1522,7 +1516,7 @@ void req_cache_write(unsigned char *b) {
 void ret_pdd2_unk23() {
 	dbg(3,"%s()\n",__func__);
 	if (model==1) return;
-	static unsigned char canned[] = {RET_PDD2_UNK23, 0x0F, 0x41, 0x10, 0x01, 0x00, 0x50, 0x05, 0x00, 0x02, 0x00, 0x28, 0x00, 0xE1, 0x00, 0x00, 0x00};
+	static unsigned char canned[] = UNK23_RET_DAT;
 	memcpy(gb, canned, canned[1]+2);
 	gb[canned[1]+2] = checksum(gb);
 	write_client_tty(gb, gb[1]+3);
@@ -1530,8 +1524,8 @@ void ret_pdd2_unk23() {
 
 /*
  * Similar to unk23, except the response is different, and not used by TS-DOS.
- * Nothing uses this command that I know of. I just found it by feeding
- * abitrary commands to a real drive with github/bkw777/pdd.sh
+ * Nothing is known to use this command. It was just found by feeding arbitrary
+ * commands to a real drive with github/bkw777/pdd.sh
  * 0x11 and 0x33 both produce the same response. Possibly 0x11 and 0x33 are
  * just different versions of the same function, like how 0x4# commands are
  * really just 0x0# commands for bank 1 instead of bank 0? Just a guess.
@@ -1542,8 +1536,8 @@ void ret_pdd2_unk23() {
  */
 void ret_pdd2_unk11() {
 	dbg(3,"%s()\n",__func__);
-	if (model==2) return;
-	static unsigned char canned[] = {RET_PDD2_UNK11, 0x06, 0x80, 0x13, 0x05, 0x00, 0x10, 0xE1};
+	if (model==1) return;
+	static unsigned char canned[] = UNK11_RET_DAT;
 	memcpy(gb, canned, canned[1]+2);
 	gb[canned[1]+2] = checksum(gb);
 	write_client_tty(gb, gb[1]+3);
@@ -1602,11 +1596,15 @@ void req_format() {
 	if (e) { ret_std(e); return; }
 
 	// write the image
+	// TPDD1 fresh OPR-mode format is strange.
+	// Sector 0 gets logical size code 0, and all other sectors get lsc 1.
+	// We exactly mimick that here "just because", even though the lsc 1's
+	// don't seem to serve any purpose or have any effect.
 	for (rn=0;rn<rc;rn++) {
 		memset(rb,0x00,rl);
 		switch (model) {
-			case 1: if (rn==0) rb[SMT_OFFSET]=PDD1_SMT; break;
-			default: rb[0]=0x16; if (rn<2) { rb[1]=0xFF; rb[SMT_OFFSET]=PDD2_SMT; }
+			case 1: if (rn==0) rb[PDD1_SECTOR_META_LEN+SMT_OFFSET]=PDD1_SMT; else rb[0]=1; break;
+			default: rb[0]=0x16; if (rn<2) { rb[1]=0xFF; rb[PDD2_SECTOR_META_LEN+SMT_OFFSET]=PDD2_SMT; }
 		}
 		if (write(disk_img_fd,rb,rl)<0) break;
 	}
@@ -1699,15 +1697,11 @@ void slowbyte(char b) {
 	write_client_tty(&b,1);
 	tcdrain(client_tty_fd);
 	usleep(BASIC_byte_us);
-	switch (debug) {
-		case 0: return;
-		case 1: dbg(0,"."); break;
-		case 2: // display nicely no matter if loader is CR, LF, or CRLF
-			if (b!=LOCAL_EOL && ch[0]==LOCAL_EOL) {ch[0]=0x00; dbg(0,"%c%c",LOCAL_EOL,b);}
-			else if (b==LOCAL_EOL || b==BASIC_EOL) ch[0]=LOCAL_EOL;
-			else if (isprint(b)) dbg(0,"%c",b);
-			else dbg(0,"\033[7m%02X\033[m",b); // hardcoded ansi/vt codes, sorry
-			break;
+	if (debug) {
+		if (b!=LOCAL_EOL && ch[0]==LOCAL_EOL) {ch[0]=0x00; dbg(0,"%c%c",LOCAL_EOL,b);}
+		else if (b==LOCAL_EOL || b==BASIC_EOL) ch[0]=LOCAL_EOL;
+		else if (isprint(b)) dbg(0,"%c",b);
+		else dbg(0,"\033[7m%02X\033[m",b); // hardcoded ansi/vt codes, sorry
 	}
 }
 
@@ -1724,7 +1718,7 @@ int send_BASIC(char *f) {
 	dbg(1,"\n");
 	while(read(fd,&b,1)==1) slowbyte(b);
 	close(fd);
-	if (dot_offset) { // don't modify data in raw mode
+	if (dot_offset) { // if not in raw mode supply missing trailing EOF & EOL
 		if (b!=LOCAL_EOL && b!=BASIC_EOL && b!=BASIC_EOF) slowbyte(BASIC_EOL);
 		if (b!=BASIC_EOF) slowbyte(BASIC_EOF);
 	}
@@ -1748,8 +1742,8 @@ int bootstrap(char *f) {
 	if (!access(t,F_OK)) dcat(t);
 	else dbg(0,"Prepare BASIC to receive:\n"
 		"\n"
-		"    RUN \"COM:98N1ENN\" [Enter]    <-- for TANDY/Olivetti/Kyotronic\n"
-		"    RUN \"COM:9N81XN\"  [Enter]    <-- for NEC\n");
+		"    RUN \"COM:98N1ENN\" [Enter]    <-- TANDY/Olivetti/Kyotronic\n"
+		"    RUN \"COM:9N81XN\"  [Enter]    <-- NEC\n");
 
 	dbg(0,"\nPress [Enter] when ready...");
 	getchar();
@@ -1797,7 +1791,7 @@ void show_config () {
 
 void show_main_help() {
 	dbg(0,
-		"%1$s - DeskLink+ " APP_VERSION " - help\n\n"
+		"%1$s - DeskLink+ " APP_VERSION " - main help\n\n"
 		"usage: %1$s [options] [tty_device] [share_path]\n"
 		"\n"
 		"options:\n"
@@ -1819,13 +1813,12 @@ void show_main_help() {
 		"   -w       WP-2 mode - 8.2 filenames\n"
 		"   -z #     Milliseconds per byte for bootstrap (%3$d)\n"
 		"\n"
-		"Alternative to the -d and -p options,\n"
 		"The 1st non-option argument is another way to specify the tty device.\n"
 		"The 2nd non-option argument is another way to specify the share path.\n"
 		"\n"
 		"   %1$s\n"
-		"   %1$s -vv /dev/ttyS0\n"
-		"   %1$s ttyUSB1 -v -w ~/Documents/wp2files\n\n"
+		"   %1$s -vvu -p ~Downloads/REX/ROMS\n"
+		"   %1$s -v -w ttyUSB1 ~/Documents/wp2files\n\n"
 	,args[0],DEFAULT_TPDD_FILE_ATTR,DEFAULT_BASIC_BYTE_MS);
 }
 

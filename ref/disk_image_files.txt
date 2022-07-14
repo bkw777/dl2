@@ -17,7 +17,7 @@ Each record is composed of 3 fields: Logical Size Code, ID, DATA
    | 1 byte | 12 bytes |             1280 bytes                |
    +--------+----------+---------------------------------------+
 
-A *.pdd2 TPDD2 disk image is composed of 160 records.
+A *.pdd2 TPDD2 disk image file is composed of 160 records.
 Each record is composed of 2 fields: METADATA, DATA
 
    +----------+------------------------------------------------+
@@ -31,17 +31,11 @@ There are no delimiters or other formatting bytes anywhere.
 See the software manual in the ref/ directory and github.com/bkw777/pdd.sh
 for the info about the contents of the fields and how they are accessed.
 
-This is a subset of the fields on a real disk, but it's everything
-needed to duplicate a disk. The other fields are just things a
-real drive uses internally.
-
 Currently, disk image files are only usable for sector access commands.
 Meaning you can not use dlplus to access the files within a disk image,
-only read and write the raw sectors. It's useful for cloning whole
-disks that are otherwise impossible to copy by normal file-access commands,
-and useful for applications that only use FDC-mode commands like databases.
+only read and write the raw sectors.
 
-Two examples so far are a dictionary disk for Sardine,
+Two example uses so far are the dictionary disk for Sardine,
 and the install disk for Disk Power KC-85.
 
 Sardine's dictionary disk is a pure data disk with no filesystem.
@@ -51,18 +45,20 @@ but the installer uses sector-access commands to read 4 64-byte chunks
 of raw data from an unmarked sector.
 
 Generally, you also need to use some extra commandline options to disable
-TS-DOS DME support: "-e" , and to force TPDD1-only or TPDD2-only emulation:
-"-m 1" / "-m 2".
-Ex: $ dl -vue -m 1 -i Sardine_American_English.pdd1
-It's not a requirement of using disk images in general, it's just that in both
-real example uses so far, the client software triggers unexpected responses
-from the server that a real drive wouldn't do.
+TS-DOS DME support (-e), and to force TPDD1-only or TPDD2-only emulation
+(-m 1) or (-m 2). Example:
 
-https://github.co/bkw777/pdd.sh creates disk image files from real disks,
-and re-creates real disks from disk image files of this same format.
+$ dl -vue -m 1 -i Sardine_American_English.pdd1
+
+It's not a requirement to use disk images in general, it's just that in both
+real examples known so far, the client software triggers unexpected responses
+from the server that a real drive wouldn't do, so the extra options make the
+server act more like a real drive, as the client software expects.
+
+Disk image files can be created with https://github.co/bkw777/pdd.sh
 
 dlplus can also create new disk images from client-issued format and sector
-access commands. Ex: run "$ dl -vve -m 1 -i ./newdisk.pdd1"
+access commands. Example: run "$ dl -vve -m 1 -i ./newdisk.pdd1"
 and then use a client to "format" and write data with sector access commands.
 
 For TPDD1, both the fdc-mode the opr-mode format commands do what a real drive
@@ -71,9 +67,11 @@ code byte per record, which creates a raw data disk with no filesystem like the
 Sardine dictionary disk. The opr-mode format command does the same as fdc-mode
 format with logical size code 0 (64-byte logical sectors) and then writes the
 single byte of non-null data at the right address to create a valid Space
-Management Table, which makes the disk into a filesystem disk.
+Management Table, which makes the disk into a functioning filesystem disk.
+(If you took the generated .pdd1 or .pdd2 file and used pdd.sh to "restore" it
+to a real disk, that disk would be a functioning filesystem disk)
 
-Real disks can only be dumped or restored using the matching type of drive.
-IE, although a TPDD2 drive is partly backwards compatible enough to read a
-TPDD1 disk, you must use a TPDD1 drive to dump a TPDD1 disk to a .pdd1 file
-or to restore a .pdd1 image to a real disk, and the same for TPDD2 & .pdd2
+Real disks can only be dumped or restored using the matching type of drive.  
+Although a real TPDD2 drive can at least read a TPDD1 disk, you must use a
+TPDD1 drive to dump a TPDD1 disk to a .pdd1 image file, or to restore a .pdd1
+image file to a real disk, and a TPDD2 drive for .pdd2 files.
