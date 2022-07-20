@@ -114,7 +114,8 @@ TPDD1 software manual. There is no known TPDD2 software manual.
 // Most things get away with 5ms.
 // REXCPM rxcini.do requires 6ms.
 // TS-DOS.200 requires 7ms. (a "?" on line 3 gets dropped)
-#define DEFAULT_BASIC_BYTE_MS 7
+// TEENY.M10 requires 8-10
+#define DEFAULT_BASIC_BYTE_MS 8
 
 #define DEFAULT_TPDD_FILE_ATTR 0x46 // F
 
