@@ -13,7 +13,7 @@ pdd.sh so that dlplus can act as a virtual drive for sector access to it.
 
 Installation: Just run the following command:
 
- $ dl -vvb Disk_Power.K85 && dl -vue -m 1 -i Disk_Power.K85.pdd1
+ $ dl -vb Disk_Power.K85 && dl -vue -m 1 -i Disk_Power.K85.pdd1
 
 (dlplus will get both files from /usr/local/lib/dl)
 
