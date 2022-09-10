@@ -9,17 +9,17 @@ Docs from the past versions of this program. They don't exactly match this versi
 [dl.do](dl.do) from dl 1.0-1.3 the original "DeskLink for \*nix" by Steven Hurd
 <!-- [Original source](http://bitchin100.com/files/linux/dlplus.zip) -->
 
-## install
+## Install
 ```
 $ make clean all && sudo make install
 ```
 
-## uninstall
+## Uninstall
 ```
 $ sudo make uninstall
 ```
 
-## manual
+## Manual
 ```
 $ dl -h
 ```
@@ -81,25 +81,27 @@ Examples:
 
 ```
 
-## run the TPDD server, verbose, upcase, serving files from the current directory
+## Examples:
+
+### Run the TPDD server, verbose, upcase, serving files from the current directory
 ```
 $ dl -vu
 ```
 
-## list all available TPDD client installers, and then bootstrap one of them
+### List all available TPDD client installers, and then bootstrap one of them
 ```
 $ dl -l
 $ dl -vb TS-DOS.100
 ```
 
-## bootstrap a [REXCPM](http://bitchin100.com/wiki/index.php?title=REXCPM)
+### Bootstrap a [REXCPM](http://bitchin100.com/wiki/index.php?title=REXCPM)
 ```
 $ dl -vb rxcini.DO && dl -vu
 ```
 ([Full directions for REXCPM](REXCPM.md))
 
 
-## UR-II
+## "Magic Files" / Ultimate ROM 2
 Ultimate ROM II ([docs](http://www.club100.org/library/libdoc.html)) ([roms](https://bitchin100.com/wiki/index.php?title=REXsharp#Option_ROM_Images_for_Download)) has a feature where it can load a RAM version of TS-DOS from disk on-the-fly.  
 This allows you to keep the TS-DOS executable on the disk instead of in ram, and it is loaded and then discarded on-demand by selecting the TS-DOS menu entry from inside UR2.
 
@@ -165,7 +167,7 @@ Disk image files may be created 2 ways:
 
 Disk image format [disk_image_files.txt](ref/disk_image_files.txt)
 
-## trivia
+## ROOT & PARENT labels
 The "ROOT  " and "PARENT" labels are not hard coded in TS-DOS. You can set them to other things. Almost anything mmay be used for the ROOT label. The PARENT label is limited to things that TS-DOS thinks is a valid filename. Sadly ".." can't be used for PARENT, but here are a few examples that do work.
 ```
 $ ROOT_LABEL=/ PARENT_LABEL=^ dl
