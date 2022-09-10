@@ -113,7 +113,7 @@ Failing that, then it looks in the root share dir. Failing that, finally it gets
 
 [More details](ref/ur2.txt)
 
-## sector access - disk images
+## Sector Access / Disk Images
 For a TPDD1 disk image
 ```
 $ dl -v -m 1 -i disk_image.pdd1
@@ -166,7 +166,7 @@ Disk image files may be created 2 ways:
 Disk image format [disk_image_files.txt](ref/disk_image_files.txt)
 
 ## trivia
-The "ROOT  " and "PARENT" labels are not hard coded in TS-DOS. You can set them to other things. Sadly, this does not extend as far as being able to use ".." for "PARENT", but many other things work. The ROOT label allows almost anything, the PARENT label is only limited by what TS-DOS thinks is a valid filename. Here are a few examples that do work.
+The "ROOT  " and "PARENT" labels are not hard coded in TS-DOS. You can set them to other things. Sadly, this does not extend as far as being able to use ".." for "PARENT", but many other things work. Almost anything mmay be used for the ROOT label. The PARENT label is limited to things that TS-DOS thinks is a valid filename. Unfortunately ".." can't be used for PARENT, but here are a few examples that do work.
 ```
 $ ROOT_LABEL=/ PARENT_LABEL=^ dl
 $ ROOT_LABEL='-root-' PARENT_LABEL='-back-' dl
