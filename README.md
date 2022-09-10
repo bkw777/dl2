@@ -96,7 +96,8 @@ $ dl -vb TS-DOS.100
 ```
 $ dl -vb rxcini.DO && dl -vu
 ```
-([full directions](REXCPM.md))
+([Full directions for REXCPM](REXCPM.md))
+
 
 ## UR-II
 Ultimate ROM II ([docs](http://www.club100.org/library/libdoc.html)) ([roms](https://bitchin100.com/wiki/index.php?title=REXsharp#Option_ROM_Images_for_Download)) has a feature where it can load a RAM version of TS-DOS from disk on-the-fly.  
