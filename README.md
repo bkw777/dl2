@@ -166,7 +166,7 @@ Disk image files may be created 2 ways:
 Disk image format [disk_image_files.txt](ref/disk_image_files.txt)
 
 ## trivia
-The "ROOT  " and "PARENT" labels are not hard coded in TS-DOS. You can set them to other things. Sadly, this does not extend as far as being able to use ".." for "PARENT", but many other things work. Almost anything mmay be used for the ROOT label. The PARENT label is limited to things that TS-DOS thinks is a valid filename. Unfortunately ".." can't be used for PARENT, but here are a few examples that do work.
+The "ROOT  " and "PARENT" labels are not hard coded in TS-DOS. You can set them to other things. Almost anything mmay be used for the ROOT label. The PARENT label is limited to things that TS-DOS thinks is a valid filename. Sadly ".." can't be used for PARENT, but here are a few examples that do work.
 ```
 $ ROOT_LABEL=/ PARENT_LABEL=^ dl
 $ ROOT_LABEL='-root-' PARENT_LABEL='-back-' dl
