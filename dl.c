@@ -10,10 +10,10 @@
 /*
 DeskLink+
 2005     John R. Hogerhuis Extensions and enhancements
-2019,2022 Brian K. White - repackaging, reorganizing, bootstrap function
-                           pdd1 disk image files, FDC-mode
-         Kurt McCullum - TS-DOS loaders
-2022     Gabriele Gorla - Add support for TS-DOS subdirectories
+2019     Brian K. White - repackaging, reorganizing, bootstrap function
+2022                      disk image files and sector-access
+2020     Kurt McCullum - TS-DOS loaders
+2022     Gabriele Gorla - TS-DOS subdirectories
 
 DeskLink+ is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License version 2 or any
@@ -28,43 +28,6 @@ You should have received a copy of the GNU General Public License
 along with this program (in the file "COPYING"); if not, write to the
 Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 MA 02111, USA.
-*/
-
-/*
-2022 bkw
-
-Some basic info about TPDD protocol formatting that explains
-some frequent idioms in here. TPDD Operation-mode transactions, both
-commands issued by the client, and responses issued by the server,
-have this general form:
-
-type     - 1 byte         the format or type of this packet
-length   - 1 byte         number of bytes that come next
-payload  - length bytes   range is 0-128
-checksum - 1 byte         includes type, length, and payload
-
-Most functions pass around a pointer to a buffer containing this
-entire structure.
-
-Frequently a buffer will be declared with a SIZE+3, where
-SIZE will be a pertinent payload size of a given command,
-like 128 for the max possible, or 11 for a DME message, etc,
-and the +3 is 3 extra bytes for type, length, and checksum.
-
-Similarly, most functions include frequent references to these
-byte offsets gb[0], gb[1], gb[2], gb+2, gb[gb[1]+2].
-
-functions named req_*() (request) receive a command in this format
-functions named ret_*() (return) generate a response in this format
-
-There is also an FDC-mode that TPDD1/FB-100 drives have, which has
-a completely different format. This program only implements
-Operation-mode. TPDD2 drives do not have FDC-mode, but they do have
-extra Operation-mode commands that TPDD1 does not have,
-some of which this program does implement.
-
-See the ref/ directory for more details, including a copy of the
-TPDD1 software manual. There is no known TPDD2 software manual.
 */
 
 #include <termios.h>
@@ -128,10 +91,10 @@ TPDD1 software manual. There is no known TPDD2 software manual.
 #define DEFAULT_DME_DIR_LABEL    "<>"       // DIR_LABEL='/'
 
 /*
- * Support for Ultimate ROM-II TS-DOS loader: see ref/ur2.txt
- * files that are always readable in any cd path, or even if
- * the file doesn't exist anywhere in the share tree.
- * Search path for any of these: cwd, share root, app_lib_dir.
+ * Support for Ultimate ROM II TS-DOS loader: see ref/ur2.txt
+ * These filenames will always be loadable by "magic" in any cd path, even
+ * if no such filename exists anywhere in the share tree. For any of these
+ * filenames, search the following paths: cwd, share root, app_lib_dir.
  * TODO add $XDG_DATA_HOME (~/.local/share/myapp  mac: ~/Library/myapp/)
  */
 char * magic_files [] = {
@@ -224,15 +187,14 @@ void dbg_b(const int v, unsigned char *b, int n) {
 }
 
 // like dbg_b, except assume the buffer is a tpdd Operation-mode
-// block and parse it to display cmd, len payload, checksum.
-// length is read from the data itself
+// block and parse it to display cmd, len, payload, checksum.
 void dbg_p(const int v, unsigned char *b) {
 	dbg(v,"cmd: %1$02X\nlen: %2$02X (%2$u)\nchk: %3$02X\ndat: ",b[0],b[1],b[b[1]+2]);
 	dbg_b(v,b+2,b[1]);
 }
 
-// On Linux 76800 would require termios2() and BOTHER
-// https://stackoverflow.com/a/39924923/5754855
+// Drive supposedly supports 76800, but on Linux (except Sparc) that would
+// require termios2() and BOTHER. https://stackoverflow.com/a/39924923/5754855
 // no idea about bsd or mac
 /*
 	struct termios2 t;
@@ -254,8 +216,8 @@ void set_baud (char * s) {
 		i==1200?B1200:
 		i==2400?B2400:
 		i==4800?B4800:
-		i==9600?B9600:
-		//i==19200?B19200: // real drive default
+		i==9600?B9600:     // Brother FB-100, KnitKing FDD19, Purple Computing D103 default
+		//i==19200?B19200: // TPDD1 & TPDD2 default
 		i==38400?B38400:
 #if defined(__sparc__)
 		i==76800?B76800:
@@ -653,16 +615,17 @@ void req_fdc_read_sector(int tp,int tl) {
 
 void req_fdc_search_id() {
 	dbg(2,"%s()\n",__func__);
-	// send OK to client
-	// read 12 bytes from client
-	// search all ID's for match
-	// return, what? Send another OK?
-	// manual says it's the same as write_sector, which
-	// sends an OK to tell client to send, and then
-	// another OK to ack. So perhaps we return
-	// just a status return that indicates if a match was found
-	// and probably the first matching sector number in the len/addr field.
-	// Probably the err field is always success.
+	// not sure how this is supposed to work yet, this is a guess:
+	//   send OK to client
+	//   read 12 bytes from client
+	//   search all ID's for match
+	//   return, what? Send another OK?
+	//   manual says it's the same as write_sector, which
+	//   sends an OK to tell client to send, and then
+	//   another OK to ack. So perhaps we return
+	//   just a status return that indicates if a match was found
+	//   and probably the first matching sector number in the len/addr field.
+	//   Probably the err field is always success.
 	ret_fdc_std(ERR_FDC_SUCCESS,0,0);
 }
 
@@ -1698,11 +1661,11 @@ void slowbyte(char b) {
 	write_client_tty(&b,1);
 	tcdrain(client_tty_fd);
 	usleep(BASIC_byte_us);
-	if (debug) {
+	if (debug) { // local display nicely regardless if CR, LF, or CRLF
 		if (b!=LOCAL_EOL && ch[0]==LOCAL_EOL) {ch[0]=0x00; dbg(0,"%c%c",LOCAL_EOL,b);}
 		else if (b==LOCAL_EOL || b==BASIC_EOL) ch[0]=LOCAL_EOL;
-		else if (isprint(b)) dbg(0,"%c",b);
-		else dbg(0,"\033[7m%02X\033[m",b); // hardcoded ansi/vt codes, sorry
+		else if (b<32 || b>126) dbg(0,"\033[7m^%02X\033[m",b); // hardcoded ansi/vt codes, sorry
+		else dbg(0,"%c",b);
 	}
 }
 
