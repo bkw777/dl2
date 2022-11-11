@@ -1,13 +1,5 @@
 # dlplus
-DeskLink+ is a [Tandy Portable Disk Drive](http://tandy.wiki/TPDD) emulator or "[TPDD server](http://tandy.wiki/TPDD_server)" implimented in C.  
-2022 [GGLabs](https://gglabs.us/) has added support for TS-DOS subdirectories!  
-[hacky extra options](ref/advanced_options.txt)  
-[Serial Cable](http://tandy.wiki/Model_T_Serial_Cable)
-
-Docs from the past versions of this program. They don't exactly match this version any more.  
-[README.txt](README.txt) from dlplus by John R. Hogerhuis  
-[dl.do](dl.do) from dl 1.0-1.3 the original "DeskLink for \*nix" by Steven Hurd
-<!-- [Original source](http://bitchin100.com/files/linux/dlplus.zip) -->
+DeskLink+ is a [Tandy Portable Disk Drive](http://tandy.wiki/TPDD) emulator or "[TPDD server](http://tandy.wiki/TPDD_server)" written in C.  
 
 ## Install
 ```
@@ -20,10 +12,6 @@ $ sudo make uninstall
 ```
 
 ## Manual
-```
-$ dl -h
-```
-
 ```
 $ dl -h
 DeskLink+ v1.5.010-90-gf089dd1
@@ -81,6 +69,15 @@ Examples:
 
 ```
 
+[hacky extra options](ref/advanced_options.txt)  
+
+Docs from the past versions of this program. They don't exactly match this version any more.   
+[README.txt](README.txt) from [dlplus](http://bitchin100.com/files/linux/dlplus.zip) by John R. Hogerhuis  
+[dl.do](dl.do) from [dl 1.0-1.3](http://m100.bbsdev.net/) the original "DeskLink for \*nix" by Steven Hurd
+
+## Hardware
+[KC-85 to PC Serial Cable](http://tandy.wiki/Model_T_Serial_Cable)
+
 ## Examples:
 
 ### Run the TPDD server, verbose, upcase, serving files from the current directory
@@ -101,17 +98,20 @@ $ dl -vb rxcini.DO && dl -vu
 ([Full directions for REXCPM](REXCPM.md))
 
 
-## "Magic Files" / Ultimate ROM 2
-Ultimate ROM II ([docs](http://www.club100.org/library/libdoc.html)) ([roms](https://bitchin100.com/wiki/index.php?title=REXsharp#Option_ROM_Images_for_Download)) has a feature where it can load a RAM version of TS-DOS from disk on-the-fly.  
-This allows you to keep the TS-DOS executable on the disk instead of in ram, and it is loaded and then discarded on-demand by selecting the TS-DOS menu entry from inside UR2.
+## "Magic Files" / Ultimate ROM II
+Ultimate ROM II ([docs](http://www.club100.org/library/libdoc.html)) ([roms](https://bitchin100.com/wiki/index.php?title=REXsharp#Option_ROM_Images_for_Download)) has a feature where it can load a RAM version of TS-DOS or Sardine from disk on-the-fly.  
+This allows you to keep the TS-DOS and/or Sardine executables on the disk instead of installed in ram, and it is loaded and then discarded on-demand by selecting the TS-DOS or Sardine entry from the UR-II menu.
 
-That normally requires that there be a copy of DOS100.CO on the "disk" so that UR-II can load it. And since this "disk" is actually a server that can cd into other directories, you would normally need a copy of the file in every single directory.  
-This version of dlplus has special support for that so that the TS-DOS button always works, even if the file doesn't exist in the current directory, or even if the file doesn't exist anywhere within the share tree.
+On a real drive this requires a copy of DOS100.CO (or DOS200.CO, or DOSNEC.CO, and/or SAR100.CO, SAR200.CO etc) on a disk, or on each disk if you want to avoid having to swap them all the time. On an emulator like dlplus, it would normally require that there be a copy of DOS100.CO in the share path in place of on a disk, and since dlplus can CD into subdirectories, it would even require keeping a copy in every subdirectory.
 
-There are copies of [DOS100.CO](clients/ts-dos/DOS100.CO), [DOS200.CO](clients/ts-dos/DOS200.CO), and [DOSNEC.CO](clients/ts-dos/DOSNEC.CO) installed to ```/usr/local/lib/dl``` by ```sudo make install```.
+But this version of dlplus has special support for this feature so that the TS-DOS and Sardine entries in UR-II always work "by magic" in any directory, even if the files don't exist in the current working directory, or the share root, or anywhere within the shared tree.
 
-When the client machine requests any of these files, dlplus first looks in the current directory like normal. If it's there, that is what is used.  
-Failing that, then it looks in the root share dir. Failing that, finally it gets the file from /usr/local/lib/dl. This way the TS-DOS button in Ultimate ROM II just always works by magic.
+There are copies of [DOS100.CO](clients/ts-dos/DOS100.CO), [DOS200.CO](clients/ts-dos/DOS200.CO), [DOSNEC.CO](clients/ts-dos/DOSNEC.CO) ,[SAR100.CO](clients/ts-dos/SAR100.CO) and [SAR200.CO](clients/ts-dos/SAR200.CO) installed to ```/usr/local/lib/dl``` by ```sudo make install```. (Sadly, no SARNEC.CO . It is known to have existed, but is currently still lost to time. If you have a copy, please upload it! There may or may not have ever existed any versions of TS-DOS or Sardine for Olivetti M10 or Kyotronic KC-85, but the code in dlplus is ready to support them if they ever turn up, or any other files you may wish to work by magic like that.)
+
+When the client machine requests any of these filenames, dlplus first looks in the current directory like normal. If a file matching the requested filename is there, that is what is used, just like for any other file. This can be used to override the files bundled with dlplus, just for the current working directory.  
+Failing that, then it looks in the root share dir. This is another way to override the files bundled with dlplus, for the entire shared directory tree.  
+Failing that, it gets the file from /usr/local/lib/dl. These files are bundled with dlplus, and means you never have to manually supply DOS100.CO or any of the others in any share paths.  
+This way the TS-DOS and Sardine options in Ultimate ROM II always work "by magic" without you having to do anything to provide the files like with a real drive & disk, yet if you want to use some other version of the files, you can, by just placing them in the share path just like placing them on a disk.
 
 [More details](ref/ur2.txt)
 
@@ -177,4 +177,5 @@ or you can confuse someone...
 $ ROOT_LABEL='C:\' PARENT_LABEL='UP:' dl
 ```
 ## OS Compatibility
-Tested on Linux, Macos, [FreeBSD](ref/freebsd.txt)
+Tested on Linux, Macos, [FreeBSD](ref/freebsd.txt)  
+Others have claimed it works under [Cygwin](https://www.cygwin.com/) on Windows, though I have not tried it myself. It probably does not work under WSL2 because WSL2 still does not provide good usb or serial port support.
