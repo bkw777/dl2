@@ -162,10 +162,10 @@ This will invoke the SAR100.CO previously loaded, which will try to do TPDD1 FDC
 Another example, [installing Disk Power for Kyotronic KC-85](clients/disk_power/Disk_Power.txt)
 
 Disk image files may be created 2 ways:  
-* Use [pdd.sh](https://github.com/bkw777/pdd.sh) **dd** command to read a real disk from a real drive into a disk image file.  
-* Run `dl -v -m 1 -i filename.pdd1` or `dl -v -m 2 -i filename.pdd2` with a non-existing or empty file, and then use a client to format disk and write sectors.
+* One method is you may use the **dd** command within [pdd.sh](https://github.com/bkw777/pdd.sh) to read a real TPDD1 or TPDD2 disk from a real TPDD1 or TPDD2 drive, and output a disk image file.  
+* Another method is you may run `dl -v -m 1 -i filename.pdd1` (for TPDD1) or `dl -v -m 2 -i filename.pdd2` (for TPDD2) where filename.pddN either doesn't exist or is zero bytes, and then use a client (like TS-DOS or pdd.sh) to format the "disk". The format command will cause dlplus to generate the empty disk image. If the client uses the "Operation-mode" format command, the generated disk image will be a valid filesystem disk, which just means it will have a particular logical sector size (64K) and valid empty Space Management Table and File Control Blocks. If the client uses the FDC-mode format command (TPDD1-only, TPDD2 does not have an FDC-mode) then the generated image will be a raw database format not a filesystem disk. This just means it will have whatever logical sector size specified by the parameters to the format command, and no SMT or FCB data, and won't be usable for saving files. In both cases, this mimics what a real drive does.
 
-Disk image format [disk_image_files.txt](ref/disk_image_files.txt)
+More details about the disk image format [disk_image_files.txt](ref/disk_image_files.txt)
 
 ## ROOT & PARENT labels
 The "ROOT  " and "PARENT" labels are not hard coded in TS-DOS. You can set them to other things. Almost anything mmay be used for the ROOT label. The PARENT label is limited to things that TS-DOS thinks is a valid filename. Sadly ".." can't be used for PARENT, but here are a few examples that do work.
@@ -178,4 +178,5 @@ $ ROOT_LABEL='C:\' PARENT_LABEL='UP:' dl
 ```
 ## OS Compatibility
 Tested on Linux, Macos, [FreeBSD](ref/freebsd.txt)  
-Others have claimed it works under [Cygwin](https://www.cygwin.com/) on Windows, though I have not tried it myself. It probably does not work under WSL2 because WSL2 still does not provide good usb or serial port support.
+Purported to work under [Cygwin](https://www.cygwin.com/) on Windows, though I have not tried it myself.  
+It probably does *not* work under WSL2 because WSL2 still does not fully support usb or serial ports.
