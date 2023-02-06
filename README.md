@@ -97,6 +97,10 @@ $ dl -vb rxcini.DO && dl -vu
 ```
 ([Full directions for REXCPM](REXCPM.md))
 
+### Update a [REX#](http://bitchin100.com/wiki/index.php?title=REXsharp)
+```
+dl -vb 'rx#u1.do' && dl -v
+```
 
 ## "Magic Files" / Ultimate ROM II
 Ultimate ROM II ([docs](http://www.club100.org/library/libdoc.html)) ([roms](https://bitchin100.com/wiki/index.php?title=REXsharp#Option_ROM_Images_for_Download)) has a feature where it can load a RAM version of TS-DOS or Sardine from disk on-the-fly.  
