@@ -354,6 +354,10 @@ int read_client_tty(void *b, const unsigned int n) {
 	unsigned t = 0;
 	int i = 0;
 	while (t<n) if ((i = read(client_tty_fd, b+t, n-t))) t+=i;
+	if (i<0) {
+		dbg(0,"error: %s\n",strerror(errno));
+		exit(EXIT_FAILURE);
+	}
 	dbg(3,"RCVD: "); dbg_b(3,b,n);
 	return t;
 }
