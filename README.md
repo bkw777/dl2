@@ -135,13 +135,13 @@ Limitations: Only supports sector access to the disk image. You can't "mount" th
 
 Useful working examples: Sardine_American_English.pdd1, Disk_Power_KC-85.pdd1
 
-Those examples are both TPDD1, but both TPDD1 and TPDD2 are supported. There just are no known database application disks like Sardine on TPDD2 media to make a good TPDD2 example. You can load up the image of the TPDD2 Utility Disk included with pdd.sh just to see that it works, but that isn't useful for anything.  
+Those examples are both TPDD1 disks, but both TPDD1 and TPDD2 are supported. There just are no known database application disks like the Sardine dictionary disk on TPDD2 media to make a good TPDD2 example. You could use the image of the TPDD2 Utility Disk included with [pdd.sh](https://github.com/bkw777/pdd.sh) just to see that it works, but that isn't useful for anything.
 
-Example, using Sardine with a Model 100 with an [Ultimate ROM II rom](http://www.club100.org/library/librom.html) installed (or loaded in a [REX](http://bitchin100.com/wiki/index.php?title=Rex)):  
-One way to use Sardine is to let UR-II load/unload the program (SAR100.CO for model 100, or SAR200.CO for model 200) from disk into ram on the fly instead of installing permanently in ram normally, and then the program accesses a special dictionary data disk with sector access commands.  
-So for this to work, UR-II has to be able to load SAR100.CO from disk, and then SAR100.CO needs to be able to read raw sectors from the dictionary disk.  
-This involves two features of dlplus. First, magic files. SAR100.CO is one of the "magic" files bundled with the app, which are always loadable from a client even if there is no such file in the share directory. When UR-II tries to load a file by that name, if there is a file by that name in the current working directory it is used, but even if there is no such file, the file access still works because then it just comes from /usr/local/lib/dl .  
-Second, disk image files and sector-access commands. If a disk image file is loaded with the -i option, then when a client tries to use sector-access commands, they work, and the data reads from / writes to the image file. If the given filename does not exist it will be created if the client issues a format command. If the given filename does not exist and is not given with any leading path, then it is searched for in /usr/local/lib/dl, as a few special disks are bundled with the app, and the Sardine dictionary is one.  
+Example, using Sardine with a Model 100 with [Ultimate ROM II](http://www.club100.org/library/librom.html):  
+One way to use Sardine is to let UR-II load/unload the program from disk into ram on the fly instead of installing permanently in ram like normal. Sardine uses raw sector access commands to read a special dictionary data disk.  
+For this to work, UR-II has to be able to load SAR100.CO from a normal filesystem disk using normal file/filesystem access, and then SAR100.CO needs to be able to read raw sectors from the special dictionary data disk.  
+This involves two features of dlplus. First, **magic files**. SAR100.CO is one of the "magic" files bundled with the app, which are always loadable from a client at any time from any directory even if there is no such file in the directory being served as the virtual "disk". When UR-II tries to load a file by that particular name, if there is a file by that name in the current working directory it is used, but if there is no such file, dlplus just serves up the one from /usr/local/lib/dl, and the client never knows the difference.  
+Second, **disk image files and sector-access commands**. If a disk image file is loaded with the **-i** option, then when a client tries to use sector-access commands, they work, and the data reads from / writes to the image file. If the specified filename does not exist it will be created if/when the client issues a format command. If the specified filename does not exist and, is not given with any leading path, then it is searched for in /usr/local/lib/dl, as a few special disks are bundled with the app, and the Sardine dictionary disk is one such.  
 
 To try it out,  
 
@@ -149,26 +149,28 @@ To try it out,
 ```
 $ dl -vue -m 1 -i Sardine_American_English.pdd1
 ```
-This tells dlplus to strictly emulate a TPDD1, disable some TPDD2 features and TS-DOS directory support which confuses SAR100.CO, and load the Sardine American English dictionary disk for sector-access commands.  
-SAR100.CO is always being provided automatically regardless of any commandline options, and "-i Sardine_American_English.pdd1" will get "Sardine_American_English.pdd1" from /usr/local/lib/dl.  
+This set of flags tells dlplus to strictly emulate a TPDD1, disable some TPDD2 features and TS-DOS directory support which confuse SAR100.CO, and use the Sardine American English dictionary disk image file for any sector-access commands the client might issue.  
+SAR100.CO is always being provided by default regardless of any commandline options so you don't have to do anything extra for that, and assuming "Sardine_American_English.pdd1" doesn't exist in your current working directory, dlplus will use the copy in /usr/local/lib/dl.  
+The disk image file is marked read-only and behaves the same as a normal disk with the write-protect notch open (write-protected).  
 
 2: Enter the UR-2 menu.  
-Notice the SARDIN entry with the word OFF under it.  
+Notice the "SARDIN" entry with the word "OFF" under it.  
 Hit enter on SARDIN.  
-Say Y if you get a prompt about HIMEM.  
-This loads SAR100.CO into ram, and now the SARDIN entry says ON under it.
+If you get a prompt about HIMEM, answer Y.  
+This loads SAR100.CO into ram.
+Notice the SARDIN entry now says "ON" under it.
 
 3: Enter T-Word and start a new document and type some text.  
 
 4: Press GRPH+F to invoke Sardine to spell-check the document.  
-This will invoke the SAR100.CO previously loaded, which will try to do TPDD1 FDC-mode sector access, wich dlplus will respond to with data from the .pdd1 file.  
+This will invoke the SAR100.CO previously loaded, which will try to use TPDD1 FDC-mode sector access commands, wich dlplus will respond to with data from the .pdd1 file.  
 
 Another example, [installing Disk Power for Kyotronic KC-85](clients/disk_power/Disk_Power.txt)
 
 Disk image files may be created 2 ways:  
 * One method is you may use the **dd** command within [pdd.sh](https://github.com/bkw777/pdd.sh) to read a real TPDD1 or TPDD2 disk from a real TPDD1 or TPDD2 drive, and output a disk image file.  
 * Another method is you may run `dl -v -m 1 -i filename.pdd1` (for TPDD1) or `dl -v -m 2 -i filename.pdd2` (for TPDD2) where filename.pddN either doesn't exist or is zero bytes, and then use a client (like TS-DOS or pdd.sh) to format the "disk". The format command will cause dlplus to generate the empty disk image.  
-In the case of TPDD1: If the client uses the "Operation-mode" format command, the generated disk image will be a valid filesystem disk, which just means it will have a particular logical sector size (64 bytes) and valid empty Space Management Table and File Control Blocks. If the client uses the "FDC-mode" format command then the generated image will be a raw data format not a filesystem disk. This just means it will have whatever logical sector size specified by the parameters to the format command, and no SMT or FCB data, and won't be usable for saving files. In both cases, this mimics what a real drive does.  
+In the case of TPDD1, there is more than one kind of format command. If the client uses the "Operation-mode" format command, the generated disk image will be a valid filesystem disk, which just means it will have a particular logical sector size (64 bytes) and valid Space Management Table and File Control Blocks. If the client uses the "FDC-mode" format command then the generated image will be a raw data format not a filesystem disk. This just means it will have whatever logical sector size was specified by the parameters to the format command, and no SMT or FCB data, and won't be usable for saving files. In both cases, this mimics what a real drive does.  
 TPDD2 does not have an "FDC-mode" and there is only one kind of format command and only one kind of new empty disk format.
 
 More details about the disk image format [disk_image_files.txt](ref/disk_image_files.txt)
@@ -183,6 +185,6 @@ or you can confuse someone...
 $ ROOT_LABEL='C:\' PARENT_LABEL='UP:' dl
 ```
 ## OS Compatibility
-Tested on Linux, Macos, [FreeBSD](ref/freebsd.txt)  
+Tested on Linux, Macos, and [FreeBSD](ref/freebsd.txt)  
 Purported to work under [Cygwin](https://www.cygwin.com/) on Windows, though I have not tried it myself.  
-It probably does *not* work under WSL2 because WSL2 still does not fully support usb or serial ports.
+As of Feb 2023, WSL2 still does not fully support usb or serial port hardware access, so WSL2 doesn't work.  
