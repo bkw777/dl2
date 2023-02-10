@@ -35,7 +35,7 @@ Init REXCPM dir? Yes
 Execute choices.. sure? (y/n) Y  
 Name: RXC_12  
 ```
-"Name:" is the basename portion of `RXC_\*.BR` from the REXCPM\*.ZIP file.  
+"Name:" is the basename portion of `RXC_*.BR` from the REXCPM\*.ZIP file.  
 The \* part may change over time, and you don't type the .BR part.  
 Currently in REXCPMV21_b19.ZIP this is `RXC_12.BR`, so you enter `RXC_12` at that prompt.
 
@@ -49,7 +49,7 @@ Enter BASIC and type: `CALL 63012` \[Enter\]  (installs RXCMGR from the REXCPM t
 * the 100 is at the main menu  
 * there is a `RXCMGR` entry on the main menu
 
-The REXCPM now has it's basic firmware installed which provides the same REX functionality as [REXCPM](http://bitchin100.com/wiki/index.php?title=REXsharp) or [REX Classic](http://tandy.wiki/REX). You can use RXCMGR to load option rom images from TPDD, select & activate installed rom images, create and restore ram backup images.
+The REXCPM now has it's basic firmware installed which provides the same REX functionality as [REX#](http://bitchin100.com/wiki/index.php?title=REXsharp) or [REX Classic](http://tandy.wiki/REX). You can use RXCMGR to load option rom images from TPDD, select & activate installed rom images, create and restore ram backup images.
 
 What is not done yet:
 * TS-DOS option rom not installed yet  
