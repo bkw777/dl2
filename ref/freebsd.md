@@ -27,7 +27,7 @@ notify 100 {
 
 * Re-plug the usb-serial adapter.
 
-## Behavior
+## Behavior Quirks
 
 Hangs at opening the client tty if the client machine is not connected yet.  
 Proceeds as soon as the client machine is connected.

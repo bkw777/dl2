@@ -185,6 +185,4 @@ or you can confuse someone...
 $ ROOT_LABEL='C:\' PARENT_LABEL='UP:' dl
 ```
 ## OS Compatibility
-Tested on Linux, Macos, and [FreeBSD](ref/freebsd.txt)  
-Purported to work under [Cygwin](https://www.cygwin.com/) on Windows, though I have not tried it myself.  
-As of Feb 2023, WSL2 still does not fully support usb or serial port hardware access, so WSL2 doesn't work.  
+Tested on Linux, Macos, [FreeBSD](ref/freebsd.md), and [Windows](ref/cygwin.md)..
