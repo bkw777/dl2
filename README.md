@@ -185,4 +185,4 @@ or you can confuse someone...
 $ ROOT_LABEL='C:\' PARENT_LABEL='UP:' dl
 ```
 ## OS Compatibility
-Tested on Linux, Macos, [FreeBSD](ref/freebsd.md), and [Windows](ref/cygwin.md)..
+Tested on Linux, Macos, [FreeBSD](ref/freebsd.md), and [Windows](ref/cygwin.md).
