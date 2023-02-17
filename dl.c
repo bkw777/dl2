@@ -130,7 +130,9 @@ char dme_parent_label[7] = DEFAULT_DME_PARENT_LABEL;
 char dme_dir_label[3] = DEFAULT_DME_DIR_LABEL;
 char default_attr = DEFAULT_TPDD_FILE_ATTR;
 bool enable_magic_files = true;
-bool getty_mode = false;
+#if !defined(_WIN)
+ bool getty_mode = false;
+#endif
 bool bootstrap_mode = false;
 int model = 2;
 
@@ -310,13 +312,17 @@ int open_client_tty () {
 	if (client_tty_fd<0) { dbg(0,"%s\n",strerror(errno)); return 1; }
 	dbg(0,"OK\n");
 
+#ifdef TIOCEXCL
 	ioctl(client_tty_fd,TIOCEXCL);
+#endif
 
+#if !defined(_WIN)
 	if (getty_mode) {
 		debug = 0;
 		if (login_tty(client_tty_fd)==0) client_tty_fd = STDIN_FILENO;
 		else (void)(daemon(1,1)+1);
 	}
+#endif
 
 	(void)(tcflush(client_tty_fd, TCIOFLUSH)+1);
 
@@ -1734,7 +1740,9 @@ int bootstrap(char *f) {
 //
 
 void show_config () {
+#if !defined(_WIN)
 	dbg(0,"getty_mode      : %s\n",getty_mode?"true":"false");
+#endif
 	dbg(0,"upcase          : %s\n",upcase?"true":"false");
 	dbg(0,"rtscts          : %s\n",rtscts?"true":"false");
 	dbg(0,"verbosity       : %d\n",debug);
@@ -1768,7 +1776,9 @@ void show_main_help() {
 		"   -b file  Bootstrap - send loader file to client\n"
 		"   -d tty   Serial device connected to client (" DEFAULT_CLIENT_TTY ")\n"
 		"   -e       Disable TS-DOS directory extension (enabled)\n"
+#if !defined(_WIN)
 		"   -g       Getty mode - run as daemon\n"
+#endif
 		"   -h       Print this help\n"
 		"   -i file  Disk image file for raw sector access, TPDD1 only\n"
 		"   -l       List loader files and show bootstrap help\n"
@@ -1810,14 +1820,20 @@ int main(int argc, char **argv) {
 	if (getenv("ATTR")) default_attr = *getenv("ATTR");
 
 	// commandline
+#if defined(_WIN)
+	while ((i = getopt (argc, argv, ":0a:b:d:ehi:lm:p:rs:uvwz:^")) >=0)
+#else
 	while ((i = getopt (argc, argv, ":0a:b:d:eghi:lm:p:rs:uvwz:^")) >=0)
+#endif
 		switch (i) {
 			case '0': dot_offset=0; upcase=false; default_attr=0x20;      break;
 			case 'a': default_attr=*strndup(optarg,1);                    break;
 			case 'b': bootstrap_mode=true; strcpy(bootstrap_fname,optarg);break;
 			case 'd': strcpy(client_tty_name,optarg);                     break;
 			case 'e': dme_disabled = true;                                break;
+#if !defined(_WIN)
 			case 'g': getty_mode = true; debug = 0;                       break;
+#endif
 			case 'h': show_main_help(); exit(0);                          break;
 			case 'i': strcpy(disk_img_fname,optarg);                      break;
 			case 'l': show_bootstrap_help(); exit(0);                     break;

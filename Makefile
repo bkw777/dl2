@@ -64,6 +64,12 @@ else
  LDLIBS += -lutil
 endif
 
+INSTALLOWNER = -o root
+ifeq ($(OS),Windows_NT)
+ INSTALLOWNER =
+ CFLAGS += -D_WIN
+endif
+
 DEFINES := \
 	-DAPP_VERSION=\"$(APP_VERSION)\" \
 	-DAPP_LIB_DIR=\"$(APP_LIB_DIR)\" \
@@ -83,21 +89,21 @@ install: $(APP_NAME) $(CLIENT_LOADERS) $(LIB_OTHER) $(DOCS)
 	mkdir -p $(APP_LIB_DIR)
 	for s in $(CLIENT_LOADERS) ;do \
 		d=$(APP_LIB_DIR)/$${s##*/} ; \
-		install -o root -m 0644 $${s} $${d} ; \
-		install -o root -m 0644 $${s}.pre-install.txt $${d}.pre-install.txt ; \
-		install -o root -m 0644 $${s}.post-install.txt $${d}.post-install.txt ; \
+		install $(INSTALLOWNER) -m 0644 $${s} $${d} ; \
+		install $(INSTALLOWNER) -m 0644 $${s}.pre-install.txt $${d}.pre-install.txt ; \
+		install $(INSTALLOWNER) -m 0644 $${s}.post-install.txt $${d}.post-install.txt ; \
 	done
 	for s in $(LIB_OTHER) ;do \
 		d=$(APP_LIB_DIR)/$${s##*/} ; \
-		install -o root -m 0644 $${s} $${d} ; \
+		install $(INSTALLOWNER) -m 0644 $${s} $${d} ; \
 	done
 	for s in $(DOCS) ;do \
 		d=$(APP_DOC_DIR)/$${s} ; \
 		mkdir -p $${d%/*} ; \
-		install -o root -m 0644 $${s} $${d} ; \
+		install $(INSTALLOWNER) -m 0644 $${s} $${d} ; \
 	done
 	mkdir -p $(PREFIX)/bin
-	install -o root -m 0755 $(APP_NAME) $(PREFIX)/bin/$(APP_NAME)
+	install $(INSTALLOWNER) -m 0755 $(APP_NAME) $(PREFIX)/bin/$(APP_NAME)
 
 uninstall:
 	rm -rf $(APP_LIB_DIR) $(APP_DOC_DIR) $(PREFIX)/bin/$(APP_NAME)
