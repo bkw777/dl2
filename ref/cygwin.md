@@ -2,9 +2,9 @@
 Sorry these are just the high points
 
 ## Requires Cygwin
-* Install [Cygwin](https://www.cygwin.com/)
-* Add packages: cygwin-devel make gcc-g++ git unzip
-  at least, possibly others
+* Install [Cygwin](https://www.cygwin.com/)  
+* Add packages: cygwin-devel make gcc-g++ git unzip  
+  (at least, possibly others)
 * Launch a Cygwin terminal window
 
 ## Download, build, & install
