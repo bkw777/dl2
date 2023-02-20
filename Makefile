@@ -90,8 +90,8 @@ install: $(APP_NAME) $(CLIENT_LOADERS) $(LIB_OTHER) $(DOCS)
 	for s in $(CLIENT_LOADERS) ;do \
 		d=$(APP_LIB_DIR)/$${s##*/} ; \
 		install $(INSTALLOWNER) -m 0644 $${s} $${d} ; \
-		install $(INSTALLOWNER) -m 0644 $${s}.pre-install.txt $${d}.pre-install.txt ; \
-		install $(INSTALLOWNER) -m 0644 $${s}.post-install.txt $${d}.post-install.txt ; \
+		[ ! -f $${s}.pre-install.txt ] && continue ;install $(INSTALLOWNER) -m 0644 $${s}.pre-install.txt $${d}.pre-install.txt ; \
+		[ ! -f $${s}.post-install.txt ] && continue ;install $(INSTALLOWNER) -m 0644 $${s}.post-install.txt $${d}.post-install.txt ; \
 	done
 	for s in $(LIB_OTHER) ;do \
 		d=$(APP_LIB_DIR)/$${s##*/} ; \
