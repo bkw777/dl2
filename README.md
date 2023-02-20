@@ -185,5 +185,11 @@ or you can confuse someone...
 $ ROOT_LABEL='C:\' PARENT_LABEL='UP:' dl
 ```
 
+## co2ba.sh
+Also included is a bash script to read a binary .CO file and output an ascii BASIC loader .DO file,  
+which may then be used with the bootstrap function to re-create the original binary .CO file on the portable.  
+All KC-85 platform machines are supported including TRS-80 Model 100, TANDY 102 & 200, Kyotronic KC-85, Olivetti M10, NEC PC-8201 & PC-8300.  
+See [co2ba](co2ba.md)
+
 ## OS Compatibility
 Tested on Linux, Macos, [FreeBSD](ref/freebsd.md), and [Windows](ref/cygwin.md).

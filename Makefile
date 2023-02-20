@@ -104,9 +104,10 @@ install: $(APP_NAME) $(CLIENT_LOADERS) $(LIB_OTHER) $(DOCS)
 	done
 	mkdir -p $(PREFIX)/bin
 	install $(INSTALLOWNER) -m 0755 $(APP_NAME) $(PREFIX)/bin/$(APP_NAME)
+	install $(INSTALLOWNER) -m 0755 co2ba.sh $(PREFIX)/bin/co2ba
 
 uninstall:
-	rm -rf $(APP_LIB_DIR) $(APP_DOC_DIR) $(PREFIX)/bin/$(APP_NAME)
+	rm -rf $(APP_LIB_DIR) $(APP_DOC_DIR) $(PREFIX)/bin/$(APP_NAME) $(PREFIX)/bin/co2ba
 
 clean:
 	rm -f $(APP_NAME)
