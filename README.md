@@ -95,11 +95,11 @@ $ dl -vb TS-DOS.100
 ```
 $ dl -vb rxcini.DO && dl -vu
 ```
-([Full directions for REXCPM](REXCPM.md))
+([Full directions for REXCPM](ref/REXCPM.md))
 
 ### Update a [REX#](http://bitchin100.com/wiki/index.php?title=REXsharp)
 ```
-dl -vb 'rx#u1.do' && dl -v
+dl -vb 'rx#u1.do' && dl -vu
 ```
 
 ## "Magic Files" / Ultimate ROM II
@@ -184,5 +184,6 @@ $ ROOT_LABEL='0:' PARENT_LABEL='^:' dl
 or you can confuse someone...  
 $ ROOT_LABEL='C:\' PARENT_LABEL='UP:' dl
 ```
+
 ## OS Compatibility
 Tested on Linux, Macos, [FreeBSD](ref/freebsd.md), and [Windows](ref/cygwin.md).

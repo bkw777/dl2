@@ -1,10 +1,8 @@
 # Notes for Windows
-Sorry these are just the high points
 
 ## Requires Cygwin
 * Install [Cygwin](https://www.cygwin.com/)  
 * Add packages: cygwin-devel make gcc-g++ git unzip  
-  (at least, possibly others)
 * Launch a Cygwin terminal window
 
 ## Download, build, & install
@@ -18,10 +16,18 @@ make clean all && make install
 
 * Getty/daemon mode is #ifdef'd out at compile-time on Windows. No getty option.
 
+* Serial tty devices are named like ttyS#  
+Use ```ls /dev/tty*``` to find the serial tty device after plugging in a usb-serial adapter.  
+Then use ```ttyS4``` (for example) as the last argument on the dl command line.
 
-* Example session that excersizes both the bootstrap and normal file access functions.  
- Download & unzip the REXCPM setup files for the Model 100
+* The Windows user may need to be in the Administrator group, I haven't done much testing.
 
+## Example usage session - initialize a REXCPM
+Initializing a REXCPM excersizes both the bootstrap and normal file access functions.
+
+Started with a cold-reset of the Model 100: SHIFT+CTRL+BREAK+RESET
+
+* Download & unzip the REXCPM setup files for the Model 100
 ```
 bkw@win10pro_bkw /cygdrive/c/Users/bkw/Documents/REX
 $ curl -O http://www.bitchin100.com/wiki/images/0/03/REXCPMV21_b19.ZIP
@@ -79,14 +85,21 @@ $
 
 
 * Identify the serial port tty device
-
 ```
 bkw@win10pro_bkw /cygdrive/c/Users/bkw/Documents/REX
 $ ls /dev/tty*
 /dev/tty  /dev/ttyS6
 ```
 
-* run dl, specifying ttyS6 for the tty device  
+* Run dl, specifying ttyS6 for the tty device  
+The command line is two consecutive commands with different arguments.  
+First ```dl -vb rxcini.DO ttyS6``` uses the bootstrap function to send rxcini.DO to the 100 and run it,  
+As soon as the previous command is done sending rxcini.DO, the next command ```dl -vu ttyS6``` immediately starts providing normal TPDD file access, with uppercase filename conversion.
+
+rxcini.DO while it is running will use the TPDD to load the REXCPM firmware image,  
+and then RXCMGR uses TPDD to load the TS-DOS option rom image,  
+and then you use TS-DOS to copy CPMUPD.CO to the 100,  
+and then CPMUPD.CO uses TPDD to load the CP/M disk image.
 
 ```
 bkw@win10pro_bkw /cygdrive/c/Users/bkw/Documents/REX
@@ -261,7 +274,7 @@ Opening "/dev/ttyS6" ... OK
 -------------------------------------------------------------------------------
 ```
 
-Typed "RXC_12" at filename prompt in rxcini
+Typed ```RXC_12``` at filename prompt in rxcini
 
 ```
 Open for read: "RXC_12.BR"
@@ -291,8 +304,13 @@ Open for read: "RXC_12.BR"
 -------------------------------------------------------------------------------
 ```
 
-After rxcini completed, ran "CALL 63012" to install RXCMGR from the REXCPM,
-ran RXCMGR, press Tab to switch to the ROM screen, F2 Load, and entered "TSD100"
+After rxcini completed:  
+- Typed ```CALL 63012``` in BASIC to install RXCMGR from the REXCPM  
+- Exited BASIC and launched RXCMGR from the main menu  
+- Pressed TAB to switch to the ROM screen in RXCMGR  
+- Pressed F2 for Load  
+- Entered ```TSD100```
+- Pressed Enter on the TS-DOS entry to install/activate the TS-DOS option rom (which also launches it)
 
 ```
 Open for read: "TSD100.BX"
@@ -346,7 +364,8 @@ Open for read: "TSD100.BX"
 -------------------------------------------------------------------------------
 ```
 
-Now TS-DOS option rom is installed, used it to copy CPMUPD.CO from "disk" to the 100.
+Now TS-DOS option rom is installed.  
+Used TS-DOS to copy CPMUPD.CO from "disk" to the 100.
 
 ```
 Open for read: "CPMUPD.CO"
@@ -401,8 +420,10 @@ Open for read: "CPMUPD.CO"
 -------------------------------------------------------------------------------
 ```
 
-Entered "CPM410.BK" at the firlname prompt in CPMUPD.
-
+- Exited TS-DOS  
+- Entered BASIC and did ```CLEAR0,60000``` to make room for CPMUPD to run  
+- Launched CPMUPD from the main menu  
+- Entered ```CPM410.BK``` at the filename prompt in CPMUPD because I have a 4MB REXCPM
 
 ```
 Open for read: "Cpm410.bk"
@@ -413,5 +434,6 @@ bkw@win10pro_bkw /cygdrive/c/Users/bkw/Documents/REX
 $
 ```
 
-REXCPM is now fully installed.
+Pressed Ctrl+C on the pc to quit dlplus.
 
+REXCPM is now fully installed.
