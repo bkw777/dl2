@@ -21,6 +21,8 @@ CLIENT_LOADERS := \
 	clients/dskmgr/DSKMGR.200 \
 	clients/dskmgr/DSKMGR.K85 \
 	clients/dskmgr/DSKMGR.M10 \
+	clients/ts-dos/TSLOAD.100 \
+	clients/ts-dos/TSLOAD.200 \
 	clients/ts-dos/TS-DOS.100 \
 	clients/ts-dos/TS-DOS.200 \
 	clients/ts-dos/TS-DOS.NEC \
