@@ -1,9 +1,28 @@
 # Notes for Windows
 
-## Requires Cygwin
+## Install either Cygwin or MSYS2
+
+### Cygwin
 * Install [Cygwin](https://www.cygwin.com/)  
-* Add packages: cygwin-devel make gcc-g++ git unzip  
+  When it gets to the **Select Packages** screen,  
+  select these additional packages to install:  
+  **cygwin-devel make gcc-g++ git**  
+  * View->Full  
+  * Scroll or search to find **cygwin-devel**  
+  * Pull-down menu to the right in the "New" column  
+  * Select the highest number that doesn't say "(Test)"  
+  * Repeat for: **gcc-g++**, **make**, **git**  
 * Launch a Cygwin terminal window
+
+### MSYS2
+* Install [MSYS2](https://www.msys2.org/)  
+* Close the URCT window that opens after install  
+* Launch an MSYS window  
+  Start -> MSYS2 -> MSYS2 MSYS  
+* Update the installed packages: ```$ pacman -Syu```  
+* If the window closed, launch new MSYS window  
+* Update again: ```$ pacman -Syu```  
+* Install git, gcc, & make:  ```$ pacman -Sy git gcc make```  
 
 ## Download, build, & install
 ```
@@ -24,8 +43,11 @@ Then use ```ttyS4``` (for example) as the last argument on the dl command line.
 
 ## Example usage session - initialize a REXCPM
 Initializing a REXCPM excersizes both the bootstrap and normal file access functions.
+In addition to the packages above, install the "unzip" package, or download and unzip the the files from Windows and skip the download & unzip steps shown here.  
+You want to get the latest versions from the REXCPM documentation page anyway instead of the exact versions shown below.
 
-Started with a cold-reset of the Model 100: SHIFT+CTRL+BREAK+RESET
+Start with a cold-reset of the Model 100: SHIFT+CTRL+BREAK+RESET  
+(this erases all RAM, including all files)
 
 * Download & unzip the REXCPM setup files for the Model 100
 ```
@@ -274,7 +296,7 @@ Opening "/dev/ttyS6" ... OK
 -------------------------------------------------------------------------------
 ```
 
-Typed ```RXC_12``` at filename prompt in rxcini
+Here I typed ```RXC_12``` at the filename prompt in rxcini
 
 ```
 Open for read: "RXC_12.BR"
@@ -310,7 +332,7 @@ After rxcini completed:
 - Pressed TAB to switch to the ROM screen in RXCMGR  
 - Pressed F2 for Load  
 - Entered ```TSD100```
-- Pressed Enter on the TS-DOS entry to install/activate the TS-DOS option rom (which also launches it)
+- Pressed Enter on the new TS-DOS entry to install the TS-DOS option rom (which also launches it)
 
 ```
 Open for read: "TSD100.BX"
@@ -365,7 +387,7 @@ Open for read: "TSD100.BX"
 ```
 
 Now TS-DOS option rom is installed.  
-Used TS-DOS to copy CPMUPD.CO from "disk" to the 100.
+Next, use TS-DOS to copy CPMUPD.CO from "disk" to the 100.
 
 ```
 Open for read: "CPMUPD.CO"
@@ -423,7 +445,7 @@ Open for read: "CPMUPD.CO"
 - Exited TS-DOS  
 - Entered BASIC and did ```CLEAR0,60000``` to make room for CPMUPD to run  
 - Launched CPMUPD from the main menu  
-- Entered ```CPM410.BK``` at the filename prompt in CPMUPD because I have a 4MB REXCPM
+- Entered ```CPM410.BK``` at the filename prompt in CPMUPD because my REXCPM has a 4MB chip.
 
 ```
 Open for read: "Cpm410.bk"
@@ -434,6 +456,6 @@ bkw@win10pro_bkw /cygdrive/c/Users/bkw/Documents/REX
 $
 ```
 
-Pressed Ctrl+C on the pc to quit dlplus.
+Press Ctrl+C on the pc to quit dlplus.
 
 REXCPM is now fully installed.

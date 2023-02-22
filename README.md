@@ -69,7 +69,7 @@ Examples:
 
 ```
 
-[hacky extra options](ref/advanced_options.txt)  
+Several of the above settings can alternatively be supplied via environment variables, as well as a few other [hacky extra options](ref/advanced_options.txt)
 
 Docs from the past versions of this program. They don't exactly match this version any more.   
 [README.txt](README.txt) from [dlplus](http://bitchin100.com/files/linux/dlplus.zip) by John R. Hogerhuis  
@@ -102,11 +102,16 @@ $ dl -vb rxcini.DO && dl -vu
 dl -vb 'rx#u1.do' && dl -vu
 ```
 
-## "Magic Files" / Ultimate ROM II
+## "Magic Files" / Ultimate ROM II / TSLOAD
 Ultimate ROM II ([docs](http://www.club100.org/library/libdoc.html)) ([roms](https://bitchin100.com/wiki/index.php?title=REXsharp#Option_ROM_Images_for_Download)) has a feature where it can load a RAM version of TS-DOS or Sardine from disk on-the-fly.  
 This allows you to keep the TS-DOS and/or Sardine executables on the disk instead of installed in ram, and it is loaded and then discarded on-demand by selecting the TS-DOS or Sardine entry from the UR-II menu.
 
-On a real drive this requires a copy of DOS100.CO (or DOS200.CO, or DOSNEC.CO, and/or SAR100.CO, SAR200.CO etc) on a disk, or on each disk if you want to avoid having to swap them all the time. On an emulator like dlplus, it would normally require that there be a copy of DOS100.CO in the share path in place of on a disk, and since dlplus can CD into subdirectories, it would even require keeping a copy in every subdirectory.
+Similarly, a stand-alone program called TSLOAD is available that does the same thing. TSLOAD allows you to install an executable in ram that is much smaller than TS-DOS, and leave the actual TS-DOS executable on the disk. Then when you want to use TS-DOS, to run TSLOAD, and it loads TS-DOS from the disk and runs it, but does not install it.
+
+On a real drive this requires keeping a copy of DOS100.CO (or DOS200.CO, or DOSNEC.CO, and/or SAR100.CO, SAR200.CO etc) on a disk, or on every disk if you want to avoid having to swap them all the time.  
+On an emulator like dlplus, the equivalent of that would mean keeping a copy of DOS100.CO in whatever directory you are sharing.  
+Additionally, since dlplus can CD into subdirectories, and since UR2 doesn't know about subdirectories, it means you would also have to keep a copy in every subdirectory.  
+(if you didn't , then what can happen is, you cd into some directory without a copy of DOS100.CO in it, exit TS-DOS, and then you can never get back in to TS-DOS because the UR2/TSLOAD don't know about cding up to the root directory, they just try to load DOS100.CO, which fails. The only fix is to restart dlplus so it's no longer cd'd in some subdirectory, or copying DOS100.CO to the subdirectory on the host side.)
 
 But this version of dlplus has special support for this feature so that the TS-DOS and Sardine entries in UR-II always work "by magic" in any directory, even if the files don't exist in the current working directory, or the share root, or anywhere within the shared tree.
 
@@ -116,6 +121,8 @@ When the client machine requests any of these filenames, dlplus first looks in t
 Failing that, then it looks in the root share dir. This is another way to override the files bundled with dlplus, for the entire shared directory tree.  
 Failing that, it gets the file from /usr/local/lib/dl. These files are bundled with dlplus, and means you never have to manually supply DOS100.CO or any of the others in any share paths.  
 This way the TS-DOS and Sardine options in Ultimate ROM II always work "by magic" without you having to do anything to provide the files like with a real drive & disk, yet if you want to use some other version of the files, you can, by just placing them in the share path just like placing them on a disk.
+
+There are bootstrap installers for TSLOAD for Model 100 and 200 bundled with the other client installers.
 
 [More details](ref/ur2.txt)
 
@@ -192,4 +199,4 @@ All KC-85 platform machines are supported including TRS-80 Model 100, TANDY 102 
 See [co2ba](co2ba.md)
 
 ## OS Compatibility
-Tested on Linux, Macos, [FreeBSD](ref/freebsd.md), and [Windows](ref/cygwin.md).
+Tested on Linux, Macos, [FreeBSD](ref/freebsd.md), and [Windows](ref/windows.md).

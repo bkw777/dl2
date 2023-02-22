@@ -1812,6 +1812,7 @@ int main(int argc, char **argv) {
 	if (getenv("DISABLE_DME")) dme_disabled = true;
 	if (getenv("DISABLE_MAGIC_FILES")) enable_magic_files = false;
 	if (getenv("DOT_OFFSET")) dot_offset = atoi(getenv("DOT_OFFSET"));
+	if (getenv("CLIENT_TTY")) strcpy(client_tty_name,getenv("CLIENT_TTY"));
 	if (getenv("BAUD")) set_baud(getenv("BAUD"));
 	if (getenv("ROOT_LABEL")) {snprintf(dme_root_label,7,"%-6.6s",getenv("ROOT_LABEL"));
 		memcpy(dme_cwd,dme_root_label,6);}

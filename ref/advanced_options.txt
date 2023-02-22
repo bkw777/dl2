@@ -117,3 +117,8 @@ Example:
 	instead of 19200, this how you can. Some drives like Purple Computing
 	are actually hard wired to run at 9600. This would let you emulate
 	one of those, perhaps for testing software against it.
+
+CLIENT_TTY
+
+	The device name of the tty that the client is connected to.  
+	Examples: ttyUSB0, ttyS6
