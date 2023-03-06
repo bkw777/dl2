@@ -1795,7 +1795,7 @@ void show_main_help() {
 		"The 2nd non-option argument is another way to specify the share path.\n"
 		"\n"
 		"   %1$s\n"
-		"   %1$s -vvu -p ~Downloads/REX/ROMS\n"
+		"   %1$s -vvu -p ~/Downloads/REX/ROMS\n"
 		"   %1$s -v -w ttyUSB1 ~/Documents/wp2files\n\n"
 	,args[0],DEFAULT_TPDD_FILE_ATTR,DEFAULT_BASIC_BYTE_MS);
 }
