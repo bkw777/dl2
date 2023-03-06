@@ -42,7 +42,7 @@ The 1st non-option argument is another way to specify the tty device.
 The 2nd non-option argument is another way to specify the share path.
 
    dl
-   dl -vvvu -p ~Downloads/REX/ROMS
+   dl -vvvu -p ~/Downloads/REX/ROMS
    dl -vw ttyUSB1 ~/Documents/wp2files
 
 $ 
