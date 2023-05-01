@@ -636,7 +636,7 @@ void req_fdc_search_id() {
 	ret_fdc_std(ERR_FDC_SUCCESS,0,0);
 }
 
-void req_fdc_write_id(uint16_t tp) {
+void req_fdc_write_id(int tp) {
 	dbg(2,"%s(%d)\n",__func__,tp);
 
 	if (open_disk_image(tp,O_RDWR,ALLOW_RET)) return; // we need both read & write
@@ -966,7 +966,7 @@ void dirent_set_name(unsigned char *b) {
 		dbg(3,"Exists: \"%s\"  %u\n", cur_file->local_fname, cur_file->len);
 		ret_dirent(cur_file);
 	} else if (check_magic_file(filename)==0) {
-		// let UR2 load <root>/DOSxxx.CO from anywhere
+		// let UR2/TSLOAD load DOSxxx.CO from anywhere
 		cur_file=make_file_entry(filename,0,0);
 		char t[LOCAL_FILENAME_MAX+1] = {0x00};
 		// try share root
