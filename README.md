@@ -183,7 +183,7 @@ TPDD2 does not have an "FDC-mode" and there is only one kind of format command a
 More details about the disk image format [disk_image_files.txt](ref/disk_image_files.txt)
 
 ## ROOT & PARENT labels
-The "ROOT  " and "PARENT" labels are not hard coded in TS-DOS. You can set them to other things. Almost anything mmay be used for the ROOT label. The PARENT label is limited to things that TS-DOS thinks is a valid filename. Sadly ".." can't be used for PARENT, but here are a few examples that do work.
+The "ROOT  " and "PARENT" labels are not hard coded in TS-DOS. You can set them to other things. Almost anything may be used for the ROOT label. The PARENT label is limited to things that TS-DOS thinks is a valid filename. Sadly ".." can't be used for PARENT, but here are a few examples that do work.
 ```
 $ ROOT_LABEL=/ PARENT_LABEL=^ dl
 $ ROOT_LABEL='-root-' PARENT_LABEL='-back-' dl
@@ -196,7 +196,13 @@ $ ROOT_LABEL='C:\' PARENT_LABEL='UP:' dl
 Also included is a bash script to read a binary .CO file and output an ascii BASIC loader .DO file,  
 which may then be used with the bootstrap function to re-create the original binary .CO file on the portable.  
 All KC-85 platform machines are supported including TRS-80 Model 100, TANDY 102 & 200, Kyotronic KC-85, Olivetti M10, NEC PC-8201 & PC-8300.  
+It's simple and doesn't handle all situations or do anything fancy like relocating, but it handles the common case and serves as a reference and starting point for making a custom loader.  
 See [co2ba](co2ba.md)
 
 ## OS Compatibility
 Tested on Linux, Macos, [FreeBSD](ref/freebsd.md), and [Windows](ref/windows.md).
+
+## TODO
+* implement req_fdc_search_id() - it's currently just a stub  
+* support big-endian platforms  
+* file/filesystem access on disk images - currently can only use for sector access

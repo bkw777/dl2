@@ -131,7 +131,7 @@ char dme_dir_label[3] = DEFAULT_DME_DIR_LABEL;
 char default_attr = DEFAULT_TPDD_FILE_ATTR;
 bool enable_magic_files = true;
 #if !defined(_WIN)
- bool getty_mode = false;
+bool getty_mode = false;
 #endif
 bool bootstrap_mode = false;
 int model = 2;
@@ -195,20 +195,20 @@ void dbg_p(const int v, unsigned char *b) {
 	dbg_b(v,b+2,b[1]);
 }
 
-// Drive supposedly supports 76800, but on Linux (except Sparc) that would
-// require termios2() and BOTHER. https://stackoverflow.com/a/39924923/5754855
-// no idea about bsd or mac
+// 76800 is a native baud rate on some platforms
+// but requires termios2 & BOTHER on most linux
+// https://stackoverflow.com/a/39924923/5754855
 /*
 	struct termios2 t;
 	ioctl(fd, TCGETS2, &t); // Read current settings
 	t.c_cflag &= ~CBAUD;    // Remove current baud rate
-	t.c_cflag |= BOTHER;    // Allow custom baud rate using int input
-	t.c_ispeed = 76800;     // Set the input baud rate
-	t.c_ospeed = 76800;     // Set the output baud rate
+	t.c_cflag |= BOTHER;    // Allow arbitrary int baud rate
+	t.c_ispeed = 76800;     // Set the input baud rate (int)
+	t.c_ospeed = 76800;     // Set the output baud rate (int)
 	ioctl(fd, TCSETS2, &t); // Apply new settings
 */
-// clients really only ever use 9600 or 19200, but the
-// real drive has dip switches for all these speeds so...
+// most clients only use 9600 or 19200 but the drive supports these
+// pdd.sh is one at least that can use any speed
 void set_baud (char * s) {
 	int i=atoi(s);
 	client_baud=
@@ -218,10 +218,10 @@ void set_baud (char * s) {
 		i==1200?B1200:
 		i==2400?B2400:
 		i==4800?B4800:
-		i==9600?B9600:     // Brother FB-100, KnitKing FDD19, Purple Computing D103 default
-		//i==19200?B19200: // TPDD1 & TPDD2 default
+		i==9600?B9600:     // Brother FB-100, KnitKing FDD19, Purple Computing D103
+		i==19200?B19200:   // TPDD1 & TPDD2
 		i==38400?B38400:
-#if defined(__sparc__)
+#if defined(B76800) //#if defined(__sparc__)
 		i==76800?B76800:
 #endif
 		B19200;
@@ -238,7 +238,7 @@ int get_baud () {
 		client_baud==B9600?9600:
 		client_baud==B19200?19200:
 		client_baud==B38400?38400:
-#if defined(__sparc__)
+#if defined(B76800)
 		client_baud==B76800?76800:
 #endif
 		0;
@@ -421,8 +421,8 @@ char *collapse_padded_fname(char *fname) {
 void lsx (char *path,char *match) {
 	struct dirent *files;
 	DIR *dir = opendir(path);
-	int i;
 	if (dir == NULL){dbg(0,"Cannot open \"%s\"",path); return;}
+	int i;
 	while ((files = readdir(dir)) != NULL) {
 		for (i=strlen(files->d_name);files->d_name[i]!='.';i--);
 		if (!strcmp(files->d_name+i+1,match)) dbg(0," %s",files->d_name);
@@ -433,7 +433,7 @@ void lsx (char *path,char *match) {
 int check_magic_file(char *b) {
 	dbg(3,"%s(\"%s\")\n",__func__,b);
 	if (!enable_magic_files) return 1;
-	if (dot_offset!=6) return 1; // UR2 only exists on the KC-85 clones
+	if (dot_offset!=6) return 1; // UR2/TSLOAD only exists on a few KC-85 clones
 	int l = sizeof(magic_files)/sizeof(magic_files[0]);
 	for (int i=0;i<l;++i) if (!strcmp(magic_files[i],b)) return 0;
 	return 1;
@@ -445,16 +445,13 @@ int check_magic_file(char *b) {
 //
 
 /*
-sectors: 0-79
-sector: 1293 bytes
-| ID 13 bytes | DATA 1280 bytes |
----
-1    logical sector length code
-12   data
----
-1280 data
----
-*/
+ * sectors: 0-79
+ * sector: 1293 bytes
+ * | LSC 1 byte | ID 12 bytes | DATA 1280 bytes |
+ * LSC: logical sector size code
+ * ID: 12 bytes of arbitrary data, searchable by req_fdc_search_id()
+ * DATA: 1280 bytes of arbitrary data, read/writable in lsc_to_len(LSC)-sized chunks
+ */
 
 // return the length in bytes for a given logical size code
 int lsc_to_len(int l) {
@@ -549,8 +546,8 @@ void req_fdc_format(int lc) {
 	dbg(2,"%s(%d)\n",__func__,lc);
 	int ll = lsc_to_len(lc);
 	int rn = 0;     // physical sector number
-	int rl = mlen+dlen; // total length
-	int rc = (PDD1_TRACKS*PDD1_SECTORS);
+	int rl = mlen+dlen; // total length of one record
+	int rc = (PDD1_TRACKS*PDD1_SECTORS); // total record count
 
 	dbg(0,"Format: Logical sector size: %d = %d\n",lc,ll);
 
@@ -575,7 +572,7 @@ void req_fdc_format(int lc) {
 void req_fdc_read_id(int p) {
 	dbg(2,"%s(%d)\n",__func__,p);
 	if (open_disk_image(p,O_RDONLY,ALLOW_RET)) return; // open and seek
-	int r = read(disk_img_fd,rb,mlen);  // read ID section
+	int r = read(disk_img_fd,rb,mlen);  // read header
 	dbg_b(2,rb,mlen);
 	int l = lsc_to_len(rb[0]);          // get logical size from header
 	ret_fdc_std(ERR_FDC_SUCCESS,p,l);   // send OK
@@ -590,8 +587,8 @@ void req_fdc_read_id(int p) {
 void req_fdc_read_sector(int tp,int tl) {
 	dbg(2,"%s(%d,%d)\n",__func__,tp,tl);
 	if (open_disk_image(tp,O_RDONLY,ALLOW_RET)) return; // open & seek to tp
-	if (read(disk_img_fd,rb,mlen)!=mlen) { // read ID section
-		dbg(1,"failed read ID\n");
+	if (read(disk_img_fd,rb,mlen)!=mlen) { // read header
+		dbg(1,"failed read header\n");
 		(void)(close(disk_img_fd)+1);
 		ret_fdc_std(ERR_FDC_READ,tp,0);
 		return;
@@ -641,19 +638,16 @@ void req_fdc_search_id() {
 
 void req_fdc_write_id(uint16_t tp) {
 	dbg(2,"%s(%d)\n",__func__,tp);
-	int s = (tp*(mlen+dlen));
-	if (open_disk_image(s,O_RDWR,ALLOW_RET)) return; // we need both read & write
-	uint8_t r = read(disk_img_fd,rb,mlen); // read ID
-	dbg_b(2,rb,r);
-	int l = lsc_to_len(rb[0]); // get logical size from header
 
-	// seek file back to tp+hdr (skip the ID header to the start of the 12 bytes of user ID data)
-	if (lseek(disk_img_fd,s+1,SEEK_SET)!=s+1) {
-		dbg(1,"failed seek %d : %s\n",s+1,strerror(errno));
+	if (open_disk_image(tp,O_RDWR,ALLOW_RET)) return; // we need both read & write
+
+	if (read(disk_img_fd,rb,1)!=1) { // read LSC
+		dbg(0,"failed to read LSC\n");
 		(void)(close(disk_img_fd)+1);
 		ret_fdc_std(ERR_FDC_READ,tp,0);
 		return;
 	}
+	int l = lsc_to_len(rb[0]); // get logical size from LSC
 
 	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // tell client to send data
 
@@ -667,11 +661,9 @@ void req_fdc_write_id(uint16_t tp) {
 		return;
 	}
 
-	// close file
-	(void)(close(disk_img_fd)+1);
+	(void)(close(disk_img_fd)+1); // close file
 
-	// send a final success response to the client
-	ret_fdc_std(ERR_FDC_SUCCESS,tp,l);
+	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // send final OK to client
 }
 
 void req_fdc_write_sector(int tp,int tl) {
@@ -686,7 +678,7 @@ void req_fdc_write_sector(int tp,int tl) {
 
 	int l = lsc_to_len(rb[0]); // get logical size from header
 
-	// seek to target_physical*full_sectors+ID+target_logical*logical_size
+	// seek to target_physical*full_sectors + header + target_logical*logical_size
 	int s = (tp*(mlen+dlen))+mlen+((tl-1)*l);
 	if (lseek(disk_img_fd,s,SEEK_SET)!=s) {
 		dbg(0,"failed seek %d : %s\n",s,strerror(errno));
@@ -707,11 +699,9 @@ void req_fdc_write_sector(int tp,int tl) {
 		return;
 	}
 
-	// close file
-	(void)(close(disk_img_fd)+1);
+	(void)(close(disk_img_fd)+1); // close file
 
-	// send a final success response to the client
-	ret_fdc_std(ERR_FDC_SUCCESS,tp,l);
+	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // send final OK to client
 }
 
 // ref/fdc.txt
@@ -1379,7 +1369,7 @@ void req_cache_load(unsigned char *b) {
 
 /*
  * req:
- * b[0] fmt
+ * b[0] fmt req_cache_read
  * b[1] len 4
  *      b[2] area        0=data 1=meta
  *      b[3] offset msb  0000-0500
@@ -1389,7 +1379,7 @@ void req_cache_load(unsigned char *b) {
  *
  * ret:
  * b[0] fmt ret_cache_read
- * b[1] len
+ * b[1] len (dlen+3)
  *      b[2] area        0=data 1=meta
  *      b[3] offset msb
  *      b[4] offset lsb
@@ -1433,8 +1423,8 @@ void req_cache_read(unsigned char *b) {
 /*
  * TPDD2 sector cache write
  * Previously called "TS-DOS mystery command 1" and had a canned response,
- * now actually implements the function. Aside from being a normal PDD2 sector
- * access command, TS-DOS uses it just to detect TPDD2
+ * now actually implements the function.
+ * Aside from being a normal PDD2 sector-access command, TS-DOS uses it just to detect TPDD2
  * 
  * b[0] fmt
  * b[1] len
@@ -1551,7 +1541,7 @@ void req_condition() {
 // the only difference from fdc-format is a single byte, the first byte of the SMT
 // opr-format is just this:
 //   start with: fdc-format 0    (0=64-byte logical sector size)
-//   then: sector 0, byte 1240, write 0x80 (or physical:0 logical:20 byte:25 counting from 1
+//   then: write 0x80 at sector 0 byte 1240 (aka physical:0 logical:20 byte:25 counting from 1)
 void req_format() {
 	dbg(2,"%s()\n",__func__);
 	const int rl = mlen+dlen; // img file record length
@@ -1570,9 +1560,9 @@ void req_format() {
 	if (e) { ret_std(e); return; }
 
 	// write the image
-	// TPDD1 fresh OPR-mode format is strange.
+	// Real drive TPDD1 fresh OPR-mode format is strange.
 	// Sector 0 gets logical size code 0, and all other sectors get lsc 1.
-	// We exactly mimick that here "just because", even though the lsc 1's
+	// We exactly mimick that here "just because", even though the lsc 1s
 	// don't seem to serve any purpose or have any effect.
 	for (rn=0;rn<rc;rn++) {
 		memset(rb,0x00,rl);
