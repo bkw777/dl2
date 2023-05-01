@@ -620,20 +620,47 @@ void req_fdc_read_sector(int tp,int tl) {
 	(void)(close(disk_img_fd)+1);
 }
 
+// ref/search_id_section.txt
 void req_fdc_search_id() {
 	dbg(2,"%s()\n",__func__);
-	// not sure how this is supposed to work yet, this is a guess:
-	//   send OK to client
-	//   read 12 bytes from client
-	//   search all ID's for match
-	//   return, what? Send another OK?
-	//   manual says it's the same as write_sector, which
-	//   sends an OK to tell client to send, and then
-	//   another OK to ack. So perhaps we return
-	//   just a status return that indicates if a match was found
-	//   and probably the first matching sector number in the len/addr field.
-	//   Probably the err field is always success.
-	ret_fdc_std(ERR_FDC_SUCCESS,0,0);
+	int rn = 0;     // physical sector number
+	int rl = mlen+dlen; // total length of one record
+	int rc = (PDD1_TRACKS*PDD1_SECTORS); // total record count
+	char sb[PDD1_SECTOR_ID_LEN] = {0x00}; // search data
+
+	if (open_disk_image(0,O_RDONLY,ALLOW_RET)) return; // open disk image
+	ret_fdc_std(ERR_FDC_SUCCESS,0,0); // tell client to send data
+	read_client_tty(sb,PDD1_SECTOR_ID_LEN); // read 12 bytes from client
+
+	int l = 0;
+	bool found = false;
+	for (rn=0;rn<rc;rn++) {
+		memset(rb,0x00,mlen);
+		if (read(disk_img_fd,rb,rl)!=rl) {  // read one record
+			dbg(0,"%s\n",strerror(errno));
+			(void)(close(disk_img_fd)+1);
+			ret_fdc_std(ERR_FDC_READ,rn,0);
+			return;
+		}
+
+		dbg(3,"%d ",rn);
+		dbg_b(3,rb,mlen);
+
+		l = lsc_to_len(rb[0]); // get logical size from header
+
+		// does sb exactly match ID?
+		if (!strncmp(sb,(char*)rb+1,PDD1_SECTOR_ID_LEN)) {
+			found = true;
+			break;
+		}
+	}
+	(void)(close(disk_img_fd)+1); // close file
+
+	if (found) {
+		ret_fdc_std(ERR_FDC_SUCCESS,rn,l);
+	} else {
+		ret_fdc_std(ERR_FDC_ID_NOT_FOUND,255,l);
+	}
 }
 
 void req_fdc_write_id(int tp) {

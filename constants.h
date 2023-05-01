@@ -106,11 +106,14 @@
 #define ERR_FDC_PARAM          33 // 'Parameter Invalid, Wrong Type'
 #define ERR_FDC_LSSC_LO        50 // 'Invalid Logical Sector Size Code'
 #define ERR_FDC_LSSC_HI        51 // 'Logical Sector Size Code Above Range'
+#define ERR_FDC_ID_NOT_FOUND   60 // 'ID Not Found'
+#define ERR_FDC_S_BAD_PARAM    61 // 'Search ID Unexpected Parameter'
 #define ERR_FDC_NOT_FORMATTED 160 // 'Disk Not Formatted'
 #define ERR_FDC_READ          161 // 'Read Error'
 #define ERR_FDC_WRITE_PROTECT 176 // 'Write-Protected Disk'
 #define ERR_FDC_COMMAND       193 // 'Invalid Command'
 #define ERR_FDC_NO_DISK       209 // 'Disk Not Inserted'
+#define ERR_FDC_INTERRUPTED   216 // 'Operation Interrupted'
 
 // TPDD1 FDC Condition bits
 #define FDC_COND_NOTINS       0x80 // bit 7 : disk not inserted

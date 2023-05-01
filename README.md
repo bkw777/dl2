@@ -203,6 +203,5 @@ See [co2ba](co2ba.md)
 Tested on Linux, Macos, [FreeBSD](ref/freebsd.md), and [Windows](ref/windows.md).
 
 ## TODO
-* implement req_fdc_search_id() - it's currently just a stub  
 * support big-endian platforms  
 * file/filesystem access on disk images - currently can only use for sector access
