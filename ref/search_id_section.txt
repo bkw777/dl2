@@ -1,57 +1,58 @@
 TPDD1 FDC-mode command "S" - Search ID Section
 bkw
 
-The software manual says almost nothing about this command. It only says:
+This is an odd command that isn't actually used by any of the main TPDD clients
+as far as I've seen yet. TS-DOS, DSKMGR, TEENY, Floppy, even Sardine all worked fine
+with dlplus before this command was implemented.
+Particularly, this is an FDC-mode command, and the only applications that actually use FDC mode
+known so far are Sardine and the installer for Disk-Power, and both of those worked with dlplus
+before this command was added.
+
+The software manual explains almost nothing about this command. It only says:
 
   "The procedure is similar to that for the Write Sector command,
    except that you send a search string instead of data to be written."
 
 So here is what I have found through some trial & error with a real drive.
 
-pdd.sh has an implementation of the client side of this and is working with real TPDD drives.
-
-dlplus has an implementation of the server side of this and is working with pdd.sh at least.
-
-This function is not actually used by TS-DOS, DSKMGR, TEENY, Floppy, nor Sardine as far as I have seen so far.
-
 The process is actually more like the Write ID Section command.
 
  1 - client sends "S" and carriage-return
- 
- 2 - drive responds with standard FDC-mode 8-byte response packet
+     This command takes no parameters after the S.
+     dlplus silently ignores any extra characters,
+     but a real drive gives error 61 if there are any extra bytes after the S.
+  
+ 2 - drive responds with standard FDC-mode response block(a)
+     If the command was valid and no hardware problem: err:0 dat:0 len:0
+     If the command was malformed: err:61 dat:0 len:0
 
-     client parses the response the same as with any other FDC-mode command
+     client parses the response block
 
-     if the response is not success, abort operation
+     if err>0, abort operation
        drive returns to waiting for new commands
        client should not send or expect anything more for this operation
-     otherwise, proceed...
+     otherwise, if err=0, proceed...
 
  3 - client sends exactly 12 bytes of data
-     right-pad with 0x00 and truncate to 12 bytes as necessary
+     right-pad with 0x00 or truncate to 12 bytes as necessary
 
-     drive works for up to 40 seconds searching all 80 tracks for a match
-     drive does not send enything during this time
+     drive is busy for up to 20 seconds while searching all 80 IDs for a match
+     drive does not send anything during this time
      client must not send anything during this time
 
- 4 - drive sends a standard FDC-mode 8-byte response block
-     2 bytes - hex pair status/error code: 0=success 60=not-found other=various errors
-     2 bytes - hex pair result data: physical sector number if found, or 255 if not found or error
-     4 bytes - 2 hex pairs result offset/length/size: logical sector size for indicated physical sector
-
- * Initial command syntax is simply "S", with no parameters.
-   Most FDC-mode commands either require or at least optionally take
-   one or two parameters for physical sector number and logical sector number,
-   or logical sector size code in the case of the fdc-format command.
-   This command gives an error 61 if given any parameters, they aren't simply ignored.
-
- * In the second stage where you send the search data, the client must send exactly 12 bytes.
-   Sending any fewer that 12 hangs the drive (it's waiting unknown time for the rest of the bytes).
-   Extra bytes get dropped or interpreted as the next command or hangs the drive.
+ 4 - drive sends another FDC-mode response block
+     If a match was found:     err:0  dat:sector-number len:logical-sector-size-bytes
+     If a match was not found: err:60 dat:255 len:logical-sector-size-bytes
 
 There seems to be no way to search for multiple matching records.
-You (apparently) can't supply any track# parameter to start searching after a previously found match,
-and repeating the same search just produces the same result which is the first match counting from track 0.
+You (apparently) can't supply any sector-number parameter to start searching after a previously found match to find the next match,
+and repeating the same search just produces the same result which is the first match counting from physical sector 0.
 
-dlplus silently discards any paramaters instead of giving error 61
-because I don't feel like changing get_fdc_cmd() to allow it to detect that.
+github/bkw777/pdd.sh has an implementation of the client side of this and is working with real TPDD drives.
+
+dlplus has an implementation of the server side of this and is working with pdd.sh.
+
+(a) FDC-mode 8-byte response block common to all FDC-mode commands:
+  2 bytes = ascii hex pair representing a uint_8 for error/status code (err:#) 0=success, >0 = various errors & conditions
+  2 bytes = ascii hex pair representing a uint_8 for result data (dat:#) meaning & valid values depends on command
+  4 bytes = 2 ascii hex pairs representing a uint_16 (msb-first) for length or offset (len:#) meaning & valid values depends on command
