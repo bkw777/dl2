@@ -10,8 +10,8 @@ So here is what I have found through some trial & error with a real drive.
 
 pdd.sh has an implementation of the client side of this and is working with real TPDD drives.
 
-dlplus does not yet implement the server side of this.
-|
+dlplus has an implementation of the server side of this and is working with pdd.sh at least.
+
 This function is not actually used by TS-DOS, DSKMGR, TEENY, Floppy, nor Sardine as far as I have seen so far.
 
 The process is actually more like the Write ID Section command.
@@ -53,3 +53,5 @@ There seems to be no way to search for multiple matching records.
 You (apparently) can't supply any track# parameter to start searching after a previously found match,
 and repeating the same search just produces the same result which is the first match counting from track 0.
 
+dlplus silently discards any paramaters instead of giving error 61
+because I don't feel like changing get_fdc_cmd() to allow it to detect that.
