@@ -207,12 +207,13 @@ void dbg_p(const int v, unsigned char *b) {
 	t.c_ospeed = 76800;     // Set the output baud rate (int)
 	ioctl(fd, TCSETS2, &t); // Apply new settings
 */
-// most clients only use 9600 or 19200 but the drive supports these
-// pdd.sh is one at least that can use any speed
+// most clients only use 9600 or 19200 but the drive supports all these
 void set_baud (char * s) {
 	int i=atoi(s);
 	client_baud=
-		i==150?B150:
+		i==75?B75:         // real drive does not support, kc85 does
+		i==110?B110:       // real drive does not support, kc85 does
+		i==150?B150:       // real drive supports, kc85 does not
 		i==300?B300:
 		i==600?B600:
 		i==1200?B1200:
@@ -229,7 +230,9 @@ void set_baud (char * s) {
 
 int get_baud () {
 	return
-		client_baud==B150?150:
+		client_baud==B75?75:      // real drive does not support, kc85 does
+		client_baud==B110?110:    // real drive does not support, kc85 does
+		client_baud==B150?150:    // real drive supports, kc85 does not
 		client_baud==B300?300:
 		client_baud==B600?600:
 		client_baud==B1200?1200:
@@ -241,6 +244,22 @@ int get_baud () {
 #if defined(B76800)
 		client_baud==B76800?76800:
 #endif
+		0;
+}
+
+// return the baud param for STAT (the # in "COM:#8N1ENN") that matches client_baud
+// ie: if client_baud == B19200 , return 9 to put in "COM:98N1ENN"
+int get_stat_baud () {
+	return
+		client_baud==B75?1:     // real drive does not support
+		client_baud==B110?2:    // real drive does not support
+		client_baud==B300?3:
+		client_baud==B600?4:
+		client_baud==B1200?5:
+		client_baud==B2400?6:
+		client_baud==B4800?7:
+		client_baud==B9600?8:
+		client_baud==B19200?9:
 		0;
 }
 
@@ -1495,11 +1514,11 @@ void req_cache_write(unsigned char *b) {
 /*
  * Another part of TS-DOS's drive/server capabilities detection scheme.
  * Previously called "TS-DOS mystery command 2"
- * The function of the command in a real drive is unknown.
- * The meaning of the response is unkmnown.
+ * The actual intended function of the command in a real drive is unknown.
+ * The meaning of the response is unknown.
  * But the command apparently takes no parameters, and a real TPDD2 always
  * responds with the same string of bytes, and TPDD1 ignores it.
- * not counting ZZ or checksums:
+ * Not including the ZZ or checksums:
  * Client sends  : 23 00
  * TPDD2 responds: 14 0F 41 10 01 00 50 05 00 02 00 28 00 E1 00 00 00
  * TPDD1 does not respond.
@@ -1728,13 +1747,24 @@ int bootstrap(char *f) {
 
 	char t[PATH_MAX]={0x00};
 
-	strcpy(t,f);
-	strcat(t,".pre-install.txt");
-	if (!access(t,F_OK)) dcat(t);
-	else dbg(0,"Prepare BASIC to receive:\n"
+	int b = get_stat_baud();
+	if (!b) {
+		dbg(0,"Prepare the client to receive data."
 		"\n"
-		"    RUN \"COM:98N1ENN\" [Enter]    <-- TANDY/Olivetti/Kyotronic\n"
-		"    RUN \"COM:9N81XN\"  [Enter]    <-- NEC\n");
+		"Note: The current baud setting, %d, is not supported\n"
+		"by the TRS-80 Model 100 or other KC-85 platform machines.\n"
+		"There is no way for BASIC or TELCOM to use this baud rate.\n",get_baud());
+	} else {
+		strcpy(t,f);
+		strcat(t,".pre-install.txt");
+		if (!access(t,F_OK) && b==9) dcat(t);
+		else {
+			dbg(0,"Prepare BASIC to receive:\n"
+			"\n"
+			"    RUN \"COM:%1$d8N1ENN\" [Enter]    <-- TANDY/Olivetti/Kyotronic\n"
+			"    RUN \"COM:%1$dN81XN\"  [Enter]    <-- NEC\n",b);
+		}
+	}
 
 	dbg(0,"\nPress [Enter] when ready...");
 	getchar();
