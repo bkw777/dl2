@@ -1,51 +1,81 @@
 TPDD1 FDC-mode command "S" - Search ID Section
-bkw
+Page 38 of the software manual
+https://archive.org/details/tandy-service-manual-26-3808-s-software-manual-for-portable-disk-drive/page/38/
 
 This is an odd command that isn't actually used by any of the main TPDD clients
-as far as I've seen yet. TS-DOS, DSKMGR, TEENY, Floppy, even Sardine all worked fine
-with dlplus before this command was implemented.
-Particularly, this is an FDC-mode command, and the only applications that actually use FDC mode
-known so far are Sardine and the installer for Disk-Power, and both of those worked with dlplus
-before this command was added.
+or applications as far as I've seen yet. All the "DOS"s (TS-DOS, DSKMGR, TEENY, Floppy, etc)
+use only "Operation-mode" (aka file-access) commands.
+The only applications I know of so far that use FDC-mode (aka sector-access) commands
+are Sardine and the installer for Disk-Power, and neither of those uses this command.
+
+So there is no client software I know of to test if we are emulating this function well enough.
+What we do have is, pdd.sh was used to probe out what a real drive does,
+and then both pdd.sh and dlplus do that.
+So *maybe* we are emulating the real drives "S" command more or less?
 
 The software manual explains almost nothing about this command. It only says:
 
   "The procedure is similar to that for the Write Sector command,
    except that you send a search string instead of data to be written."
 
-So here is what I have found through some trial & error with a real drive.
+Which is not only insufficient but also not as correct as it could be.
 
 The process is actually more like the Write ID Section command.
 
- 1 - client sends "S" and carriage-return
+The process goes like this (as far as I can tell):
+
+ 0 - client sends the Operation-mode command for "switch to FDC-mode"
+     0x5A 0x5A 0x08 0x00 0xDC
+     (ZZ 0x08 NULL checksum)
+ 
+     "Search ID Section" is an FDC-mode command, and a real drive always starts
+     in Operation-mode at power-on by default. So if not done already,
+     the drive must first be switched from Operation-mode to FDC-mode before
+     you can issue any FDC-mode commands.
+  
+     https://archive.org/details/tandy-service-manual-26-3808-s-software-manual-for-portable-disk-drive/page/21/
+
+     The drive does not send back any response to this command.
+     The drive is simply now in FDC-mode, waiting to accept FDC-mode commands instead of Operation-mode commands.
+
+ 1 - client sends 0x53 0x0D
+     (S carriage-return)
+
      This command takes no parameters after the S.
      dlplus silently ignores any extra characters,
      but a real drive gives error 61 if there are any extra bytes after the S.
-  
- 2 - drive responds with standard FDC-mode response block(a)
+
+ 2 - drive sends a standard FDC-mode response block(a)
+     (8 bytes, all ascii "0"s if there was no hardware fault or other error)
+
      If the command was valid and no hardware problem: err:0 dat:0 len:0
+     (0x30 0x30 0x30 0x30 0x30 0x30 0x30 0x30 = "00000000" = err:0 = success)
+
      If the command was malformed: err:61 dat:0 len:0
+     (0x36 0x31 0x30 0x30 0x30 0x30 0x30 0x30 = "61000000" = err:61 = error)
 
      client parses the response block
 
      if err>0, abort operation
        drive returns to waiting for new commands
        client should not send or expect anything more for this operation
-     otherwise, if err=0, proceed...
+     otherwise, if err==0, proceed...
 
  3 - client sends exactly 12 bytes of data
      right-pad with 0x00 or truncate to 12 bytes as necessary
+     to search for "abc" send 0x61 0x62 0x63 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
 
-     drive is busy for up to 20 seconds while searching all 80 IDs for a match
+     drive is busy for up to 20 seconds while searching up to 80 IDs for a match
      drive does not send anything during this time
      client must not send anything during this time
+     wait at least 20 seconds and abort if no response by 30 seconds
 
  4 - drive sends another FDC-mode response block
      If a match was found:     err:0  dat:sector-number len:logical-sector-size-bytes
      If a match was not found: err:60 dat:255 len:logical-sector-size-bytes
 
 There seems to be no way to search for multiple matching records.
-You (apparently) can't supply any sector-number parameter to start searching after a previously found match to find the next match,
+For instance, as far as I can tell you can't supply any sector-number parameter to start searching at the next sector after a previously found match to find the next match,
 and repeating the same search just produces the same result which is the first match counting from physical sector 0.
 
 github/bkw777/pdd.sh has an implementation of the client side of this and is working with real TPDD drives.
@@ -54,5 +84,5 @@ dlplus has an implementation of the server side of this and is working with pdd.
 
 (a) FDC-mode 8-byte response block common to all FDC-mode commands:
   2 bytes = ascii hex pair representing a uint_8 for error/status code (err:#) 0=success, >0 = various errors & conditions
-  2 bytes = ascii hex pair representing a uint_8 for result data (dat:#) meaning & valid values depends on command
-  4 bytes = 2 ascii hex pairs representing a uint_16 (msb-first) for length or offset (len:#) meaning & valid values depends on command
+  2 bytes = ascii hex pair representing a uint_8 for result data (dat:#),  meaning depends on command
+  4 bytes = 2 ascii hex pairs representing a uint_16 (msb-first) for length or offset (len:#),  meaning depends on command
