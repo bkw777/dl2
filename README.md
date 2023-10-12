@@ -200,7 +200,7 @@ It's simple and doesn't handle all situations or do anything fancy like relocati
 See [co2ba](co2ba.md)
 
 ## OS Compatibility
-Tested on Linux, Macos, [FreeBSD](ref/freebsd.md), and [Windows](ref/windows.md).
+Tested on Linux, [Mac](ref/mac.md), [FreeBSD](ref/freebsd.md), and [Windows](ref/windows.md).
 
 ## TODO
 * support big-endian platforms  

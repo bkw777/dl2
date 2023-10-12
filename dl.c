@@ -207,8 +207,9 @@ void dbg_p(const int v, unsigned char *b) {
 	t.c_ospeed = 76800;     // Set the output baud rate (int)
 	ioctl(fd, TCSETS2, &t); // Apply new settings
 */
-// most clients only use 9600 or 19200 but the drive supports all these
-void set_baud (char * s) {
+// given string "9600", set client_baud = B9600
+// most clients only use 9600 or 19200 but a real drive supports all these
+void set_client_baud (char * s) {
 	int i=atoi(s);
 	client_baud=
 		i==75?B75:         // real drive does not support, kc85 does
@@ -228,7 +229,8 @@ void set_baud (char * s) {
 		B19200;
 }
 
-int get_baud () {
+// return a normal int corresponding to the current client_baud
+int get_int_baud () {
 	return
 		client_baud==B75?75:      // real drive does not support, kc85 does
 		client_baud==B110?110:    // real drive does not support, kc85 does
@@ -247,8 +249,8 @@ int get_baud () {
 		0;
 }
 
-// return the baud param for STAT (the # in "COM:#8N1ENN") that matches client_baud
-// ie: if client_baud == B19200 , return 9 to put in "COM:98N1ENN"
+// return the kc85 STAT baud param (the # in "COM:#8N1ENN") that will work with the current client_baud
+// ie: if client_baud == B19200 , return 9, to be put into "COM:98N1ENN"
 int get_stat_baud () {
 	return
 		client_baud==B75?1:     // real drive does not support
@@ -1746,14 +1748,13 @@ int bootstrap(char *f) {
 	}
 
 	char t[PATH_MAX]={0x00};
-
 	int b = get_stat_baud();
 	if (!b) {
 		dbg(0,"Prepare the client to receive data."
 		"\n"
 		"Note: The current baud setting, %d, is not supported\n"
 		"by the TRS-80 Model 100 or other KC-85 platform machines.\n"
-		"There is no way for BASIC or TELCOM to use this baud rate.\n",get_baud());
+		"There is no way for BASIC or TELCOM to use this baud rate.\n",get_int_baud());
 	} else {
 		strcpy(t,f);
 		strcat(t,".pre-install.txt");
@@ -1803,7 +1804,7 @@ void show_config () {
 	dbg(0,"disk_img_fname  : \"%s\"\n",disk_img_fname);
 	dbg(0,"share_path      : \"%s\"\n",cwd);
 	dbg(2,"opr_mode        : %d\n",opr_mode);
-	dbg(2,"baud            : %d\n",get_baud());
+	dbg(2,"baud            : %d\n",get_int_baud());
 	dbg(0,"dme_disabled    : %s\n",dme_disabled?"true":"false");
 	dbg(2,"dme_root_label  : \"%-6.6s\"\n",dme_root_label);
 	dbg(2,"dme_parent_label: \"%-6.6s\"\n",dme_parent_label);
@@ -1860,7 +1861,7 @@ int main(int argc, char **argv) {
 	if (getenv("DISABLE_MAGIC_FILES")) enable_magic_files = false;
 	if (getenv("DOT_OFFSET")) dot_offset = atoi(getenv("DOT_OFFSET"));
 	if (getenv("CLIENT_TTY")) strcpy(client_tty_name,getenv("CLIENT_TTY"));
-	if (getenv("BAUD")) set_baud(getenv("BAUD"));
+	if (getenv("BAUD")) set_client_baud(getenv("BAUD"));
 	if (getenv("ROOT_LABEL")) {snprintf(dme_root_label,7,"%-6.6s",getenv("ROOT_LABEL"));
 		memcpy(dme_cwd,dme_root_label,6);}
 	if (getenv("PARENT_LABEL")) snprintf(dme_parent_label,7,"%-6.6s",getenv("PARENT_LABEL"));
@@ -1888,7 +1889,7 @@ int main(int argc, char **argv) {
 			case 'm': model=atoi(optarg);                                 break;
 			case 'p': (void)(chdir(optarg)+1);                            break;
 			case 'r': rtscts = true;                                      break;
-			case 's': set_baud(optarg);                                   break;
+			case 's': set_client_baud(optarg);                            break;
 			case 'u': upcase = true;                                      break;
 			case 'v': debug++;                                            break;
 			case 'w': dot_offset = 8;                                     break;
