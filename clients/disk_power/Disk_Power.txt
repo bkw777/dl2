@@ -7,7 +7,7 @@ Disk Power requires both INSTAL.CO and the distribution disk to install.
 
 Here, INSTAL.CO has been repackaged into a BASIC loader which can be
 bootstrapped over a serial cable, and the disk has been imaged with
-pdd.sh so that dlplus can act as a virtual drive for sector access to it.
+pdd.sh so that dl2 can act as a virtual drive for sector access to it.
 
 ---------------------------------------------------------------------------
 
@@ -15,9 +15,9 @@ Installation: Just run the following command:
 
  $ dl -vb Disk_Power.K85 && dl -vue -m 1 -i Disk_Power.K85.pdd1
 
-(dlplus will get both files from /usr/local/lib/dl)
+(dl2 will get both files from /usr/local/lib/dl)
 
-When the installer prompts to insert the disk, just hit [Enter].
+When the installer on the KC-85 prompts to insert the disk, just hit [Enter].
 
 ---------------------------------------------------------------------------
 
@@ -31,22 +31,76 @@ Usage:
        |   F1   |   F2   |   F3   |   F4   |   F5   |   F6   |   F7   |   F8   |
        +--------+--------+--------+--------+--------+--------+--------+--------+
 
-The top row are DISK functions, available while in DISK view.
-The bottom row are RAM functions, available while in RAM view.
+The top row are DISK operations which apply while in DISK view mode.
+The bottom row are RAM operations which apply while in RAM view mode.
 
-F4 toggles between RAM and DISK view.
+DISK Operations:
 
-F8 exits back to the main menu.
+  F1 - NewDsk - (re)-Read the (changed) disk directory.
 
-ClrBAS and ClrPST clear the BASIC program area an the Paste buffer to
-recover ram for saving files.
+  F2 - Load - Load a file from DISK to RAM.
 
-F7 Format quirk: F4 will not enter DISK view unless there is a valid
-formatted disk inserted to read. This means it's not possible to format a
-new blank disk unless you already have some other formatted disk to put in
-the drive first in order to access DISK view. Once in DISK view, then you
-can swap in the blank disk and press F7 to format it. You can use the install
-disk for that if nothing else. You can also format a new disk with pdd.sh
+  F3 - ALL - TODO/FIXME: I don't remember now, select all probably?
+
+  F4 - RAMDIR - Switch to RAM View Mode
+
+  F5 - Kill - Delete a file from the DISK.
+
+  F6 - List - TODO/FIXME: I don't remember.
+
+  F7 - Format - Format the disk. (note1)
+
+  F8 - Menu - Exit out of Disk-Power back to the KC-85 main menu.
+
+RAM Operations:
+
+  F1 - ClrBAS - Clear the BASIC program area to recover ram for loading files.
+
+  F2 - Save - Save a file from RAM to DISK.
+
+  F3 - ALL - TODO/FIXME: I don't remember now, select all probably?
+
+  F4 - DSKDIR - Switch to DISK View Mode. (note1)
+
+  F5 - Kill - Delete a file from RAM.
+
+  F6 - List - TODO/FIXME: I don't remember.
+
+  F7 - ClrPST - Clear the PASTE buffer area to recover ram for loading files.
+
+  F8 - Menu - Exit out of Disk-Power back to the KC-85 main menu.
+
+
+(note1) F4 Disk / F7 Format quirk:
+
+  F4 will not enter DISK view unless there is a valid formatted disk
+  inserted to read.
+
+  The F7 Format Disk function...
+  needed to create a formatted disk...
+  is in the DISK menu...
+  which requires a formatted disk to access...
+
+  This means that it's not possible to format a new blank disk unless you
+  already have at least one other already-formatted disk available, just
+  to put in the drive first, just so that you can access the DISK
+  functions at all, where the Format function is.
+
+  Once in DISK view mode, then you can swap in another disk and press
+  F7 to format it.
+
+  Presumably the user was expected to always have the distribution disk
+  available if nothing else, because the software required the original
+  distribution disk to install or re-install after a crash. There was no
+  way to back up either the installed program or the original disk.
+  So, since crashes can happen at any time, you needed to carry the
+  actual distribution disk around with the computer at all times.
+  And so you could always use that to access the DISK menu if nothing else.
+
+  In reality, today you can just use another TPDD client like DSKMGR on the
+  KC-85, or pdd.sh on a PC. This is only a theoretical limitation if it were
+  1985, you were away from home, and had only your not-crashed KC-85 with
+  Disk-Power already installed, and a new disk.
 
 ---------------------------------------------------------------------------
 
