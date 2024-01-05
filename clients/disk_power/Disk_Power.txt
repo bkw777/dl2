@@ -92,7 +92,7 @@ RAM Operations:
   Presumably the user was expected to always have the distribution disk
   available if nothing else, because the software required the original
   distribution disk to install or re-install after a crash. There was no
-  way to back up either the installed program or the original disk.
+  way to back up either the installed program or the whole original disk.
   So, since crashes can happen at any time, you needed to carry the
   actual distribution disk around with the computer at all times.
   And so you could always use that to access the DISK menu if nothing else.
