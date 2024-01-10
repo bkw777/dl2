@@ -1,0 +1,258 @@
+PAKDOS.DOC -- Documentation for the disk file manager/archiver,
+ PAKDOS.100 and PAKDOS.200  v1.2 [1-7-91]
+By James Yi [73327,1653]
+
+
+___ What is it? ___
+
+  PAKDOS allows you to compress and combine Ram files to disk, in addition
+ to other routine disk file management tasks, such as Save, Load, Erase, etc.
+  Since files can be combined, more than 40 files can be stored per disk.
+  DO files get reduced by about %40-%60, BA and CO files %10-%30.
+  It runs on Model 100 or 200 with either PDD1 or PDD2.
+
+
+___ How to load and run it ___
+
+1. Download the program in the form of text file.  There are two versions,
+ PAKDOS.100 for Model 100 and PAKDOS.200 for Tandy 200.
+
+2. Convert the text file to BA program file by going to BASIC and LOADing it.
+  If you get ?OM error, you can either save the text file to cassette or disk
+ and LOAD from there, or use DO2BA.100 or DO2BA.200 to convert it directly to
+ a BA file.
+
+3. Run the converted BA loader to create PAKDOS.CO.  While being created, its
+ loading address is set according to the value of HIMEM; the address of its
+ last byte is set at HIMEM-1.  If you are not worried about it conflicting
+ with other machine language programs in HIMEM, you can just load it at the
+ highest possible address by setting HIMEM to MAXRAM before running the
+ loader.  HIMEM can be set by typing  CLEAR 0,xxxxx
+ where xxxxx is the new HIMEM value.  After it is created, you may delete
+ the loader.
+
+4. Run PAKDOS.CO.  If it just beeps at you or gives an ?OM error, you need to
+ make space for it in HIMEM by setting HIMEM to at or below the load address
+ of PAKDOS.CO.  The load address is found out by going to BASIC and
+ LOADMing the program by typing
+  LOADM "PAKDOS"
+ There will be displayed "Top", "End", "Exe" values; set HIMEM equal to "Top",
+ by typing
+  CLEAR 0,xxxxx
+ where xxxxx is the value of "Top".  If you get ?OM error again, it means there
+ is not enough free Ram.
+
+
+___ How to use it ___
+
+At the command prompt "PakDOS:", enter a command in the following format:
+
+  CMD FNM1 FNM2 ... -OPT1 -OPT2 ...
+ (Each item is seperated by blanks.)
+
+CMD is the command string.  It is one character long.
+FNM is the name of the file for the command to process.  Enter as many FNMs
+ as are needed.
+-OPT (option) is optional subcommand.  For example, -L option shows, in
+ addition to the name of the file being processed, its size and date/time.
+
+
+___ List of commands ___
+
+Note:
+ 1. Although the command words shown below are spelled out, you need to
+ specify only the first letter.
+
+ 2. Abbreviations for file name specifications: DFL = file on disk,
+ RFL = file in RAM, FNM = just any name.
+
+ 4. Wildcards(*,?) are allowed for file name specifications when W is attached
+ to it.  For example, RFLW means that wildcard substitution is allowed for
+ RFL.  More about wildcards later.
+
+ 3. Use of brackets([]) means that the item in it is optional.  If a file name
+ specification is in [], it means that by omitting the file name, you can
+ pause before processing each file and press Y to process it, N to skip, or a
+ control character(^C, ESC, ENTER, etc.) to stop.
+
+ 5. The following subcommands have common use in all of the commands that
+ allow them:
+  -I (Interact) gives a pause at each file to be processed, so you can
+ press Y to process it, N to skip, or a control character(^C, ESC, ENTER, etc.)
+ to stop.  For example, to select only some DO files, specify *.DO and use -I.
+  It will then pause at every file with DO extension.
+  -L (Long format) displays in addition to the name of the file being
+ processed, its size, and where applicable, date/time and compressed
+ size.
+  -M (Move) deletes the file after it is processed.
+  -D (Date/time stamp) stamps the
+ date/time when creating a disk file.  As a side effect, putting the date/time
+ on the file makes it unreadable by other disk related programs that do not
+ expect the date/time stamp.
+  -X (execute) executes DO, BA, or CO file after it is created in Ram, by
+ Load or Unpack command.  DO and BA files load as files, but CO file does
+ not, i.e., it won't be on the Menu when you exit the CO file.  If the load
+ address of CO file conflicts with that of PakDOS, you can still execute it,
+ but PakDOS will be overwritten.
+
+
+  Pack DFL [RFLW] [-S] [-M] [-I] [-L] [-D]
+
+compresses RFLW and stores them as DFL.  Packed files are simply combined with
+ other packed files in DFL if DFL exists already.  The default extension for
+ DFL is "PD".
+  -S (Skip compression) skips compression, when you want to just
+ combine files together without size reduction.
+
+
+  Unpack DFL [RFLW] [-I] [-L] [-X]
+
+decompresses RFLW from DFL and loads them to Ram.
+
+
+  View DFL [FNMW] [-L]
+
+lists packed files in DFL.
+
+
+  Omit DFL [FNMW] [-I] [-L] [-D]
+
+deletes packed files from DFL.  Leave enough free Ram to buffer the DFL.
+  If there isn't enough free Ram, the DFL will be read from disk more than
+ once, in order to process it in parts.  The more parts it has to be divided up
+ into, the longer it will take.
+
+
+  Save [RFLW] [-M] [-ADFL] [-I] [-H] [-D] [-L]
+
+saves RAM files to disk.
+  -ADFL option lets you append RFLW to DFL.
+  -H (remove Header) lets you remove the 6 bytes header of a CO type file to
+ save only the data part of it.  This might come handy when for example, you
+ have Loaded a PD file from disk into Ram, and want to save it back onto
+ disk; -H removes the header that was attached to the PD file when it was
+ Loaded.
+
+
+  Load [DFLW] [-I] [-L] [-X]
+
+loads disk files to Ram.  If the file extension's first letter is not one of
+ B for Basic, C for CO(binary) type, D for text type, it will load the file as
+ a CO type file, attaching to it a 6 bytes header needed to store a CO type
+ file in Ram.
+
+
+  DiskDirectory [FNMW] [-L]
+
+lists disk files.
+
+
+  Erase [DFLW] [-I] [-L]
+
+erases disk files.
+
+
+  Type [DFLW] [-Pnn] [-I] [-L]
+
+prints the content of disk files on screen.
+  -Pnn (print) outputs the file to printer, sending the printer code nn at
+ the end of each file, e.g., -P12 sends Form Feed, and just -P sends nothing.
+
+
+  Kill [RFLW] [-I] [-L]
+
+deletes RAM files.
+
+
+  Files [RFLW] [-L]
+
+lists RAM files.
+
+
+  Read [RFLW] [-L]
+
+prints content of Ram files on screen.
+
+
+  Quit
+
+exits the program.
+
+
+  Bye
+
+is a permanent exit, returning the HIMEM space occupied by PAKDOS to free
+ memory, and deleting PAKDOS.CO if it's in Ram.
+
+
+  HELP or any other nonexistent command shows the Help menu.
+
+
+--- Other details ---
+
+  ';' for command repeats the previous command.
+
+  During files listing, press any key to pause, and then press a control
+ chr(^C, ESC, ENTER, etc.) to stop, or any other key to resume.
+
+  Holding down SHIFT stops batch processing of files, letting the
+ current file finish, then stopping before processing the next file.
+
+Just press ENTER at the command prompt to clear the screen.
+
+  If you use it with PDD2, you can add the prefix 0: or 1: to the file name to
+ specify which bank the file is in.  Then the bank selection is set to that
+ bank for subsequent commands until you switch it back by using another prefix.
+  For example,
+  D 1:
+ lists directory of bank 1 and lets all subsequent operations take place in
+ bank 1. Or,
+  S 0:*.*
+ saves all Ram files to bank 0.
+
+  Making a Ram file invisible makes it inaccessable by PakDOS.
+
+  You can make CALLs to PakDOS to execute a single command and return.
+  The following example demonstrates this.  It lists the disk files
+ directory in long format.
+
+10 LOADM"PakDOS"
+20 PD=XXXXX:'"Top" address of PakDOS
+30 C$="d -l"+CHR$(0):'Command string
+40 C=VARPTR(C$):C=PEEK(C+1)+PEEK(C+2)*256
+50 CALL PD+3,,C
+60 END
+
+Replace XXXXX in line 20 with the address of PakDOS's Top.  When you CALL
+ PakDOS at Top, to run the program, or at Top+3, to execute a single command,
+ like the example above, all Basic variables are retained and you will be
+ returned to resume running the Basic program.  The only case where a
+ variable might not be retained is when a string variable is assigned a single
+ constant literal string, like this:
+
+10 A$="hello"
+
+However this can be corrected by changing it to:
+
+10 A$=""+"hello"
+  or
+10 A$="h"+"ello"
+
+The + forces the data of A$ to be located in a seperate variable storage
+ area, instead of being imbedded in the program line.
+
+  If you up/download files using the built-in 300 baud modem and run out of
+memory to hold all the files, you can use PakDOS without having to logoff
+ and relogon, by exiting the comm program, use PakDOS to save/load files
+ from disk, and resume the comm program.
+
+--- Wildcards ---
+
+ * - Replaces a field...; *.* - any file; *.DO - any file with DO
+ extension; GR*.* - any file beginning with GR
+
+ ? - Replaces a single letter...; ?ILE.* - file name with any first letter,
+ followed by "ILE" and any extension. ??????.?? is the same as *.*
+
+
+		END

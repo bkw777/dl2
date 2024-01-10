@@ -26,6 +26,7 @@ CLIENT_LOADERS := \
 	clients/ts-dos/TS-DOS.100 \
 	clients/ts-dos/TS-DOS.200 \
 	clients/ts-dos/TS-DOS.NEC \
+	clients/pakdos/PAKDOS.200 \
 	clients/disk_power/Disk_Power.K85 \
 #	clients/power-dos/POWR-D.100
 
@@ -46,6 +47,7 @@ CLIENT_DOCS := \
 	clients/teeny/ddoc.do \
 	clients/dskmgr/DSKMGR.DOC \
 	clients/ts-dos/tsdos.pdf \
+	clients/pakdos/PAKDOS.DOC \
 	clients/disk_power/Disk_Power.txt \
 #	clients/power-dos/powr-d.txt
 
