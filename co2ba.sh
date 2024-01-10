@@ -48,9 +48,9 @@ printf '%uIFS<>%uTHEN?"Bad Checksum":END\r' $((LINE++)) $SUM
 
 # action after loading
 case "$ACTION" in
-	CALL|EXEC) printf '%uCLS:%s%u\r' $((LINE++)) $ACTION $EXE ;;
-	SAVEM|BSAVE) printf '%uCLS:?"Saving "N$:%sN$,%u,%u,%u\r' $((LINE++)) $ACTION $TOP $END $EXE ;;
-	*) printf '%uCLS:?"Loaded:":?"top %u":?"end %u":?"exe %u"\r' $((LINE++)) $TOP $END $EXE ;;
+	CALL|EXEC) printf '%u%s%u\r' $((LINE++)) $ACTION $EXE ;;
+	SAVEM|BSAVE) printf '%u?:?"Done. Please type: NEW":%sN$,%u,%u,%u\r' $((LINE++)) $ACTION $TOP $END $EXE ;;
+	*) printf '%uCLS:?"Loaded:":?"top %u":?"end %u":?"exe %u":"?"Please type: NEW"\r' $((LINE++)) $TOP $END $EXE ;;
 esac
 
 # DATA lines
