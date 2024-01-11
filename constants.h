@@ -13,30 +13,32 @@
 #define REQ_FORMAT        0x06
 #define REQ_STATUS        0x07
 #define REQ_FDC           0x08 // TPDD1
-#define REQ_SEEK          0x09
-#define REQ_TELL          0x0A
-#define REQ_SET_EXT       0x0B
+#define REQ_SEEK          0x09 // NADSBox extension
+#define REQ_TELL          0x0A // NADSBox extension
+#define REQ_SET_EXT       0x0B // NADSBox extension
 #define REQ_CONDITION     0x0C // TPDD2
 #define REQ_RENAME        0x0D // TPDD2
-#define REQ_EXT_QUERY     0x0E
-#define REQ_COND_LIST     0x0F // generates 0x38 ret fmt
-#define REQ_PDD2_UNK11    0x11 // TPDD2 unknown function - TPDD2 responds: 3A 06 80 13 05 00 10 E1 36
-#define REQ_PDD2_UNK23    0x23 // TPDD2 unknown function - "TS-DOS mystery" TS-DOS uses for to detect TPDD2 - TPDD2 responds, TPDD1 does not.
-#define REQ_CACHE_LOAD    0x30 // TPDD2 sector access
-#define REQ_CACHE_WRITE   0x31 // TPDD2 sector access
-#define REQ_CACHE_READ    0x32 // TPDD2 sector access
-#define REQ_PDD2_UNK33    0x33 // TPDD2 same as UNK11
+#define REQ_EXT_QUERY     0x0E // ??? Maybe NADSBox also, compliment of REQ_SET_EXT ?
+#define REQ_COND_LIST     0x0F // ??? - TPDD2 responds RET_CACHE
+#define REQ_UNDOC11       0x11 // TPDD2 undocumented synonym for REQ_PDD2_SYSINFO
+#define REQ_VERSION       0x23 // TPDD2 Get Version Number - TPDD2 responds PDD2_VERSION_DAT
+#define REQ_CACHE         0x30 // TPDD2 sector access
+#define REQ_MEM_WRITE     0x31 // TPDD2 sector access
+#define REQ_MEM_READ      0x32 // TPDD2 sector access
+#define REQ_SYSINFO       0x33 // TPDD2 Get System Information - TPDD2 responds PDD2_SYSINFO_DAT
+#define REQ_EXEC          0x34 // TPDD2 Execute Program
 
 // TPDD return block formats
 #define RET_READ          0x10
 #define RET_DIRENT        0x11
 #define RET_STD           0x12 // shared return format for: error open close delete status write
-#define RET_PDD2_UNK23    0x14 // TPDD2 unknown function - "TS-DOS mystery" TS-DOS uses to detect TPDD2
+#define RET_VERSION       0x14 // TPDD2
 #define RET_CONDITION     0x15 // TPDD2
-#define RET_CACHE_STD     0x38 // TPDD2 shared return format for: cache_load cache_write cond_list
-#define RET_CACHE_READ    0x39 // TPDD2
-#define RET_PDD2_UNK11    0x3A // TPDD2 unknown function
-#define RET_PDD2_UNK33    0x3A // TPDD2 same as UNK11
+#define RET_CACHE         0x38 // TPDD2 shared return format for: cache mem_write cond_list
+#define RET_MEM_READ      0x39 // TPDD2
+#define RET_SYSINFO       0x3A // TPDD2
+#define RET_EXEC          0x3B // TPDD2
+
 
 // directory entry request types
 #define DIRENT_SET_NAME   0x00
@@ -55,7 +57,7 @@
 #define ERR_SUCCESS       0x00 // 'Operation Complete'
 #define ERR_NO_FILE       0x10 // 'File Not Found'
 #define ERR_EXISTS        0x11 // 'File Exists'
-#define ERR_CMDSEQ        0x30 // 'Command Parameter Error or Sequence Error'
+#define ERR_NO_FNAME      0x30 // 'Missing Filename'
 #define ERR_DIR_SEARCH    0x31 // 'Directory Search Error'
 #define ERR_BANK          0x35 // 'Bank Error'
 #define ERR_PARAM         0x36 // 'Parameter Error'
@@ -140,10 +142,6 @@
 #define PDD2_COND_POWER       0x01 // bit 0 : low power
 #define PDD2_COND_NONE        0x00 // no conditions
 
-// misc
-#define UNK11_RET_DAT {RET_PDD2_UNK11,0x06,0x80,0x13,0x05,0x00,0x10,0xE1}
-#define UNK23_RET_DAT {RET_PDD2_UNK23,0x0F,0x41,0x10,0x01,0x00,0x50,0x05,0x00,0x02,0x00,0x28,0x00,0xE1,0x00,0x00,0x00}
-
 // lengths & addresses
 #define PDD1_TRACKS           40
 #define PDD1_SECTORS          2
@@ -160,7 +158,7 @@
 #define PDD1_SECTOR_LSC_LEN   1
 #define PDD1_SECTOR_ID_LEN    12
 #define PDD1_SECTOR_META_LEN  (PDD1_SECTOR_LSC_LEN+PDD1_SECTOR_ID_LEN)
-#define PDD2_SECTOR_META_LEN  4
+#define PDD2_SECTOR_META_LEN  4 // TODO - PDD2 service manual shows there is 17-bytes ID field
 #define SMT_OFFSET            1240
 #define PDD1_SMT              0x80
 #define PDD2_SMT              0xC0
@@ -168,23 +166,48 @@
 #define PDD2_CACHE_READ_MAX   252
 #define PDD2_CACHE_WRITE_MAX  127
 
-// flags
-#define FE_FLAGS_NONE 0x00
-#define FE_FLAGS_DIR  0x01
-#define NO_RET        0
-#define ALLOW_RET     1
-#define CACHE_LOAD    0
-#define CACHE_UNLOAD  2
-#define CACHE_AREA_DATA 0
-#define CACHE_AREA_META 1
+// TPDD2 version data: 41 10 01 00 50 05 00 02 00 28 00 E1 00 00 00
+#define VERSION_MSB       0x41
+#define VERSION_LSB       0x10
+#define SIDES             0x01
+#define TRACKS_MSB        0x00
+#define TRACKS_LSB        0x50
+#define SECTOR_SIZE_MSB   0x05
+#define SECTOR_SIZE_LSB   0x00
+#define SECTORS_PER_TRACK 0x02
+#define DIRENTS_MSB       0x00
+#define DIRENTS_LSB       0x28
+#define MAX_FD            0x00
+#define MODEL             0xE1     // E1 = TPDD2
+#define VERSION_R0        0x00
+#define VERSION_R1        0x00
+#define VERSION_R2        0x00
 
-// KC-85 platform BASIC interpreter EOL & EOF bytes for bootstrap()
+// TPDD2 sysinfo data: 80 13 05 00 10 E1
+#define SECTOR_CACHE_START_MSB 0x80
+#define SECTOR_CACHE_START_LSB 0x13
+#define SECTOR_CACHE_LEN_MSB   0x05
+#define SECTOR_CACHE_LEN_LSB   0x00
+#define SYSINFO_CPU            0x10 // 0x10 = HD6301
+//#define MODEL                  0xE1
+
+// flags
+#define FE_FLAGS_NONE          0x00
+#define FE_FLAGS_DIR           0x01
+#define NO_RET                 0
+#define ALLOW_RET              1
+#define CACHE_LOAD             0
+#define CACHE_COMMIT           1
+#define CACHE_COMMIT_VERIFY    2
+#define MEM_CACHE              0
+#define MEM_CPU                1
+
+// KC-85-platform BASIC interpreter EOL & EOF bytes for bootstrap()
 #define BASIC_EOL 0x0D
 #define BASIC_EOF 0x1A
 #define LOCAL_EOL 0x0A
 
 #define OPR_CMD_SYNC 0x5A
 #define FDC_CMD_EOL 0x0D
-
 
 #endif // PDD_CONSTANTS_H

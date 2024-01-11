@@ -1249,7 +1249,7 @@ void req_read(void) {
 	int i;
 
 	if (o_file_h<0) {
-		ret_std(ERR_CMDSEQ);
+		ret_std(ERR_NO_FNAME);
 		return;
 	}
 	if (f_open_mode!=F_OPEN_READ) {
@@ -1287,7 +1287,7 @@ void req_write(unsigned char *b) {
 	dbg_p(4,b);
 	dbg(4,".....................\n");
 
-	if (o_file_h<0) {ret_std(ERR_CMDSEQ); return;}
+	if (o_file_h<0) {ret_std(ERR_NO_FNAME); return;}
 
 	if (f_open_mode!=F_OPEN_WRITE && f_open_mode !=F_OPEN_APPEND) {
 		ret_std(ERR_FMT_MISMATCH);
@@ -1311,38 +1311,42 @@ void req_delete(void) {
 	ret_std (ERR_SUCCESS);
 }
 
-void ret_cache_std(int e) {
+
+// also the return format for mem_write and undocumented 0x0F
+void ret_cache(int e) {
 	dbg(3,"%s()\n",__func__);
-	gb[0]=RET_CACHE_STD;
+	gb[0]=RET_CACHE;
 	gb[1]=0x01;
 	gb[2]=e;
 	gb[3]=checksum(gb);
 	write_client_tty(gb,4);
 }
 
-
 /*
- * Load a sector from disk into rb[], or unload rb[] to a sector on the disk,
- * and like a real drive, flushing the cache to disk does not clear the cache.
+ * Load a sector from disk into rb[],
+ * or commit rb[] to a sector on the disk.
  *
- * rb[] (record buffer) is the drive cache
+ * Committing the cache to disk does NOT clear the cache in ram.
  *
- * Load/Unload Cache
+ * rb[] (record buffer) is the drive cache / sector buffer
+ *
+ * Load/Commit Cache
  * b[0] fmt 0x30
  * b[1] len 0x05
- *   b[2] action 0=load (cache<disk) 2=unload (cache>disk)
- *   b[3] -
- *   b[4] track 0-79
- *   b[5] -
+ *   b[2] action 0=load (cache<disk) 1=commit (cache>disk) 2=commit+verify
+ *   b[3] track msb - (always 00)
+ *   b[4] track lsb - 00-4F
+ *   b[5] side (always 00)
  *   b[6] sector 0-1
  */
-void req_cache_load(unsigned char *b) {
+void req_cache(unsigned char *b) {
 	dbg(3,"%s(action=%u track=%u sector=%u)\n",__func__,b[2],b[4],b[6]);
 	if (model==1) return;
 	int a=b[2];
-	int t=b[4];
+	int t=b[3]*256+b[4];
+	//int d=b[5];
 	int s=b[6];
-	if ((a!=0 && a!=2) || t>79 || s>1) { ret_cache_std(ERR_PARAM); return; }
+	if (t>=PDD2_TRACKS || s>=PDD2_SECTORS) { ret_cache(ERR_PARAM); return; }
 	int rn = t*2 + s; // convert track#:sector# to linear record#
 	int rl = mlen+dlen;
 	int e;
@@ -1357,16 +1361,17 @@ void req_cache_load(unsigned char *b) {
 				case ERR_FDC_READ: e=ERR_FMT_INTERRUPT; break;
 				case ERR_FDC_SUCCESS: e=ERR_SUCCESS;
 			}
-			if (e) { ret_cache_std(e); return; }
+			if (e) { ret_cache(e); return; }
 			memset(rb,0x00,rl);
 			if (read(disk_img_fd,rb,rl)!=rl) {
 				dbg(2,"failed cache load\n");
 				(void)(close(disk_img_fd)+1);
-				ret_cache_std(ERR_DEFECTIVE);
+				ret_cache(ERR_DEFECTIVE);
 				return;
 			}
 			break;
-		case CACHE_UNLOAD:
+		case CACHE_COMMIT:   // write cache to disk
+		case CACHE_COMMIT_VERIFY: // write cache to disk and verify
 			dbg(2,"cache unload: track:%u  sector:%u\n",t,s);
 			e = open_disk_image (rn, O_WRONLY, NO_RET );
 			switch (e) { // convert the FDC error codes to equivalent OPR error codes
@@ -1375,36 +1380,40 @@ void req_cache_load(unsigned char *b) {
 				case ERR_FDC_READ: e=ERR_FMT_INTERRUPT; break;
 				case ERR_FDC_SUCCESS: e=ERR_SUCCESS;
 			}
-			if (e) { ret_cache_std(e); return; }
+			if (e) { ret_cache(e); return; }
 			if (write(disk_img_fd,rb,rl)!=rl) {
 				dbg(2,"failed cache unload\n");
 				(void)(close(disk_img_fd)+1);
-				ret_cache_std(ERR_DEFECTIVE);
+				ret_cache(ERR_DEFECTIVE);
 				return;
 			}
+		default: ret_cache(ERR_PARAM); return;
 	}
 	(void)(close(disk_img_fd)+1);
 	dbg_b(3,rb,rl);
-	ret_cache_std(ERR_SUCCESS);
+	ret_cache(ERR_SUCCESS);
 }
 
-/* Emulating access to the main data area is pretty straightforward, but the
- * metadata area (or maybe it should be called a mode?) is mostly a mystery.
- * So we aren't really implementing the full whatever a real drive does for
- * metadata read/write, because we don't know what a real drive does. We just
- * recognize one magic value for "offset" (which is probably not actually an
- * offset while in metadata mode, but just 2 bytes with some other meaning),
- * and treat that as an otherwise ordinary access but to the 4-byte metadata
- * field instead of the main data field, and just return "success" for all
- * other access to the metadata area without actually doing anything.
- * Since all other observed accesses to the metadata area are always just writes
- * without matching reads, and the data is always the same, it suggests these
- * other writes are not storing data but issuing commands to control the drive.
+/* Emulating access to the sector cache is straightforward.
+ * Emulating access to the cpu memory is less so.
  *
- * Some metadata accesses from common clients, not including ZZ or checksum:
- * "metadatat access" = command 0x31 or 0x32, area/mode 0x01
+ * The command allows to read from anywhere in the cpus address space,
+ * but we wouldn't know what to return for much of that.
  *
- * BACKUP.BA  len    area   offset      data
+ * We recognize a few special addresses and just return "success"
+ * for all other access to the cpu area without actually doing anything.
+ *
+ * cpu memory map:
+ * 0000-001F cpu i/o port
+ * 0080-00FF cpu internal ram 128 bytes
+ * 4000-4002 gate array (floppy controller)
+ * 8000-87FF ram 2k bytes
+ * F000-FFFF cpu internal rom 4k bytes
+ *
+ * Some cpu_memory writes observed from common clients, not including ZZ or checksum:
+ *
+ * fmt        len    area   offset      data
+ * BACKUP.BA
  * 0x31,      0x04,  0x01,  0x00,0x83,  0x00,
  * 0x31,      0x04,  0x01,  0x00,0x96,  0x00,
  * 0x31,      0x07,  0x01,  0x80,0x04,  0x16,0x00,0x00,0x00    (data varies) this is the only one we actually do anything
@@ -1413,51 +1422,58 @@ void req_cache_load(unsigned char *b) {
  * 0x31,      0x04,  0x01,  0x00,0x84,  0xFF,
  * 0x31,      0x04,  0x01,  0x00,0x96,  0x0F,
  * 0x31,      0x04,  0x01,  0x00,0x94,  0x0F,
+ *
+ * pdd2 service manual p102 says:
+ *   Reset Drive Status
+ *     write FF to 0084
+ *     write 0F to 0096
+ *     write 0F to 0094
+ *
  */
 
 /*
  * req:
- * b[0] fmt req_cache_read
+ * b[0] fmt req_mem_read
  * b[1] len 4
- *      b[2] area        0=data 1=meta
+ *      b[2] area        0=sector_cache 1=cpu_memory
  *      b[3] offset msb  0000-0500
  *      b[4] offset lsb
  *      b[5] dlen        00-FC
  * b[6] chk
  *
  * ret:
- * b[0] fmt ret_cache_read
+ * b[0] fmt ret_mem_read
  * b[1] len (dlen+3)
- *      b[2] area        0=data 1=meta
+ *      b[2] area        0=sector_cache 1=cpu_memory
  *      b[3] offset msb
  *      b[4] offset lsb
  *      b[5+] data       dlen bytes
  * b[#] chk
  */
-void req_cache_read(unsigned char *b) {
+void req_mem_read(unsigned char *b) {
 	dbg(3,"%s()\n",__func__);
 	if (model==1) return;
 	int a = b[2];
 	int o = b[3]*256+b[4];
 	int l = b[5];
 	int e = -1;
-	dbg(2,"cache_read: area:%u  offset:%u  len:%u\n",a,o,l);
+	dbg(2,"mem_read: area:%u  offset:%u  len:%u\n",a,o,l);
 	switch (a) {
-		case CACHE_AREA_DATA:
+		case MEM_CACHE:
 			if (o+l>SECTOR_DATA_LEN || l>PDD2_CACHE_READ_MAX) e=ERR_PARAM;
 			o+=PDD2_SECTOR_META_LEN; // shift offset past metadata field
 			break;
-		case CACHE_AREA_META:
+		case MEM_CPU:
 			if (o==PDD2_META_ADDR) { o=0; if (l>PDD2_SECTOR_META_LEN) e=ERR_PARAM; } // set offset to start of metadata field
 			else e=ERR_PARAM; // this is wrong, real drive returns all kinds of data
 			break;
 		default: e=ERR_PARAM;
 	}
-	if (e!=-1) { ret_cache_std(e); return; }
+	if (e!=-1) { ret_cache(e); return; }
 	dbg(3,"offset:%u  len:%u\n",o,l);
 
 	// copy some data from rb[] and return to client
-	gb[0]=RET_CACHE_READ;
+	gb[0]=RET_MEM_READ;
 	gb[1]=3+l;  // len = area + omsb + olsb + data
 	gb[2]=b[2]; // area
 	gb[3]=b[3]; // offset msb
@@ -1469,20 +1485,17 @@ void req_cache_read(unsigned char *b) {
 }
 
 /*
- * TPDD2 sector cache write
- * Previously called "TS-DOS mystery command 1" and had a canned response,
- * now actually implements the function.
- * Aside from being a normal PDD2 sector-access command, TS-DOS uses it just to detect TPDD2
+ * TPDD2 mem write
  * 
  * b[0] fmt
  * b[1] len
- *      b[2] area
- *      b[3] offset msb
- *      b[4] offset lsb
+ *      b[2] area  0=sector_cache  1=cpu_memory
+ *      b[3] addr msb - address or offset, 2 bytes
+ *      b[4] addr lsb
  *      b[5+] data
  * b[#] chk
  */
-void req_cache_write(unsigned char *b) {
+void req_mem_write(unsigned char *b) {
 	dbg(3,"%s()\n",__func__);
 	if (model==1) return;
 	int a = b[2];
@@ -1492,17 +1505,17 @@ void req_cache_write(unsigned char *b) {
 	int e = -1;
 	dbg(2,"cache_write: area:%u  offset:%u  len:%u\n",a,o,l);
 	switch (a) {
-		case CACHE_AREA_DATA:
+		case MEM_CACHE:
 			if (o+l>SECTOR_DATA_LEN || l>PDD2_CACHE_WRITE_MAX) e=ERR_PARAM;
 			o+=PDD2_SECTOR_META_LEN; // shift offset past metadata field
 			break;
-		case CACHE_AREA_META:
+		case MEM_CPU:
 			if (o==PDD2_META_ADDR) { o=0 ;if (l>PDD2_SECTOR_META_LEN) e=ERR_PARAM; } // set offset to start of metadata field
 			else e=ERR_SUCCESS; // thumbs-up but don't actually do anything
 			break;
 		default: e=ERR_PARAM;
 	}
-	if (e!=-1) { ret_cache_std(e); return; }
+	if (e!=-1) { ret_cache(e); return; }
 	dbg(3,"offset:%u  len:%u\n",o,l);
 
 	// copy data from client over part of rb[]
@@ -1510,49 +1523,66 @@ void req_cache_write(unsigned char *b) {
 	dbg_b(3,rb,mlen+dlen);
 	memcpy(rb+o,b+s,l);
 	dbg_b(3,rb,mlen+dlen);
-	ret_cache_std(ERR_SUCCESS);
+	ret_cache(ERR_SUCCESS);
 }
 
 /*
- * Another part of TS-DOS's drive/server capabilities detection scheme.
- * Previously called "TS-DOS mystery command 2"
- * The actual intended function of the command in a real drive is unknown.
- * The meaning of the response is unknown.
- * But the command apparently takes no parameters, and a real TPDD2 always
- * responds with the same string of bytes, and TPDD1 ignores it.
+ * PDD2 get version
+ *
  * Not including the ZZ or checksums:
  * Client sends  : 23 00
  * TPDD2 responds: 14 0F 41 10 01 00 50 05 00 02 00 28 00 E1 00 00 00
  * TPDD1 does not respond.
+ *
+ * Some versions of TS-DOS use this to detect TPDD2, matching the entire packet,
+ * so we have to return this exact canned data if we want TS-DOS to know
+ * that it can use TPDD2 features. (not a big deal really)
+ *
  */
-void ret_pdd2_unk23() {
+void ret_version() {
 	dbg(3,"%s()\n",__func__);
 	if (model==1) return;
-	static unsigned char canned[] = UNK23_RET_DAT;
-	memcpy(gb, canned, canned[1]+2);
-	gb[canned[1]+2] = checksum(gb);
-	write_client_tty(gb, gb[1]+3);
+	gb[0]=RET_VERSION;
+	gb[1]=0x0F;
+	gb[2]=VERSION_MSB;
+	gb[3]=VERSION_LSB;
+	gb[4]=SIDES;
+	gb[5]=TRACKS_MSB;
+	gb[6]=TRACKS_LSB;
+	gb[7]=SECTOR_SIZE_MSB;
+	gb[8]=SECTOR_SIZE_LSB;
+	gb[9]=SECTORS_PER_TRACK;
+	gb[10]=DIRENTS_MSB;
+	gb[11]=DIRENTS_LSB;
+	gb[12]=MAX_FD;
+	gb[13]=MODEL;
+	gb[14]=VERSION_R0;
+	gb[15]=VERSION_R1;
+	gb[16]=VERSION_R2;
+	gb[17]=checksum(gb);
+	write_client_tty(gb,18);
 }
 
 /*
- * Similar to unk23, except the response is different, and not used by TS-DOS.
- * Nothing is known to use this command. It was just found by feeding arbitrary
- * commands to a real drive with github/bkw777/pdd.sh
- * 0x11 and 0x33 both produce the same response. Possibly 0x11 and 0x33 are
- * just different versions of the same function, like how 0x4# commands are
- * really just 0x0# commands for bank 1 instead of bank 0? Just a guess.
- * not counting ZZ or checksums:
- * Client sends  : 11 00
- *     or sends  : 33 00
+ * Similar to ret_version, except the response is different, and not used by TS-DOS.
+ * Real drives also respond to request 0x11 exactly the same as 0x33, though only 0x33 is documented.
+ * Not counting ZZ or checksums:
+ * Client sends  : 33 00
  * TPDD2 responds: 3A 06 80 13 05 00 10 E1
  */
-void ret_pdd2_unk11() {
+void ret_sysinfo() {
 	dbg(3,"%s()\n",__func__);
 	if (model==1) return;
-	static unsigned char canned[] = UNK11_RET_DAT;
-	memcpy(gb, canned, canned[1]+2);
-	gb[canned[1]+2] = checksum(gb);
-	write_client_tty(gb, gb[1]+3);
+	gb[0]=RET_SYSINFO;
+	gb[1]=0x06;
+	gb[2]=SECTOR_CACHE_START_MSB;
+	gb[3]=SECTOR_CACHE_START_LSB;
+	gb[4]=SECTOR_CACHE_LEN_MSB;
+	gb[5]=SECTOR_CACHE_LEN_LSB;
+	gb[6]=SYSINFO_CPU;
+	gb[7]=MODEL;
+	gb[8]=checksum(gb);
+	write_client_tty(gb,9);
 }
 
 void req_rename(unsigned char *b) {
@@ -1575,8 +1605,9 @@ void req_close() {
 	ret_std(ERR_SUCCESS);
 }
 
-void req_status() {
-	dbg(2,"%s()\n",__func__);
+void req_status(uint8_t fmt) {
+	dbg(2,"%s(0x%02X)\n",__func__,fmt);
+	if (fmt>REQ_STATUS && model!=1) return;
 	ret_std(ERR_SUCCESS);
 }
 
@@ -1633,6 +1664,63 @@ void req_format() {
 	ret_std(ERR_SUCCESS);
 }
 
+/*
+ * req_exec() - execute program
+ *
+ * Just a stub. Not likely to impliment any time soon,
+ * but might as well put the stub in to document it.
+ *
+ * TPDD2 IPL uses this
+ */
+
+/* response from req_exec()
+ * returns the execution results from the cpu A and X registers
+ * b[0] fmt (0x3B)
+ * b[1] len (0x03)
+ *      b[2] reg A - 1 byte
+ *      b[3] reg X msb - 2 bytes
+ *      b[4] reg X lsb
+ * b[5] chk
+*/
+void ret_exec(uint8_t reg_A, uint16_t reg_X) {
+	dbg(3,"%s(%u,%u)\n",__func__,reg_A,reg_X);
+	gb[0]=RET_EXEC;
+	gb[1]=0x03;
+	gb[2]=reg_A;
+	gb[3]=(uint8_t)(reg_X >> 0x08); // msb
+	gb[4]=(uint8_t)(reg_X & 0xFF);  // lsb
+	gb[5]=checksum(gb);
+	write_client_tty(gb,6);
+}
+
+/* Loads cpu registers A and X with supplied values, then jumps to supplied address.
+ *
+ * To supply the code/data (instead of running some part of the rom),
+ * use mem_write() to write data to cpu memory before this.
+ *
+ * b[0] fmt (0x34)
+ * b[1] len (0x05)
+ *      b[2] addr msb - execute address 2 bytes
+ *      b[3] addr lsb
+ *      b[4] reg A - 1 byte
+ *      b[5] reg X msb - 2 bytes
+ *      b[6] reg X lsb
+ * b[7] chk
+ */
+void req_exec(unsigned char *b) {
+	dbg(3,"%s()\n",__func__);
+	if (model==1) return;
+	uint16_t addr = b[2]*256+b[3];
+	uint8_t reg_A = b[4];
+	uint16_t reg_X = b[5]*256+b[6];
+	dbg(2,"exec:  addr:%u  A:%u  X:%u\n",addr,reg_A,reg_X);
+	/*
+	 * ...6301 emulator here...
+	 * executed code leaves new values in reg_A and reg_X
+	 */
+	ret_exec(reg_A,reg_X);
+}
+
 void get_opr_cmd(void) {
 	dbg(3,"%s()\n",__func__);
 	unsigned char b[TPDD_DATA_MAX] = {0x00};
@@ -1649,7 +1737,7 @@ void get_opr_cmd(void) {
 	dbg_p(3,b);
 
 	if ((i=checksum(b))!=b[b[1]+2]) {
-		dbg(0,"Failed checksum: received: %02X  calculated: %02X\n",b[b[1]+2],i);
+		dbg(0,"Failed checksum: received: 0x%02X  calculated: 0x%02X\n",b[b[1]+2],i);
 		return; // real drive does not return anything
 	}
 
@@ -1657,24 +1745,33 @@ void get_opr_cmd(void) {
 
 	// dispatch
 	switch(b[0]) {
+		case REQ_DIRENT+0x40:
 		case REQ_DIRENT:        req_dirent(b);       break;
+		case REQ_OPEN+0x40:
 		case REQ_OPEN:          req_open(b);         break;
+		case REQ_CLOSE+0x40:
 		case REQ_CLOSE:         req_close();         break;
+		case REQ_READ+0x40:
 		case REQ_READ:          req_read();          break;
+		case REQ_WRITE+0x40:
 		case REQ_WRITE:         req_write(b);        break;
+		case REQ_DELETE+0x40:
 		case REQ_DELETE:        req_delete();        break;
 		case REQ_FORMAT:        req_format();        break;
-		case REQ_STATUS:        req_status();        break;
+		case REQ_STATUS+0x40:
+		case REQ_STATUS:        req_status(b[0]);    break;
 		case REQ_FDC:           req_fdc();           break;
 		case REQ_CONDITION:     req_condition();     break;
+		case REQ_RENAME+0x40:
 		case REQ_RENAME:        req_rename(b);       break;
-		case REQ_PDD2_UNK23:    ret_pdd2_unk23();    break;
-		case REQ_CACHE_LOAD:    req_cache_load(b);   break;
-		case REQ_CACHE_READ:    req_cache_read(b);   break;
-		case REQ_CACHE_WRITE:   req_cache_write(b);  break;
-		case REQ_PDD2_UNK11:    ret_pdd2_unk11();    break;
-		case REQ_PDD2_UNK33:    ret_pdd2_unk11();    break;
-		default: dbg(1,"OPR: unknown cmd \"%02X\"\n",b[0]); if (debug<3) dbg_p(2,b);
+		case REQ_VERSION:       ret_version();       break;
+		case REQ_CACHE:         req_cache(b);        break;
+		case REQ_MEM_READ:      req_mem_read(b);     break;
+		case REQ_MEM_WRITE:     req_mem_write(b);    break;
+		case REQ_UNDOC11:
+		case REQ_SYSINFO:       ret_sysinfo();       break;
+		case REQ_EXEC:          req_exec(b);         break;
+		default: dbg(1,"OPR: unknown cmd \"0x%02X\"\n",b[0]); dbg_p(1,b);
 		// local msg, nothing to client
 	}
 }
