@@ -147,7 +147,7 @@
 #define PDD1_SECTORS          2
 #define PDD2_TRACKS           80
 #define PDD2_SECTORS          2
-#define TPDD_DATA_MAX         260  // largest packet is cache_read can be 256+3
+#define TPDD_DATA_MAX         260  // largest possible packet is 256+3
 #define REQ_RW_DATA_MAX       128  // largest chunk size in req_read() req_write()
 #define LEN_RET_STD           0x01
 #define LEN_RET_DME           0x0B
@@ -162,9 +162,9 @@
 #define SMT_OFFSET            1240
 #define PDD1_SMT              0x80
 #define PDD2_SMT              0xC0
-#define PDD2_META_ADDR        32772
-#define PDD2_CACHE_READ_MAX   252
-#define PDD2_CACHE_WRITE_MAX  127
+#define PDD2_META_ADDR        0x8004
+#define PDD2_MEM_READ_MAX     252
+#define PDD2_MEM_WRITE_MAX    127
 
 // TPDD2 version data: 41 10 01 00 50 05 00 02 00 28 00 E1 00 00 00
 #define VERSION_MSB       0x41

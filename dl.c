@@ -774,7 +774,7 @@ void get_fdc_cmd(void) {
 	}
 
 	// read params
-	while (i<6 && !eol) { // if we get out of sync (i>5), just fall through to restart
+	while (i<5 && !eol) { // if we get out of sync (i>4), just fall through to restart
 		if (read_client_tty(&b[i],1)==1) {
 			dbg(3,"i:%d b:\"%s\"\n",i,b);
 			switch (b[i]) {
@@ -1313,7 +1313,7 @@ void req_delete(void) {
 
 
 // also the return format for mem_write and undocumented 0x0F
-void ret_cache(int e) {
+void ret_cache(uint8_t e) {
 	dbg(3,"%s()\n",__func__);
 	gb[0]=RET_CACHE;
 	gb[1]=0x01;
@@ -1343,7 +1343,7 @@ void req_cache(unsigned char *b) {
 	dbg(3,"%s(action=%u track=%u sector=%u)\n",__func__,b[2],b[4],b[6]);
 	if (model==1) return;
 	int a=b[2];
-	int t=b[3]*256+b[4];
+	int t=b[4]; // t=b[3]*256+b[4];
 	//int d=b[5];
 	int s=b[6];
 	if (t>=PDD2_TRACKS || s>=PDD2_SECTORS) { ret_cache(ERR_PARAM); return; }
@@ -1372,7 +1372,7 @@ void req_cache(unsigned char *b) {
 			break;
 		case CACHE_COMMIT:   // write cache to disk
 		case CACHE_COMMIT_VERIFY: // write cache to disk and verify
-			dbg(2,"cache unload: track:%u  sector:%u\n",t,s);
+			dbg(2,"cache commit: track:%u  sector:%u\n",t,s);
 			e = open_disk_image (rn, O_WRONLY, NO_RET );
 			switch (e) { // convert the FDC error codes to equivalent OPR error codes
 				case ERR_FDC_NO_DISK: e=ERR_NO_DISK; break;
@@ -1382,7 +1382,7 @@ void req_cache(unsigned char *b) {
 			}
 			if (e) { ret_cache(e); return; }
 			if (write(disk_img_fd,rb,rl)!=rl) {
-				dbg(2,"failed cache unload\n");
+				dbg(2,"failed cache commit\n");
 				(void)(close(disk_img_fd)+1);
 				ret_cache(ERR_DEFECTIVE);
 				return;
@@ -1453,14 +1453,14 @@ void req_cache(unsigned char *b) {
 void req_mem_read(unsigned char *b) {
 	dbg(3,"%s()\n",__func__);
 	if (model==1) return;
-	int a = b[2];
-	int o = b[3]*256+b[4];
-	int l = b[5];
+	uint8_t a = b[2];
+	uint16_t o = b[3]*256+b[4];
+	uint8_t l = b[5];
 	int e = -1;
 	dbg(2,"mem_read: area:%u  offset:%u  len:%u\n",a,o,l);
 	switch (a) {
 		case MEM_CACHE:
-			if (o+l>SECTOR_DATA_LEN || l>PDD2_CACHE_READ_MAX) e=ERR_PARAM;
+			if (o+l>SECTOR_DATA_LEN || l>PDD2_MEM_READ_MAX) e=ERR_PARAM;
 			o+=PDD2_SECTOR_META_LEN; // shift offset past metadata field
 			break;
 		case MEM_CPU:
@@ -1498,15 +1498,15 @@ void req_mem_read(unsigned char *b) {
 void req_mem_write(unsigned char *b) {
 	dbg(3,"%s()\n",__func__);
 	if (model==1) return;
-	int a = b[2];
-	int o = b[3]*256+b[4];
-	int s = 5; // start of data
-	int l = b[1]-3; // length of data = length of packet - area - omsb - olsb
+	uint8_t a = b[2];
+	uint16_t o = b[3]*256+b[4];
+	uint8_t s = 5; // start of data
+	uint8_t l = b[1]-3; // length of data = length of packet - area - omsb - olsb
 	int e = -1;
-	dbg(2,"cache_write: area:%u  offset:%u  len:%u\n",a,o,l);
+	dbg(2,"mem_write: area:%u  offset:%u  len:%u\n",a,o,l);
 	switch (a) {
 		case MEM_CACHE:
-			if (o+l>SECTOR_DATA_LEN || l>PDD2_CACHE_WRITE_MAX) e=ERR_PARAM;
+			if (o+l>SECTOR_DATA_LEN || l>PDD2_MEM_WRITE_MAX) e=ERR_PARAM;
 			o+=PDD2_SECTOR_META_LEN; // shift offset past metadata field
 			break;
 		case MEM_CPU:
@@ -1802,15 +1802,23 @@ void show_bootstrap_help() {
 	,args[0]);
 }
 
-void slowbyte(char b) {
+// hardcoded vt codes, sorry
+//void showbyte(const int v,uint8_t b) {
+void showbyte(uint8_t b) {
+	//if (debug<v) return;
+	if (b<32) dbg(0,"\033[7m^%c\033[m",b+64);
+	else if (b>126) dbg(0,"\033[7m^%02X\033[m",b);
+	else dbg(0,"%c",b);
+}
+
+void slowbyte(uint8_t b) {
 	write_client_tty(&b,1);
 	tcdrain(client_tty_fd);
 	usleep(BASIC_byte_us);
 	if (debug) { // local display nicely regardless if CR, LF, or CRLF
 		if (b!=LOCAL_EOL && ch[0]==LOCAL_EOL) {ch[0]=0x00; dbg(0,"%c%c",LOCAL_EOL,b);}
 		else if (b==LOCAL_EOL || b==BASIC_EOL) ch[0]=LOCAL_EOL;
-		else if (b<32 || b>126) dbg(0,"\033[7m^%02X\033[m",b); // hardcoded ansi/vt codes, sorry
-		else dbg(0,"%c",b);
+		else showbyte(b);
 	}
 }
 
