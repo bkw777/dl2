@@ -26,6 +26,7 @@ CLIENT_LOADERS := \
 	clients/ts-dos/TS-DOS.100 \
 	clients/ts-dos/TS-DOS.200 \
 	clients/ts-dos/TS-DOS.NEC \
+	clients/pakdos/PAKDOS.100 \
 	clients/pakdos/PAKDOS.200 \
 	clients/disk_power/Disk_Power.K85 \
 #	clients/power-dos/POWR-D.100
