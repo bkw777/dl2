@@ -142,7 +142,7 @@ int client_tty_fd = -1;
 int disk_img_fd = -1;
 struct termios client_termios;
 int o_file_h = -1;
-unsigned char gb[TPDD_DATA_MAX];
+uint8_t gb[TPDD_DATA_MAX];
 char cwd[PATH_MAX] = {0x00};
 char dme_cwd[7] = DEFAULT_DME_ROOT_LABEL;
 char bootstrap_fname[PATH_MAX] = {0x00};
@@ -153,9 +153,9 @@ bool dme_disabled = false;
 char ch[2] = {0xFF};
 uint8_t mlen = PDD2_SECTOR_META_LEN;
 const uint16_t dlen = SECTOR_DATA_LEN;
-const int fdc_logical_size_codes[] = FDC_LOGICAL_SIZE_CODES;
+const uint16_t fdc_logical_size_codes[] = FDC_LOGICAL_SIZE_CODES;
 const char fdc_cmds[] = FDC_CMDS;
-unsigned char * rb = 0x00;
+uint8_t * rb = 0x00;
 
 FILE_ENTRY *cur_file;
 int dir_depth=0;
@@ -607,6 +607,7 @@ void req_fdc_read_id(int p) {
 // tl = target logical sector
 void req_fdc_read_sector(int tp,int tl) {
 	dbg(2,"%s(%d,%d)\n",__func__,tp,tl);
+
 	if (open_disk_image(tp,O_RDONLY,ALLOW_RET)) return; // open & seek to tp
 	if (read(disk_img_fd,rb,mlen)!=mlen) { // read header
 		dbg(1,"failed read header\n");
@@ -758,12 +759,15 @@ void get_fdc_cmd(void) {
 	char b[6] = {0x00};
 	unsigned i = 0;
 	bool eol = false;
-	char c = 0x00;
+	uint8_t c = 0x00;
 	int p = -1;
 	int l = -1;
 
-	// see if the command byte was collected already by req_fdc()
-	if (gb[0]>0x00 && gb[0]!=FDC_CMD_EOL && gb[1]==0x00) c=gb[0];
+	// before we reset gb[], see if a command byte was collected already by req_fdc()
+	if (gb[0]>0x00 && gb[0]!=FDC_CMD_EOL && gb[1]==0x00) {
+		c=gb[0];
+		dbg(3,"Command \"%b\" from req_fdc()\n",c);
+	}
 	memset(gb,0x00,TPDD_DATA_MAX);
 
 	// scan for a valid command byte first
@@ -774,7 +778,8 @@ void get_fdc_cmd(void) {
 	}
 
 	// read params
-	while (i<5 && !eol) { // if we get out of sync (i>4), just fall through to restart
+	i = 0;
+	while (i<6 && !eol) { // if we get out of sync (i>5), just fall through to restart
 		if (read_client_tty(&b[i],1)==1) {
 			dbg(3,"i:%d b:\"%s\"\n",i,b);
 			switch (b[i]) {
@@ -1138,7 +1143,7 @@ void req_fdc() {
 		dbg(3,"dme detected\n");
 		ret_dme_cwd();
 	} else {
-		//if (model==2) { ret_std(ERR_PARAM); return; } // real tpdd2 returns
+		if (model==2) { ret_std(ERR_PARAM); return; } // real tpdd2 does this
 		opr_mode = 0;
 		dbg(1,"Switching to \"FDC\" mode\n"); // no response to client, just switch modes
 	}
@@ -1724,14 +1729,14 @@ void req_exec(unsigned char *b) {
 void get_opr_cmd(void) {
 	dbg(3,"%s()\n",__func__);
 	unsigned char b[TPDD_DATA_MAX] = {0x00};
-	unsigned i = 0;
+	uint16_t i = 0;
 	memset(gb,0x00,TPDD_DATA_MAX);
 
 	while (read_client_tty(&b,1) == 1) {
 		if (b[0]==OPR_CMD_SYNC) i++; else { i=0; b[0]=0x00; continue; }
 		if (i<2) { b[0]=0x00; continue; }
 		if (read_client_tty(&b,2) == 2) if (read_client_tty(&b[2],b[1]+1) == b[1]+1) break;
-		i=0; memset(b,0x00,TPDD_DATA_MAX	);
+		i=0; memset(b,0x00,TPDD_DATA_MAX);
 	}
 
 	dbg_p(3,b);
@@ -1802,29 +1807,27 @@ void show_bootstrap_help() {
 	,args[0]);
 }
 
-// hardcoded vt codes, sorry
-//void showbyte(const int v,uint8_t b) {
-void showbyte(uint8_t b) {
-	//if (debug<v) return;
-	if (b<32) dbg(0,"\033[7m^%c\033[m",b+64);
-	else if (b>126) dbg(0,"\033[7m^%02X\033[m",b);
-	else dbg(0,"%c",b);
-}
-
 void slowbyte(uint8_t b) {
 	write_client_tty(&b,1);
 	tcdrain(client_tty_fd);
 	usleep(BASIC_byte_us);
 	if (debug) { // local display nicely regardless if CR, LF, or CRLF
-		if (b!=LOCAL_EOL && ch[0]==LOCAL_EOL) {ch[0]=0x00; dbg(0,"%c%c",LOCAL_EOL,b);}
-		else if (b==LOCAL_EOL || b==BASIC_EOL) ch[0]=LOCAL_EOL;
-		else showbyte(b);
+		if (ch[0]==BASIC_EOL) {
+			 ch[0]=0x00;
+			 dbg(0,"%c",LOCAL_EOL);
+			 if (b==LOCAL_EOL) return;
+		}
+		if (b==BASIC_EOL) { ch[0]=BASIC_EOL; return; }
+		//if (b<32) { dbg(0,"\033[7m^%c\033[m",b+64); return; }
+		//if (b>126) { dbg(0,"\033[7m%02X\033[m",b); return; }
+		if (b<32||b>126) { dbg(0,"\033[7m%02X\033[m",b); return; }
+		dbg(0,"%c",b);
 	}
 }
 
 int send_BASIC(char *f) {
 	int fd;
-	char b;
+	uint8_t b;
 
 	if ((fd=open(f,O_RDONLY))<0) {
 		dbg(1,"Could not open \"%s\" : %s\n",f,errno);
@@ -1832,7 +1835,9 @@ int send_BASIC(char *f) {
 	}
 
 	dbg(0,"Sending \"%s\" ... ",f);
+	//dbg(1,"%c F",27); // disable 8-bit vtxx control codes (0x80-0x9F) so we can display them
 	dbg(1,"\n");
+	ch[0]=0x00;
 	while(read(fd,&b,1)==1) slowbyte(b);
 	close(fd);
 	if (dot_offset) { // if not in raw mode supply missing trailing EOF & EOL

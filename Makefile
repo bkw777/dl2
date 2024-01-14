@@ -12,7 +12,7 @@ APP_VERSION := $(shell git describe --long 2>&-)
 
 CLIENT_LOADERS := \
 	clients/teeny/TINY.100 \
-	clients/teeny/D_WEENY.100 \
+	clients/teeny/D.100 \
 	clients/teeny/TEENY.100 \
 	clients/teeny/TEENY.200 \
 	clients/teeny/TEENY.NEC \
