@@ -1610,9 +1610,13 @@ void req_close() {
 	ret_std(ERR_SUCCESS);
 }
 
+// undocumented but TPDD2 responds to both 0x07 and 0x47
+// TPDD1 ignores 0x47, no error response
+// PakDOS uses 0x47, but also falls back to 0x07 if 0x47 didn't work
+// possibly as way to detect TPDD2
 void req_status(uint8_t fmt) {
 	dbg(2,"%s(0x%02X)\n",__func__,fmt);
-	if (fmt>REQ_STATUS && model!=1) return;
+	if (fmt>REQ_STATUS && model==1) return;
 	ret_std(ERR_SUCCESS);
 }
 
