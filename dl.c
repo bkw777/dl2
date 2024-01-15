@@ -1123,8 +1123,8 @@ void ret_dme_cwd() {
 
 // Any FDC request might actually be a DME request
 // See ref/dme.txt for the full explaination because it's a lot.
-// dme_fdc is only retained for the duration of one directory listing
-// dme_detected is retained forever
+// dme_fdc = Is the current FDC request a DME request? Retained during one dir listing.
+// dme_detected = Have we ever recieved a DME request? Retained forever.
 void req_fdc() {
 	dbg(2,"%s()\n",__func__);
 	dbg(3,"dme detection %s\n",dme_disabled?"disabled":"allowed");
@@ -1143,7 +1143,7 @@ void req_fdc() {
 		dbg(3,"dme detected\n");
 		ret_dme_cwd();
 	} else {
-		if (model==2) { ret_std(ERR_PARAM); return; } // real tpdd2 does this
+		//if (model==2) { ret_std(ERR_PARAM); return; } // real tpdd2 does this
 		opr_mode = 0;
 		dbg(1,"Switching to \"FDC\" mode\n"); // no response to client, just switch modes
 	}
@@ -1645,9 +1645,13 @@ void req_format() {
 
 	// write the image
 	// Real drive TPDD1 fresh OPR-mode format is strange.
-	// Sector 0 gets logical size code 0, and all other sectors get lsc 1.
-	// We exactly mimick that here "just because", even though the lsc 1s
-	// don't seem to serve any purpose or have any effect.
+	// Any sector with any data gets LSC 0, and all others get LSC 1.
+	// Later, any sector that gets used by a file gets changed from LSC 1 to
+	// LSC 0, and never changed back even when files are deleted.
+	// A fresh format has one byte of data in sector 0 in the SMT.
+	// So a fresh format sector 0 has LSC 0 and all other sectors have LSC 1.
+	// We exactly mimick that here "just because", even though the LSC 1s
+	// don't seem to actually matter and we could just make all LSC 0.
 	for (rn=0;rn<rc;rn++) {
 		memset(rb,0x00,rl);
 		switch (model) {
@@ -1672,14 +1676,16 @@ void req_format() {
 /*
  * req_exec() - execute program
  *
+ * TPDD2 only
+ *
  * Just a stub. Not likely to impliment any time soon,
  * but might as well put the stub in to document it.
  *
- * TPDD2 IPL uses this
+ * TPDD2 util disk bootstrap uses this
  */
 
 /* response from req_exec()
- * returns the execution results from the cpu A and X registers
+ * returns the execution results from the cpu reisters A and X
  * b[0] fmt (0x3B)
  * b[1] len (0x03)
  *      b[2] reg A - 1 byte
@@ -1698,10 +1704,12 @@ void ret_exec(uint8_t reg_A, uint16_t reg_X) {
 	write_client_tty(gb,6);
 }
 
-/* Loads cpu registers A and X with supplied values, then jumps to supplied address.
+/* Load cpu registers A and X with supplied values, then jump to supplied address.
  *
- * To supply the code/data (instead of running some part of the rom),
- * use mem_write() to write data to cpu memory before this.
+ * examples:
+ * - jump to a rom routine
+ * - req_cache() to load a sector from disk first, then jump to the sector cache
+ * - req_mem_write() to write arbitrary code to cpu memory first, then jump to it
  *
  * b[0] fmt (0x34)
  * b[1] len (0x05)
@@ -1713,7 +1721,7 @@ void ret_exec(uint8_t reg_A, uint16_t reg_X) {
  * b[7] chk
  */
 void req_exec(unsigned char *b) {
-	dbg(3,"%s()\n",__func__);
+	dbg(3,"%s() ***STUB***\n",__func__);
 	if (model==1) return;
 	uint16_t addr = b[2]*256+b[3];
 	uint8_t reg_A = b[4];
@@ -1723,6 +1731,7 @@ void req_exec(unsigned char *b) {
 	 * ...6301 emulator here...
 	 * executed code leaves new values in reg_A and reg_X
 	 */
+	dbg(2,"(stub, exec() not implimented)");
 	ret_exec(reg_A,reg_X);
 }
 
