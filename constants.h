@@ -21,11 +21,11 @@
 #define REQ_EXT_QUERY     0x0E // ??? Maybe NADSBox also, compliment of REQ_SET_EXT ?
 #define REQ_COND_LIST     0x0F // ??? - TPDD2 responds RET_CACHE
 #define REQ_UNDOC11       0x11 // TPDD2 undocumented synonym for REQ_PDD2_SYSINFO
-#define REQ_VERSION       0x23 // TPDD2 Get Version Number - TPDD2 responds PDD2_VERSION_DAT
+#define REQ_VERSION       0x23 // TPDD2 Get Version Number
 #define REQ_CACHE         0x30 // TPDD2 sector access
 #define REQ_MEM_WRITE     0x31 // TPDD2 sector access
 #define REQ_MEM_READ      0x32 // TPDD2 sector access
-#define REQ_SYSINFO       0x33 // TPDD2 Get System Information - TPDD2 responds PDD2_SYSINFO_DAT
+#define REQ_SYSINFO       0x33 // TPDD2 Get System Information
 #define REQ_EXEC          0x34 // TPDD2 Execute Program
 
 // TPDD return block formats
