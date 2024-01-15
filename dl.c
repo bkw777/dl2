@@ -1648,8 +1648,8 @@ void req_format() {
 	// Any sector with any data gets LSC 0, and all others get LSC 1.
 	// Later, any sector that gets used by a file gets changed from LSC 1 to
 	// LSC 0, and never changed back even when files are deleted.
-	// A fresh format has one byte of data in sector 0 in the SMT.
-	// So a fresh format sector 0 has LSC 0 and all other sectors have LSC 1.
+	// A fresh format has one byte of data in sector 0 in the SMT,
+	// so a fresh format sector 0 has LSC 0 and all other sectors have LSC 1.
 	// We exactly mimick that here "just because", even though the LSC 1s
 	// don't seem to actually matter and we could just make all LSC 0.
 	for (rn=0;rn<rc;rn++) {
