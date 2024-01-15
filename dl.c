@@ -1827,9 +1827,19 @@ void slowbyte(uint8_t b) {
 			 if (b==LOCAL_EOL) return;
 		}
 		if (b==BASIC_EOL) { ch[0]=BASIC_EOL; return; }
-		//if (b<32) { dbg(0,"\033[7m^%c\033[m",b+64); return; }
-		//if (b>126) { dbg(0,"\033[7m%02X\033[m",b); return; }
+#if defined(SHOWBYTES_A)
+		// show <32 as inverse "^X", >126 as inverse hex pair
+		if (b<32) { dbg(0,"\033[7m^%c\033[m",b+64); return; }
+		if (b>126) { dbg(0,"\033[7m%02X\033[m",b); return; }
+#elseif defined(SHOWBYTES_B)
+		// show <32 and 127 as inverse ctrl char without ^
+		// show everything else as-is, requires disable 8bit vt ctrl codes
+		if (b<32) { dbg(0,"\033[7m%c\033[m",b+64); return; }
+		if (b==127) { dbg(0,"\033[7m?\033[m"); return; }
+#else
+		// show all non-ascii as inverse hex pair
 		if (b<32||b>126) { dbg(0,"\033[7m%02X\033[m",b); return; }
+#endif
 		dbg(0,"%c",b);
 	}
 }
@@ -1844,7 +1854,9 @@ int send_BASIC(char *f) {
 	}
 
 	dbg(0,"Sending \"%s\" ... ",f);
-	//dbg(1,"%c F",27); // disable 8-bit vtxx control codes (0x80-0x9F) so we can display them
+#if defined(SHOWBYTES_B)
+	dbg(1,"%c F",27); // disable 8-bit vtxx control codes (0x80-0x9F) so we can display them
+#endif
 	dbg(1,"\n");
 	ch[0]=0x00;
 	while(read(fd,&b,1)==1) slowbyte(b);

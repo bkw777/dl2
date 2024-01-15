@@ -4,6 +4,8 @@ OS ?= $(shell uname)
 CC ?= gcc
 CFLAGS += -O2 -Wall
 #CFLAGS += -std=c99 -D_DEFAULT_SOURCE    # prove the code is still plain c
+#CFLAGS += SHOWBYTES_A # bootstrap() display non-printing bytes differently
+#CFLAGS += SHOWBYTES_B # bootstrap() display non-printing bytes differently
 PREFIX ?= /usr/local
 APP_NAME := dl
 APP_LIB_DIR := $(PREFIX)/lib/$(APP_NAME)
