@@ -1569,7 +1569,7 @@ void ret_version() {
 }
 
 /*
- * Similar to ret_version, except the response is different, and not used by TS-DOS.
+ * Similar to ret_version, except different data, and not used by TS-DOS.
  * Real drives also respond to request 0x11 exactly the same as 0x33, though only 0x33 is documented.
  * Not counting ZZ or checksums:
  * Client sends  : 33 00
