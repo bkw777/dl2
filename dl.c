@@ -1884,7 +1884,7 @@ int bootstrap(char *f) {
 		dbg(0,"Prepare the client to receive data."
 		"\n"
 		"Note: The current baud setting, %d, is not supported\n"
-		"by the TRS-80 Model 100 or other KC-85 platform machines.\n"
+		"by the TRS-80 Model 100 or other KC-85-platform machines.\n"
 		"There is no way for BASIC or TELCOM to use this baud rate.\n",get_int_baud());
 	} else {
 		strcpy(t,f);
@@ -1962,7 +1962,7 @@ void show_main_help() {
 		"   -i file  Disk image file for raw sector access, TPDD1 only\n"
 		"   -l       List loader files and show bootstrap help\n"
 		"   -m model Model: 1 for TPDD1, 2 for TPDD2 (2)\n"
-		"   -p dir   Share path - directory with files to be served (.)\n"
+		"   -p dir   Share path - directory with files to be served (./)\n"
 		"   -r       RTS/CTS hardware flow control\n"
 		"   -s #     Speed - serial port baud rate 9600 or 19200 (19200)\n"
 		"   -u       Uppercase all filenames\n"
