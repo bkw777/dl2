@@ -38,11 +38,11 @@ int file_list_init ();
 int file_list_cleanup ();
 
 void file_list_clear_all ();
-int  add_file (FILE_ENTRY *fe);
+int  add_file (FILE_ENTRY* fe);
 
-FILE_ENTRY * find_file (char *client_fname);
-FILE_ENTRY * get_first_file (void);
-FILE_ENTRY * get_next_file (void);
-FILE_ENTRY * get_prev_file (void);
+FILE_ENTRY* find_file (char* client_fname);
+FILE_ENTRY* get_first_file (void);
+FILE_ENTRY* get_next_file (void);
+FILE_ENTRY* get_prev_file (void);
 
 #endif

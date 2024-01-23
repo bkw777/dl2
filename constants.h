@@ -104,7 +104,7 @@
 #define ERR_FDC_SUCCESS         0 // 'OK'
 #define ERR_FDC_LSN_LO         17 // 'Logical Sector Number Below Range'
 #define ERR_FDC_LSN_HI         18 // 'Logical Sector Number Above Range'
-#define ERR_FDC_PSN HI         19 // 'Physical Sector Number Above Range'
+#define ERR_FDC_PSN_HI         19 // 'Physical Sector Number Above Range'
 #define ERR_FDC_PARAM          33 // 'Parameter Invalid, Wrong Type'
 #define ERR_FDC_LSSC_LO        50 // 'Invalid Logical Sector Size Code'
 #define ERR_FDC_LSSC_HI        51 // 'Logical Sector Size Code Above Range'

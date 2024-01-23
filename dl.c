@@ -136,7 +136,7 @@ bool getty_mode = false;
 bool bootstrap_mode = false;
 int model = 2;
 
-char **args;
+char** args;
 int f_open_mode = F_OPEN_NONE;
 int client_tty_fd = -1;
 int disk_img_fd = -1;
@@ -147,17 +147,16 @@ char cwd[PATH_MAX] = {0x00};
 char dme_cwd[7] = DEFAULT_DME_ROOT_LABEL;
 char bootstrap_fname[PATH_MAX] = {0x00};
 int opr_mode = 1;
-bool dme_detected = false;
-bool dme_fdc = false;
+uint8_t dme = 0;
 bool dme_disabled = false;
-char ch[2] = {0xFF};
+char ch[2] = {0xFF}; // 0x00 is a valid OPR command, so init to 0xFF
 uint8_t mlen = PDD2_SECTOR_META_LEN;
 const uint16_t dlen = SECTOR_DATA_LEN;
 const uint16_t fdc_logical_size_codes[] = FDC_LOGICAL_SIZE_CODES;
 const char fdc_cmds[] = FDC_CMDS;
-uint8_t * rb = 0x00;
+uint8_t* rb = 0x00;
 
-FILE_ENTRY *cur_file;
+FILE_ENTRY* cur_file;
 int dir_depth=0;
 
 void show_main_help();
@@ -179,7 +178,7 @@ void dbg( const int v, const char* format, ... ) {
 // dbg_b(3, b , 24); // like dbg() except
 // print the buffer as hex pairs with a single trailing newline
 // if len<0, then assume the max tpdd buffer TPDD_DATA_MAX
-void dbg_b(const int v, unsigned char *b, int n) {
+void dbg_b(const int v, unsigned char* b, int n) {
 	if (debug<v) return;
 	unsigned i;
 	if (n<0) n = TPDD_DATA_MAX;
@@ -190,7 +189,7 @@ void dbg_b(const int v, unsigned char *b, int n) {
 
 // like dbg_b, except assume the buffer is a tpdd Operation-mode
 // block and parse it to display cmd, len, payload, checksum.
-void dbg_p(const int v, unsigned char *b) {
+void dbg_p(const int v, unsigned char* b) {
 	dbg(v,"cmd: %1$02X\nlen: %2$02X (%2$u)\nchk: %3$02X\ndat: ",b[0],b[1],b[b[1]+2]);
 	dbg_b(v,b+2,b[1]);
 }
@@ -209,7 +208,7 @@ void dbg_p(const int v, unsigned char *b) {
 */
 // given string "9600", set client_baud = B9600
 // most clients only use 9600 or 19200 but a real drive supports all these
-void set_client_baud (char * s) {
+void set_client_baud (char* s) {
 	int i=atoi(s);
 	client_baud=
 		i==75?B75:         // real drive does not support, kc85 does
@@ -265,7 +264,7 @@ int get_stat_baud () {
 		0;
 }
 
-void find_lib_file (char *f) {
+void find_lib_file (char* f) {
 	if (f[0]==0x00) return;
 
 	char t[PATH_MAX]={0x00};
@@ -367,16 +366,16 @@ int open_client_tty () {
 	return 0;
 }
 
-int write_client_tty(void *b, int n) {
+int write_client_tty(void* b, int n) {
 	dbg(4,"%s(%u)\n",__func__,n);
 	n = write(client_tty_fd,b,n);
 	dbg(3,"SENT: "); dbg_b(3,b,n);
 	return n;
 }
 
-// it's correct that this waits forever
-// the one time we don't want to block, we don't use this
-int read_client_tty(void *b, const unsigned int n) {
+// It is correct that this blocks and waits forever.
+// The one time we don't want to block, we don't use this.
+int read_client_tty(void* b, const unsigned int n) {
 	dbg(4,"%s(%u)\n",__func__,n);
 	unsigned t = 0;
 	int i = 0;
@@ -389,8 +388,8 @@ int read_client_tty(void *b, const unsigned int n) {
 	return t;
 }
 
-// cat a file to terminal, for bootstrap directions
-void dcat(char *f) {
+// cat a file to terminal, for custom loader directions in bootstrap()
+void dcat(char* f) {
 	char b[4097]={0x00}; int h=open(f,O_RDONLY);
 	if (h<0) return;
 	while (read(h,&b,4096)>0) dbg(0,"%s",b);
@@ -415,13 +414,13 @@ void dcat(char *f) {
  * b[2] to b[1+len] = 0 to 128 bytes of payload  (data block)
  * ignore everything after b[1+len]
  */
-unsigned char checksum(unsigned char *b) {
+unsigned char checksum(unsigned char* b) {
 	unsigned short s=0; unsigned char i; unsigned char l=2+b[1];
 	for (i=0;i<l;i++) s+=b[i];
 	return ~(s&0xFF);
 }
 
-char *collapse_padded_fname(char *fname) {
+char* collapse_padded_fname(char* fname) {
 	dbg(3,"%s(\"%s\")\n",__func__,fname);
 	if (!dot_offset) return fname;
 
@@ -439,7 +438,7 @@ char *collapse_padded_fname(char *fname) {
 	return fname;
 }
 
-void lsx (char *path,char *match) {
+void lsx (char* path,char* match) {
 	struct dirent *files;
 	DIR *dir = opendir(path);
 	if (dir == NULL){dbg(0,"Cannot open \"%s\"",path); return;}
@@ -451,7 +450,7 @@ void lsx (char *path,char *match) {
 	closedir(dir);
 }
 
-int check_magic_file(char *b) {
+int check_magic_file(char* b) {
 	dbg(3,"%s(\"%s\")\n",__func__,b);
 	if (!enable_magic_files) return 1;
 	if (dot_offset!=6) return 1; // UR2/TSLOAD only exists on a few KC-85 clones
@@ -605,7 +604,7 @@ void req_fdc_read_id(int p) {
 
 // tp = target physical sector
 // tl = target logical sector
-void req_fdc_read_sector(int tp,int tl) {
+void req_fdc_read_sector(uint8_t tp,uint8_t tl) {
 	dbg(2,"%s(%d,%d)\n",__func__,tp,tl);
 
 	if (open_disk_image(tp,O_RDONLY,ALLOW_RET)) return; // open & seek to tp
@@ -617,7 +616,12 @@ void req_fdc_read_sector(int tp,int tl) {
 	}
 	dbg_b(3,rb,mlen);
 
-	int l = lsc_to_len(rb[0]); // get logical size from header
+	uint16_t l = lsc_to_len(rb[0]); // get logical size from header
+	if (l*tl>SECTOR_DATA_LEN) {
+		(void)(close(disk_img_fd)+1);
+		ret_fdc_std(ERR_FDC_LSN_HI,tp,l);
+		return;
+	}
 
 	// seek to target_physical*(id_len+physical_len) + id_len + (target_logical-1)*logical_len
 	int s = (tp*(mlen+dlen))+mlen+((tl-1)*l);
@@ -634,12 +638,11 @@ void req_fdc_read_sector(int tp,int tl) {
 		ret_fdc_std(ERR_FDC_READ,tp,0);
 		return;
 	}
+	(void)(close(disk_img_fd)+1);
 	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // 1st stage response
 	char t=0x00;
 	read_client_tty(&t,1);  // read 1 byte from client
-	if (t!=0x0D) return;    // if it's anything but CR, silently abort
-	write_client_tty(rb,l); // send data
-	(void)(close(disk_img_fd)+1);
+	if (t==0x0D) write_client_tty(rb,l); // if it's \r send data
 }
 
 // ref/search_id_section.txt
@@ -756,32 +759,32 @@ void req_fdc_write_sector(int tp,int tl) {
 // ref/fdc.txt
 void get_fdc_cmd(void) {
 	dbg(3,"%s()\n",__func__);
-	char b[6] = {0x00};
+	char b[8] = {0x00};
 	unsigned i = 0;
 	bool eol = false;
 	uint8_t c = 0x00;
 	int p = -1;
 	int l = -1;
 
-	// before we reset gb[], see if a command byte was collected already by req_fdc()
-	if (gb[0]>0x00 && gb[0]!=FDC_CMD_EOL && gb[1]==0x00) {
-		c=gb[0];
-		dbg(3,"Command \"%b\" from req_fdc()\n",c);
-	}
 	memset(gb,0x00,TPDD_DATA_MAX);
-
 	// scan for a valid command byte first
 	while (!c) {
-		read_client_tty(&c,1);
+		if (ch[0]) {
+			c = ch[0];
+			ch[0] = 0x00;
+			dbg(3,"Restored from req_fdc(): 0x%02X\n",c);
+		} else {
+			read_client_tty(&c,1);
+		}
 		if (c==FDC_CMD_EOL) { eol=true; c=0x20; break; } // fall through to ERR_FDC_COMMAND, important for Sardine
 		if (!strchr(fdc_cmds,c)) c=0x20 ; // eat bytes until valid cmd or eol
 	}
 
 	// read params
 	i = 0;
-	while (i<6 && !eol) { // if we get out of sync (i>5), just fall through to restart
+	while (i<6 && !eol) {
 		if (read_client_tty(&b[i],1)==1) {
-			dbg(3,"i:%d b:\"%s\"\n",i,b);
+			dbg(3,"i:%d b[]:\n%s\n",i,b);
 			switch (b[i]) {
 				case FDC_CMD_EOL: eol=true;
 				case 0x20: b[i]=0x00; break;
@@ -799,16 +802,21 @@ void get_fdc_cmd(void) {
 	// where:
 	// P = physical sector number 0-79 (decimal integer as 0-2 ascii characters)
 	// L = logical sector number 1-20 (decimal integer as 0-2 ascii characters)
-	// (format & condition have different meanings but the rule still holds)
+	// (P & L sometimes have other meanings but the format & type rule still holds)
 	p=0; // real drive uses physical sector 0 when omitted
 	l=1; // real drive uses logical sector 1 when omitted
 	char* t;
 	if ((t=strtok(b,","))!=NULL) p=atoi(t); // target physical sector number
 	if ((t=strtok(NULL,","))!=NULL) l=atoi(t); // target logical sector number
-	if (p<0 || p>79 || l<1 || l>20) {ret_fdc_std(ERR_FDC_PARAM,0,0); return;}
+	// for physical sector out of range, real drive error response will have dat=last_valid_p if any
+	// if no command has ever supplied a valid physical sector number yet, then dat=FF
+	if (p<0) {ret_fdc_std(ERR_FDC_PARAM,0xFF,0); return;}
+	if (p>79) {ret_fdc_std(ERR_FDC_PSN_HI,0xFF,0); return;}
+	if (l<1) {ret_fdc_std(ERR_FDC_LSN_LO,p,0); return;}
+	if (l>20) {ret_fdc_std(ERR_FDC_LSN_HI,p,0); return;}
 
 	// debug
-	dbg(3,"\"c:%c p:%d l:%d\"\n",c,p,l);
+	dbg(3,"command:%c  physical:%d  logical:%d\n",c,p,l);
 
 	// dispatch
 	switch (c) {
@@ -833,7 +841,7 @@ void get_fdc_cmd(void) {
 //  OPERATION MODE
 //
 
-FILE_ENTRY *make_file_entry(char *namep, uint16_t len, char flags) {
+FILE_ENTRY* make_file_entry(char* namep, uint16_t len, char flags) {
 	dbg(3,"%s(\"%s\")\n",__func__,namep);
 	static FILE_ENTRY f;
 	int i;
@@ -903,10 +911,10 @@ void ret_std(unsigned char err) {
 	if (gb[2]!=ERR_SUCCESS) dbg(2,"ERROR RESPONSE TO CLIENT\n");
 }
 
-int read_next_dirent(DIR *dir,int m) {
+int read_next_dirent(DIR* dir,int m) {
 	dbg(3,"%s()\n",__func__);
 	struct stat st;
-	struct dirent *dire;
+	struct dirent* dire;
 	int flags;
 
 	if (dir == NULL) {
@@ -927,7 +935,7 @@ int read_next_dirent(DIR *dir,int m) {
 		if (S_ISDIR(st.st_mode)) flags=FE_FLAGS_DIR;
 		else if (!S_ISREG (st.st_mode)) continue;
 
-		if (flags==FE_FLAGS_DIR && !dme_detected) continue;
+		if (flags==FE_FLAGS_DIR && dme<2) continue;
 
 		if (dot_offset) {
 			if (dire->d_name[0]=='.') continue; // skip "." ".." and hidden files
@@ -952,7 +960,7 @@ int read_next_dirent(DIR *dir,int m) {
 // read the current share directory
 void update_file_list(int m) {
 	dbg(3,"%s()\n",__func__);
-	DIR * dir;
+	DIR* dir;
 
 	dir=opendir(".");
 	file_list_clear_all();
@@ -964,7 +972,7 @@ void update_file_list(int m) {
 }
 
 // return for dirent
-int ret_dirent(FILE_ENTRY *ep) {
+int ret_dirent(FILE_ENTRY* ep) {
 	dbg(2,"%s(\"%s\")\n",__func__,ep->client_fname);
 	int i;
 
@@ -997,9 +1005,9 @@ int ret_dirent(FILE_ENTRY *ep) {
 	return (write_client_tty(gb,31) == 31);
 }
 
-void dirent_set_name(unsigned char *b) {
+void dirent_set_name(unsigned char* b) {
 	dbg(2,"%s(%-24.24s)\n",__func__,b+2);
-	char *p;
+	char* p;
 	char filename[TPDD_FILENAME_LEN+1]={0x00};
 	int f = 0;
 	if (b[2]) {
@@ -1010,7 +1018,7 @@ void dirent_set_name(unsigned char *b) {
 	// * clients may open files without ever listing (teeny, ur2, etc)
 	// * local files may be changed at any time by other processes
 	update_file_list(ALLOW_RET);
-	strncpy(filename,(char *)b+2,TPDD_FILENAME_LEN);
+	strncpy(filename,(char*)b+2,TPDD_FILENAME_LEN);
 	filename[TPDD_FILENAME_LEN]=0;
 	// Remove trailing spaces
 	for (p = strrchr(filename,' '); p >= filename && *p == ' '; p--) *p = 0x00;
@@ -1052,7 +1060,7 @@ void dirent_get_first() {
 	// because set-name is not required before get-first
 	update_file_list(ALLOW_RET);
 	ret_dirent(get_first_file());
-	dme_fdc = 0; // see req_fdc() & ref/fdc.txt
+	dme = 0;
 }
 
 // b[0] = cmd
@@ -1064,7 +1072,7 @@ void dirent_get_first() {
 // Ignore the name & attr until after determining the action.
 // TS-DOS submits get-first & get-next requests with junk data
 // in the filename & attribute fields left over from previous actions.
-int req_dirent(unsigned char *b) {
+int req_dirent(unsigned char* b) {
 	dbg(2,"%s(%s)\n",__func__,
 		b[27]==DIRENT_SET_NAME?"set_name":
 		b[27]==DIRENT_GET_FIRST?"get_first":
@@ -1122,25 +1130,31 @@ void ret_dme_cwd() {
 }
 
 // Any FDC request might actually be a DME request
-// See ref/dme.txt for the full explaination because it's a lot.
-// dme_fdc = Is the current FDC request a DME request? Retained during one dir listing.
-// dme_detected = Have we ever recieved a DME request? Retained forever.
+// See ref/dme.txt for the full explaination
 void req_fdc() {
 	dbg(2,"%s()\n",__func__);
-	dbg(3,"dme detection %s\n",dme_disabled?"disabled":"allowed");
-	dbg(3,"dme %spreviously detected\n",dme_fdc?"":"not ");
+	//dbg(3,"dme detection %s\n",dme_disabled?"disabled":"allowed");
+	//if (!dme_disabled) dbg(3,"dme %spreviously detected\n",dme?"":"not ");
 
-	if (!dme_fdc && !dme_disabled) {
-		dbg(3,"testing for dme\n");
-		gb[0] = 0x00;
+	// Some versions of TS-DOS send 2 FDC requests in a row, both with trailing \r.
+	// Some versions also send a 3rd one without the trailing \r.
+	// If we already have 2, then don't try to read a trailing \r any more,
+	// but do incriment the dme flag and do still treat the FDC request
+	// as really a DME request as long as the dme flag has not been reset.
+	// We don't really need to even track this once we have the 2 but whatever.
+	if (dme>1 && dme<0xFF) dme++;
+
+	if (dme<2 && !dme_disabled) {
+		//dbg(3,"looking for dme req %d of 2\n",dme+1);
+		ch[0] = 0x00;
 		client_tty_vmt(0,1);   // allow this read to time out
-		(void)(read(client_tty_fd,gb,1)+1);
+		(void)(read(client_tty_fd,ch,1)+1);
 		client_tty_vmt(-1,-1); // restore normal VMIN/VTIME
-		if (gb[0]==FDC_CMD_EOL) dme_fdc = true;
+		if (ch[0]==FDC_CMD_EOL) dbg(3,"Got dme req %d of 2\n",++dme);
+		//if (ch[0]) dbg(3,"ate a byte: %02X\n",ch[0]);
 	}
-	if (dme_fdc) {
-		dme_detected=true;
-		dbg(3,"dme detected\n");
+	if (dme>1) {
+		//dbg(3,"got dme req\n");
 		ret_dme_cwd();
 	} else {
 		//if (model==2) { ret_std(ERR_PARAM); return; } // real tpdd2 does this
@@ -1155,7 +1169,7 @@ void req_fdc() {
 //             0x02 write append
 //             0x03 read
 // b[3] = chk
-int req_open(unsigned char *b) {
+int req_open(unsigned char* b) {
 	dbg(2,"%s(\"%s\")\n",__func__,cur_file->client_fname);
 	dbg(5,"b[]\n"); dbg_b(5,b,-1);
 	dbg_p(4,b);
@@ -1250,7 +1264,7 @@ int req_open(unsigned char *b) {
 }
 
 void req_read(void) {
-	if (ch[1]!=REQ_READ || debug>2) dbg(2,"%s()\n",__func__);
+	dbg(2,"%s()\n",__func__);
 	int i;
 
 	if (o_file_h<0) {
@@ -1285,8 +1299,8 @@ void req_read(void) {
 // b[1] = 0x01 - 0x80
 // b[2] = b[1] bytes
 // b[2+len] = chk
-void req_write(unsigned char *b) {
-	if (ch[1]!=REQ_WRITE || debug>2) dbg(2,"%s()\n",__func__);
+void req_write(unsigned char* b) {
+	dbg(2,"%s()\n",__func__);
 	dbg(4,"...incoming packet...\n");
 	dbg(5,"b[]\n"); dbg_b(5,b,-1);
 	dbg_p(4,b);
@@ -1344,7 +1358,7 @@ void ret_cache(uint8_t e) {
  *   b[5] side (always 00)
  *   b[6] sector 0-1
  */
-void req_cache(unsigned char *b) {
+void req_cache(unsigned char* b) {
 	dbg(3,"%s(action=%u track=%u sector=%u)\n",__func__,b[2],b[4],b[6]);
 	if (model==1) return;
 	int a=b[2];
@@ -1455,7 +1469,7 @@ void req_cache(unsigned char *b) {
  *      b[5+] data       dlen bytes
  * b[#] chk
  */
-void req_mem_read(unsigned char *b) {
+void req_mem_read(unsigned char* b) {
 	dbg(3,"%s()\n",__func__);
 	if (model==1) return;
 	uint8_t a = b[2];
@@ -1500,7 +1514,7 @@ void req_mem_read(unsigned char *b) {
  *      b[5+] data
  * b[#] chk
  */
-void req_mem_write(unsigned char *b) {
+void req_mem_write(unsigned char* b) {
 	dbg(3,"%s()\n",__func__);
 	if (model==1) return;
 	uint8_t a = b[2];
@@ -1590,7 +1604,7 @@ void ret_sysinfo() {
 	write_client_tty(gb,9);
 }
 
-void req_rename(unsigned char *b) {
+void req_rename(unsigned char* b) {
 	dbg(3,"%s(%-24.24s)\n",__func__,b+2);
 	if (model==1) return;
 	char *t = (char *)b + 2;
@@ -1724,7 +1738,7 @@ void ret_exec(uint8_t reg_A, uint16_t reg_X) {
  *      b[6] reg X lsb
  * b[7] chk
  */
-void req_exec(unsigned char *b) {
+void req_exec(unsigned char* b) {
 	dbg(3,"%s() ***STUB***\n",__func__);
 	if (model==1) return;
 	uint16_t addr = b[2]*256+b[3];
@@ -1758,8 +1772,6 @@ void get_opr_cmd(void) {
 		dbg(0,"Failed checksum: received: 0x%02X  calculated: 0x%02X\n",b[b[1]+2],i);
 		return; // real drive does not return anything
 	}
-
-	ch[1]=ch[0]; ch[0]=b[0]; // command history
 
 	// dispatch
 	switch(b[0]) {
@@ -1848,7 +1860,7 @@ void slowbyte(uint8_t b) {
 	}
 }
 
-int send_BASIC(char *f) {
+int send_BASIC(char* f) {
 	int fd;
 	uint8_t b;
 
@@ -1875,7 +1887,7 @@ int send_BASIC(char *f) {
 	return 0;
 }
 
-int bootstrap(char *f) {
+int bootstrap(char* f) {
 	dbg(0,"Bootstrap: Installing \"%s\"\n\n",f);
 	if (access(f,F_OK)==-1) {
 		dbg(0,"Not found.\n");
@@ -1983,8 +1995,8 @@ void show_main_help() {
 	,args[0],DEFAULT_TPDD_FILE_ATTR,DEFAULT_BASIC_BYTE_MS);
 }
 
-int main(int argc, char **argv) {
-	dbg(0,"DeskLink+ " APP_VERSION "\n");
+int main(int argc, char** argv) {
+	dbg(0,"DeskLink2 " APP_VERSION "\n");
 
 	int i;
 	bool x = false;
