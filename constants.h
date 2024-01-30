@@ -4,23 +4,26 @@
 // TPDD drive firmware/protocol constants
 
 // TPDD request block formats
-#define REQ_DIRENT        0x00
-#define REQ_OPEN          0x01
-#define REQ_CLOSE         0x02
-#define REQ_READ          0x03
-#define REQ_WRITE         0x04
-#define REQ_DELETE        0x05
+#define REQ_DIRENT        0x00 // (add 0x40 for TPDD2 bank 1)
+#define REQ_OPEN          0x01 // (add 0x40 for TPDD2 bank 1)
+#define REQ_CLOSE         0x02 // (add 0x40 for TPDD2 bank 1)
+#define REQ_READ          0x03 // (add 0x40 for TPDD2 bank 1)
+#define REQ_WRITE         0x04 // (add 0x40 for TPDD2 bank 1)
+#define REQ_DELETE        0x05 // (add 0x40 for TPDD2 bank 1)
 #define REQ_FORMAT        0x06
-#define REQ_STATUS        0x07
+#define REQ_STATUS        0x07 // (add 0x40 for undocumented synonym on TPDD2)
 #define REQ_FDC           0x08 // TPDD1
-#define REQ_SEEK          0x09 // NADSBox extension
-#define REQ_TELL          0x0A // NADSBox extension
-#define REQ_SET_EXT       0x0B // NADSBox extension
+#ifdef NADSBOX_EXTENSIONS
+	#define REQ_NADSBOX_SEEK       0x09
+	#define REQ_NADSBOX_TELL       0x0A
+	#define REQ_NADSBOX_SET_EXT    0x0B
+#endif
 #define REQ_CONDITION     0x0C // TPDD2
-#define REQ_RENAME        0x0D // TPDD2
-#define REQ_EXT_QUERY     0x0E // ??? Maybe NADSBox also, compliment of REQ_SET_EXT ?
-#define REQ_COND_LIST     0x0F // ??? - TPDD2 responds RET_CACHE
-#define REQ_UNDOC11       0x11 // TPDD2 undocumented synonym for REQ_PDD2_SYSINFO
+#define REQ_RENAME        0x0D // TPDD2 (add 0x40 for bank 1)
+#ifdef NADSBOX_EXTENSIONS
+	#define REQ_NADSBOX_GET_EXT    0x0E
+	#define REQ_NADSBOX_COND_LIST  0x0F // NADSBox but TPDD2 also responds with RET_CACHE
+#endif
 #define REQ_VERSION       0x23 // TPDD2 Get Version Number
 #define REQ_CACHE         0x30 // TPDD2 sector access
 #define REQ_MEM_WRITE     0x31 // TPDD2 sector access
@@ -147,24 +150,26 @@
 #define PDD1_SECTORS          2
 #define PDD2_TRACKS           80
 #define PDD2_SECTORS          2
-#define TPDD_DATA_MAX         260  // largest possible packet is 256+3
+#define TPDD_DATA_MAX         260  // largest theoretical packet is 256+3
 #define REQ_RW_DATA_MAX       128  // largest chunk size in req_read() req_write()
 #define LEN_RET_STD           0x01
 #define LEN_RET_DME           0x0B
 #define LEN_RET_DIRENT        0x1C
 #define TPDD_FILENAME_LEN     24
 #define LOCAL_FILENAME_MAX    256
+#define SECTOR_ID_LEN         12
+#define SECTOR_HEADER_LEN     (SECTOR_ID_LEN+1) // pdd1: lsc+id, pdd2: id+unknown
 #define SECTOR_DATA_LEN       1280
-#define PDD1_SECTOR_LSC_LEN   1
-#define PDD1_SECTOR_ID_LEN    12
-#define PDD1_SECTOR_META_LEN  (PDD1_SECTOR_LSC_LEN+PDD1_SECTOR_ID_LEN)
-#define PDD2_SECTOR_META_LEN  4 // TODO - PDD2 service manual shows there is 17-bytes ID field
+//#define OLD_PDD2_HEADER_LEN   4 // for old .pdd2 disk image files
+#define SECTOR_LEN            (SECTOR_HEADER_LEN+SECTOR_DATA_LEN)
+#define PDD1_IMG_LEN          (PDD1_TRACKS*PDD1_SECTORS*SECTOR_LEN)
+#define PDD2_IMG_LEN          (PDD2_TRACKS*PDD2_SECTORS*SECTOR_LEN)
 #define SMT_OFFSET            1240
 #define PDD1_SMT              0x80
 #define PDD2_SMT              0xC0
-#define PDD2_META_ADDR        0x8004
-#define PDD2_MEM_READ_MAX     252
-#define PDD2_MEM_WRITE_MAX    127
+#define PDD2_ID_ADDR          0x8004
+#define PDD2_MEM_READ_MAX     252 // real drive absolute limit
+#define PDD2_MEM_WRITE_MAX    127 // real drive absolute limit
 
 // TPDD2 version data: 41 10 01 00 50 05 00 02 00 28 00 E1 00 00 00
 #define VERSION_MSB       0x41

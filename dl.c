@@ -11,15 +11,17 @@
 DeskLink+
 2005     John R. Hogerhuis Extensions and enhancements
 2019     Brian K. White - repackaging, reorganizing, bootstrap function
-2022                      disk image files and sector-access
 2020     Kurt McCullum - TS-DOS loaders
 2022     Gabriele Gorla - TS-DOS subdirectories
 
-DeskLink+ is free software; you can redistribute it and/or modify it
-under the terms of the GNU General Public License version 2 or any
-later as version as published by the Free Software Foundation.  
+DeskLink2
+2023     Brian K. White - disk image files, pdd1 FDC mode, pdd2 cache & memory
 
-DeskLink+ is distributed in the hope that it will be useful, but
+DeskLink2 is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License version 2 or any
+later version as published by the Free Software Foundation.  
+
+DeskLink2 is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 General Public License for more details.
@@ -62,6 +64,11 @@ MA 02111, USA.
 
 /*** config **************************************************/
 
+
+#ifndef APP_NAME
+#define APP_NAME "DeskLink"
+#endif
+
 #ifndef APP_LIB_DIR
 #define APP_LIB_DIR "."
 #endif
@@ -82,7 +89,7 @@ MA 02111, USA.
 
 #define DEFAULT_TPDD_FILE_ATTR 0x46 // F
 
-// To mimic the original DeskLink from Travelling Software:
+// To mimic the original Desk-Link from Travelling Software:
 //#define DEFAULT_DME_ROOT_LABEL   "ROOT  "
 //#define DEFAULT_DME_PARENT_LABEL "PARENT" // environment variables:
 #define DEFAULT_DME_ROOT_LABEL   "0:    "   // ROOT_LABEL='0:'   '-root-' 'C:\'
@@ -150,11 +157,10 @@ int opr_mode = 1;
 uint8_t dme = 0;
 bool dme_disabled = false;
 char ch[2] = {0xFF}; // 0x00 is a valid OPR command, so init to 0xFF
-uint8_t mlen = PDD2_SECTOR_META_LEN;
-const uint16_t dlen = SECTOR_DATA_LEN;
+//uint8_t img_header_len = SECTOR_HEADER_LEN;
 const uint16_t fdc_logical_size_codes[] = FDC_LOGICAL_SIZE_CODES;
 const char fdc_cmds[] = FDC_CMDS;
-uint8_t* rb = 0x00;
+uint8_t rb[2048] = {0x00}; // disk image record buffer / virtual pdd2 ram
 
 FILE_ENTRY* cur_file;
 int dir_depth=0;
@@ -289,6 +295,52 @@ void find_lib_file (char* f) {
 
 	dbg(0,"Loading: \"%s\"\n",f);
 }
+
+int check_disk_image () {
+	if (!disk_img_fname[0]) return 1;
+	find_lib_file(disk_img_fname);
+	if (disk_img_fname[0]) {
+		struct stat info;
+		stat(disk_img_fname, &info);
+		// allow missing or zero-byte file,
+		// we will create it if client issues format command
+		// but if file exists, sanity check based on size
+		if (info.st_size) {
+			if (model==1 && info.st_size != PDD1_IMG_LEN) {
+				dbg(0,"Expected TPDD1 disk image file size %u\n",PDD1_IMG_LEN);
+				dbg(0,"\"%s\" is %u\n",disk_img_fname,info.st_size);
+				return 1;
+			}
+			if (model==2 && info.st_size != PDD2_IMG_LEN) {
+				dbg(0,"Expected TPDD2 disk image file size %u\n",PDD2_IMG_LEN);
+				dbg(0,"\"%s\" is %u\n",disk_img_fname,info.st_size);
+				return 1;
+			}
+			//printf("%s: size=%ld\n", disk_img_fname, info.st_size);
+			//if (model==2 && info.st_size == PDD2_TRACKS*PDD2_SECTORS*(OLD_PDD2_HEADER_LEN+SECTOR_DATA_LEN)) {
+			//	img_header_len = OLD_PDD2_HEADER_LEN;
+			//	dbg(0,"Detected OLD TPDD2 disk image file format\n");
+			//}
+		}
+	}
+	return 0;
+}
+
+// TODO - search for likely TTY(s) automatically
+/*
+void guess_client_tty () {
+	struct dirent *files;
+	char path[] = "/dev/";
+	DIR *dir = opendir(path);
+	if (dir == NULL){dbg(0,"Cannot open \"%s\"",path); return;}
+	int i;
+	while ((files = readdir(dir)) != NULL) {
+		for (i=strlen(files->d_name);files->d_name[i]!='/';i--);
+		if (!strcmp(files->d_name+i+1,match)) dbg(0," %s",files->d_name);
+	}
+	closedir(dir);
+}
+*/
 
 void resolve_client_tty_name () {
 	dbg(3,"%s()\n",__func__);
@@ -438,14 +490,14 @@ char* collapse_padded_fname(char* fname) {
 	return fname;
 }
 
-void lsx (char* path,char* match) {
+void lsx (char* path,char* match,char* fmt) {
 	struct dirent *files;
 	DIR *dir = opendir(path);
 	if (dir == NULL){dbg(0,"Cannot open \"%s\"",path); return;}
 	int i;
 	while ((files = readdir(dir)) != NULL) {
 		for (i=strlen(files->d_name);files->d_name[i]!='.';i--);
-		if (!strcmp(files->d_name+i+1,match)) dbg(0," %s",files->d_name);
+		if (!strcmp(files->d_name+i+1,match)) dbg(0,fmt,files->d_name);
 	}
 	closedir(dir);
 }
@@ -492,21 +544,13 @@ void ret_fdc_std(uint8_t e, uint8_t s, uint16_t l) {
 	write_client_tty(b,8);
 }
 
-/*
-int seek_disk_image (int p, int l, int r) {
-	int s = (p*(mlen+dlen));
-	if (l) s+=mlen+l*llen-l;
-	return lseek(disk_img_fd,s,SEEK_SET);
-}
-*/
-
 // p   : physical sector to seek to
 // m   : read-only / write-only / read-write
 // r   : send or don't send error response to client from here
 int open_disk_image (int p, int m, int r) {
 	dbg(2,"%s(%d,%d,%d)\n",__func__,p,m,r);
 
-	if (!strcmp(disk_img_fname,"")) return ERR_FDC_NO_DISK;
+	if (!*disk_img_fname) return ERR_FDC_NO_DISK;
 	int of; int e=ERR_FDC_SUCCESS;
 
 	switch (m) {
@@ -528,7 +572,7 @@ int open_disk_image (int p, int m, int r) {
 	}
 
 	if (!e) {
-		int s = (p*(mlen+dlen)); // initial seek position to start of physical sector
+		int s = (p*SECTOR_LEN); // initial seek position to start of physical sector
 		if (lseek(disk_img_fd,s,SEEK_SET)!=s) e=ERR_FDC_READ;
 	}
 
@@ -536,7 +580,7 @@ int open_disk_image (int p, int m, int r) {
 	return e;
 }
 
-void req_fdc_set_mode(int m) {
+void req_fdc_set_mode(uint8_t m) {
 	dbg(2,"%s(%d)\n",__func__,m);
 	dbg(1,"FDC: Switching to \"%s\" mode\n",m==0?"FDC":m==1?"Operation":"-invalid-");
 	opr_mode=m; // no response, just switch modes
@@ -562,21 +606,20 @@ void req_fdc_condition() {
 }
 
 // lc = logical sector size code
-void req_fdc_format(int lc) {
+void req_fdc_format(uint8_t lc) {
 	dbg(2,"%s(%d)\n",__func__,lc);
 	int ll = lsc_to_len(lc);
 	int rn = 0;     // physical sector number
-	int rl = mlen+dlen; // total length of one record
 	int rc = (PDD1_TRACKS*PDD1_SECTORS); // total record count
 
 	dbg(0,"Format: Logical sector size: %d = %d\n",lc,ll);
 
 	if (open_disk_image(0,O_RDWR,ALLOW_RET)) return;
 
-	memset(rb,0x00,rl);
+	memset(rb,0x00,SECTOR_LEN);
 	rb[0]=lc;            // logical sector size code
 	for (rn=0;rn<rc;rn++) {
-		if (write(disk_img_fd,rb,rl)<0) {
+		if (write(disk_img_fd,rb,SECTOR_LEN)<0) {
 			dbg(0,"%s\n",strerror(errno));
 			(void)(close(disk_img_fd)+1);
 			ret_fdc_std(ERR_FDC_READ,rn,0);
@@ -589,11 +632,11 @@ void req_fdc_format(int lc) {
 }
 
 // p = physical sector number
-void req_fdc_read_id(int p) {
+void req_fdc_read_id(uint8_t p) {
 	dbg(2,"%s(%d)\n",__func__,p);
 	if (open_disk_image(p,O_RDONLY,ALLOW_RET)) return; // open and seek
-	int r = read(disk_img_fd,rb,mlen);  // read header
-	dbg_b(2,rb,mlen);
+	int r = read(disk_img_fd,rb,SECTOR_HEADER_LEN);  // read header
+	dbg_b(2,rb,SECTOR_HEADER_LEN);
 	int l = lsc_to_len(rb[0]);          // get logical size from header
 	ret_fdc_std(ERR_FDC_SUCCESS,p,l);   // send OK
 	char t=0x00; read_client_tty(&t,1); // read 1 byte from client
@@ -608,13 +651,13 @@ void req_fdc_read_sector(uint8_t tp,uint8_t tl) {
 	dbg(2,"%s(%d,%d)\n",__func__,tp,tl);
 
 	if (open_disk_image(tp,O_RDONLY,ALLOW_RET)) return; // open & seek to tp
-	if (read(disk_img_fd,rb,mlen)!=mlen) { // read header
+	if (read(disk_img_fd,rb,SECTOR_HEADER_LEN)!=SECTOR_HEADER_LEN) { // read header
 		dbg(1,"failed read header\n");
 		(void)(close(disk_img_fd)+1);
 		ret_fdc_std(ERR_FDC_READ,tp,0);
 		return;
 	}
-	dbg_b(3,rb,mlen);
+	dbg_b(3,rb,SECTOR_HEADER_LEN);
 
 	uint16_t l = lsc_to_len(rb[0]); // get logical size from header
 	if (l*tl>SECTOR_DATA_LEN) {
@@ -624,7 +667,7 @@ void req_fdc_read_sector(uint8_t tp,uint8_t tl) {
 	}
 
 	// seek to target_physical*(id_len+physical_len) + id_len + (target_logical-1)*logical_len
-	int s = (tp*(mlen+dlen))+mlen+((tl-1)*l);
+	int s = (tp*SECTOR_LEN)+SECTOR_HEADER_LEN+((tl-1)*l);
 	if (lseek(disk_img_fd,s,SEEK_SET)!=s) {
 		dbg(1,"failed seek %d : %s\n",s,strerror(errno));
 		(void)(close(disk_img_fd)+1);
@@ -649,19 +692,18 @@ void req_fdc_read_sector(uint8_t tp,uint8_t tl) {
 void req_fdc_search_id() {
 	dbg(2,"%s()\n",__func__);
 	int rn = 0;     // physical sector number
-	int rl = mlen+dlen; // total length of one record
 	int rc = (PDD1_TRACKS*PDD1_SECTORS); // total record count
-	char sb[PDD1_SECTOR_ID_LEN] = {0x00}; // search data
+	char sb[SECTOR_ID_LEN] = {0x00}; // search data
 
 	if (open_disk_image(0,O_RDONLY,ALLOW_RET)) return; // open disk image
 	ret_fdc_std(ERR_FDC_SUCCESS,0,0); // tell client to send data
-	read_client_tty(sb,PDD1_SECTOR_ID_LEN); // read 12 bytes from client
+	read_client_tty(sb,SECTOR_ID_LEN); // read 12 bytes from client
 
 	int l = 0;
 	bool found = false;
 	for (rn=0;rn<rc;rn++) {
-		memset(rb,0x00,mlen);
-		if (read(disk_img_fd,rb,rl)!=rl) {  // read one record
+		memset(rb,0x00,SECTOR_HEADER_LEN);
+		if (read(disk_img_fd,rb,SECTOR_LEN)!=SECTOR_LEN) {  // read one record
 			dbg(0,"%s\n",strerror(errno));
 			(void)(close(disk_img_fd)+1);
 			ret_fdc_std(ERR_FDC_READ,rn,0);
@@ -669,12 +711,12 @@ void req_fdc_search_id() {
 		}
 
 		dbg(3,"%d ",rn);
-		dbg_b(3,rb,mlen);
+		dbg_b(3,rb,SECTOR_HEADER_LEN);
 
 		l = lsc_to_len(rb[0]); // get logical size from header
 
 		// does sb exactly match ID?
-		if (!strncmp(sb,(char*)rb+1,PDD1_SECTOR_ID_LEN)) {
+		if (!strncmp(sb,(char*)rb+1,SECTOR_ID_LEN)) {
 			found = true;
 			break;
 		}
@@ -703,10 +745,10 @@ void req_fdc_write_id(int tp) {
 
 	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // tell client to send data
 
-	read_client_tty(rb,PDD1_SECTOR_ID_LEN); // read 12 bytes from client
+	read_client_tty(rb,SECTOR_ID_LEN); // read 12 bytes from client
 
 	// write those to the file
-	if (write(disk_img_fd,rb,PDD1_SECTOR_ID_LEN)<0) {
+	if (write(disk_img_fd,rb,SECTOR_ID_LEN)<0) {
 		dbg(0,"%s\n",strerror(errno));
 		(void)(close(disk_img_fd)+1);
 		ret_fdc_std(ERR_FDC_READ,tp,0);
@@ -721,7 +763,7 @@ void req_fdc_write_id(int tp) {
 void req_fdc_write_sector(int tp,int tl) {
 	dbg(2,"%s(%d,%d)\n",__func__,tp,tl);
 	if (open_disk_image(tp,O_RDWR,ALLOW_RET)) return; // open & seek to tp
-	if (read(disk_img_fd,rb,mlen)!=mlen) { // read ID section
+	if (read(disk_img_fd,rb,SECTOR_HEADER_LEN)!=SECTOR_HEADER_LEN) { // read header
 		dbg(0,"failed read ID\n");
 		(void)(close(disk_img_fd)+1);
 		ret_fdc_std(ERR_FDC_READ,tp,0);
@@ -731,7 +773,7 @@ void req_fdc_write_sector(int tp,int tl) {
 	int l = lsc_to_len(rb[0]); // get logical size from header
 
 	// seek to target_physical*full_sectors + header + target_logical*logical_size
-	int s = (tp*(mlen+dlen))+mlen+((tl-1)*l);
+	int s = (tp*SECTOR_LEN)+SECTOR_HEADER_LEN+((tl-1)*l);
 	if (lseek(disk_img_fd,s,SEEK_SET)!=s) {
 		dbg(0,"failed seek %d : %s\n",s,strerror(errno));
 		(void)(close(disk_img_fd)+1);
@@ -1367,7 +1409,6 @@ void req_cache(unsigned char* b) {
 	int s=b[6];
 	if (t>=PDD2_TRACKS || s>=PDD2_SECTORS) { ret_cache(ERR_PARAM); return; }
 	int rn = t*2 + s; // convert track#:sector# to linear record#
-	int rl = mlen+dlen;
 	int e;
 
 	switch (a) {
@@ -1381,8 +1422,8 @@ void req_cache(unsigned char* b) {
 				case ERR_FDC_SUCCESS: e=ERR_SUCCESS;
 			}
 			if (e) { ret_cache(e); return; }
-			memset(rb,0x00,rl);
-			if (read(disk_img_fd,rb,rl)!=rl) {
+			memset(rb,0x00,SECTOR_LEN);
+			if (read(disk_img_fd,rb,SECTOR_LEN)!=SECTOR_LEN) {
 				dbg(2,"failed cache load\n");
 				(void)(close(disk_img_fd)+1);
 				ret_cache(ERR_DEFECTIVE);
@@ -1400,7 +1441,7 @@ void req_cache(unsigned char* b) {
 				case ERR_FDC_SUCCESS: e=ERR_SUCCESS;
 			}
 			if (e) { ret_cache(e); return; }
-			if (write(disk_img_fd,rb,rl)!=rl) {
+			if (write(disk_img_fd,rb,SECTOR_LEN)!=SECTOR_LEN) {
 				dbg(2,"failed cache commit\n");
 				(void)(close(disk_img_fd)+1);
 				ret_cache(ERR_DEFECTIVE);
@@ -1409,7 +1450,7 @@ void req_cache(unsigned char* b) {
 		default: ret_cache(ERR_PARAM); return;
 	}
 	(void)(close(disk_img_fd)+1);
-	dbg_b(3,rb,rl);
+	dbg_b(3,rb,SECTOR_LEN);
 	ret_cache(ERR_SUCCESS);
 }
 
@@ -1469,6 +1510,10 @@ void req_cache(unsigned char* b) {
  *      b[5+] data       dlen bytes
  * b[#] chk
  */
+// TODO - construct a mockup of the 2k drive ram
+// and allow reading from anywhere in it,
+// rather than just the sector ID part.
+// Client requested address minus 0x8000 = offset into 2k virtual drive ram.
 void req_mem_read(unsigned char* b) {
 	dbg(3,"%s()\n",__func__);
 	if (model==1) return;
@@ -1478,13 +1523,16 @@ void req_mem_read(unsigned char* b) {
 	int e = -1;
 	dbg(2,"mem_read: area:%u  offset:%u  len:%u\n",a,o,l);
 	switch (a) {
-		case MEM_CACHE:
-			if (o+l>SECTOR_DATA_LEN || l>PDD2_MEM_READ_MAX) e=ERR_PARAM;
-			o+=PDD2_SECTOR_META_LEN; // shift offset past metadata field
-			break;
 		case MEM_CPU:
-			if (o==PDD2_META_ADDR) { o=0; if (l>PDD2_SECTOR_META_LEN) e=ERR_PARAM; } // set offset to start of metadata field
-			else e=ERR_PARAM; // this is wrong, real drive returns all kinds of data
+			// read from the ID section - offset=0  len=SECTOR_HEADER_LEN
+			// cpu memory address 0x8004 is offset 0 in the disk image sector
+			if (o==PDD2_ID_ADDR) { o=0; if (l>SECTOR_HEADER_LEN) e=ERR_PARAM; }
+			else e=ERR_PARAM; // real drive allows reading from anywhere in ram but we don't support that yet
+			break;
+		case MEM_CACHE:
+			// read from the DATA section
+			if (o+l>SECTOR_DATA_LEN || l>PDD2_MEM_READ_MAX) e=ERR_PARAM;
+			o+=SECTOR_HEADER_LEN; // shift offset past header
 			break;
 		default: e=ERR_PARAM;
 	}
@@ -1526,10 +1574,10 @@ void req_mem_write(unsigned char* b) {
 	switch (a) {
 		case MEM_CACHE:
 			if (o+l>SECTOR_DATA_LEN || l>PDD2_MEM_WRITE_MAX) e=ERR_PARAM;
-			o+=PDD2_SECTOR_META_LEN; // shift offset past metadata field
+			o+=SECTOR_HEADER_LEN; // shift offset past header
 			break;
 		case MEM_CPU:
-			if (o==PDD2_META_ADDR) { o=0 ;if (l>PDD2_SECTOR_META_LEN) e=ERR_PARAM; } // set offset to start of metadata field
+			if (o==PDD2_ID_ADDR) { o=0 ;if (l>SECTOR_HEADER_LEN) e=ERR_PARAM; } // set offset to start of header
 			else e=ERR_SUCCESS; // thumbs-up but don't actually do anything
 			break;
 		default: e=ERR_PARAM;
@@ -1539,9 +1587,9 @@ void req_mem_write(unsigned char* b) {
 
 	// copy data from client over part of rb[]
 	dbg_b(3,b+s,l);
-	dbg_b(3,rb,mlen+dlen);
+	dbg_b(3,rb,SECTOR_LEN);
 	memcpy(rb+o,b+s,l);
-	dbg_b(3,rb,mlen+dlen);
+	dbg_b(3,rb,SECTOR_LEN);
 	ret_cache(ERR_SUCCESS);
 }
 
@@ -1646,7 +1694,6 @@ void req_condition() {
 //   then: write 0x80 at sector 0 byte 1240 (aka physical:0 logical:20 byte:25 counting from 1)
 void req_format() {
 	dbg(2,"%s()\n",__func__);
-	const int rl = mlen+dlen; // img file record length
 	const int rc = model==1?(PDD1_TRACKS*PDD1_SECTORS):(PDD2_TRACKS*PDD2_SECTORS); // records count
 	int rn = 0;          // record number
 
@@ -1671,12 +1718,12 @@ void req_format() {
 	// We exactly mimick that here "just because", even though the LSC 1s
 	// don't seem to actually matter and we could just make all LSC 0.
 	for (rn=0;rn<rc;rn++) {
-		memset(rb,0x00,rl);
+		memset(rb,0x00,SECTOR_LEN);
 		switch (model) {
-			case 1: if (rn==0) rb[PDD1_SECTOR_META_LEN+SMT_OFFSET]=PDD1_SMT; else rb[0]=1; break;
-			default: rb[0]=0x16; if (rn<2) { rb[1]=0xFF; rb[PDD2_SECTOR_META_LEN+SMT_OFFSET]=PDD2_SMT; }
+			case 1: if (rn==0) rb[SECTOR_HEADER_LEN+SMT_OFFSET]=PDD1_SMT; else rb[0]=1; break;
+			default: rb[0]=0x16; if (rn<2) { rb[1]=0xFF; rb[SECTOR_HEADER_LEN+SMT_OFFSET]=PDD2_SMT; }
 		}
-		if (write(disk_img_fd,rb,rl)<0) break;
+		if (write(disk_img_fd,rb,SECTOR_LEN)<0) break;
 	}
 
 	if (rn<rc) {
@@ -1795,11 +1842,15 @@ void get_opr_cmd(void) {
 		case REQ_RENAME+0x40:
 		case REQ_RENAME:        req_rename(b);       break;
 		case REQ_VERSION:       ret_version();       break;
+		case REQ_CACHE-0x22:
 		case REQ_CACHE:         req_cache(b);        break;
+		case REQ_MEM_READ-0x22:
 		case REQ_MEM_READ:      req_mem_read(b);     break;
+		case REQ_MEM_WRITE-0x22:
 		case REQ_MEM_WRITE:     req_mem_write(b);    break;
-		case REQ_UNDOC11:
+		case REQ_SYSINFO-0x22:
 		case REQ_SYSINFO:       ret_sysinfo();       break;
+		case REQ_EXEC-0x22:
 		case REQ_EXEC:          req_exec(b);         break;
 		default: dbg(1,"OPR: unknown cmd \"0x%02X\"\n",b[0]); dbg_p(1,b);
 		// local msg, nothing to client
@@ -1812,24 +1863,32 @@ void get_opr_cmd(void) {
 //
 
 void show_bootstrap_help() {
-	dbg(0,"%1$s - DeskLink+ " APP_VERSION " - \"bootstrap\" help\n\n"
-		"Available loader files (in %2$s):\n\n",args[0],app_lib_dir);
+	dbg(0,"Available support files in %s\n\n",app_lib_dir);
 
-	dbg(0,  "TRS-80 Model 100/102 :"); lsx(app_lib_dir,"100");
-	dbg(0,"\nTANDY Model 200      :"); lsx(app_lib_dir,"200");
-	dbg(0,"\nNEC PC-8201/PC-8300  :"); lsx(app_lib_dir,"NEC");
-	dbg(0,"\nKyotronic KC-85      :"); lsx(app_lib_dir,"K85");
-	dbg(0,"\nOlivetti M-10        :"); lsx(app_lib_dir,"M10");
+	dbg(0,"Loader files for use with -b:\n"
+	      "-----------------------------\n");
+	dbg(0,  "TRS-80 Model 100/102 :"); lsx(app_lib_dir,"100"," %s");
+	dbg(0,"\nTANDY Model 200      :"); lsx(app_lib_dir,"200"," %s");
+	dbg(0,"\nNEC PC-8201/PC-8300  :"); lsx(app_lib_dir,"NEC"," %s");
+	dbg(0,"\nKyotronic KC-85      :"); lsx(app_lib_dir,"K85"," %s");
+	dbg(0,"\nOlivetti M-10        :"); lsx(app_lib_dir,"M10"," %s");
+
+	dbg(0,"\n\nDisk image files for use with -i:\n"
+	          "---------------------------------\n");
+	lsx(app_lib_dir,"pdd1","%s\n");
+	dbg(0,"\n");
+	lsx(app_lib_dir,"pdd2","%s\n");
 
 	dbg(0,
-		"\n\n"
-		"Filenames given without any path are searched from above\n"
+		"\n"
+		"Filenames given without any path are searched from %2$s\n"
 		"as well as the current dir.\n"
 		"Examples:\n\n"
 		"   %1$s -b TS-DOS.100\n"
 		"   %1$s -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100\n"
-		"   %1$s -b ./rxcini.DO\n\n"
-	,args[0]);
+		"   %1$s -vb rxcini.DO && %1$s -vu\n"
+		"   %1$s -vue -m 1 -i Sardine_American_English.pdd1\n\n"
+	,args[0],app_lib_dir);
 }
 
 void slowbyte(uint8_t b) {
@@ -1962,7 +2021,7 @@ void show_config () {
 
 void show_main_help() {
 	dbg(0,
-		"%1$s - DeskLink+ " APP_VERSION " - main help\n\n"
+		"%1$s - " APP_NAME " " APP_VERSION " - main help\n\n"
 		"usage: %1$s [options] [tty_device] [share_path]\n"
 		"\n"
 		"options:\n"
@@ -1996,7 +2055,7 @@ void show_main_help() {
 }
 
 int main(int argc, char** argv) {
-	dbg(0,"DeskLink2 " APP_VERSION "\n");
+	dbg(0,APP_NAME " " APP_VERSION "\n");
 
 	int i;
 	bool x = false;
@@ -2061,10 +2120,8 @@ int main(int argc, char** argv) {
 
 	// auto-completes & fixups
 	if (model<1||model>2) model=2;
-	if (model==1) mlen = PDD1_SECTOR_META_LEN;
 	resolve_client_tty_name();
-	find_lib_file(disk_img_fname);
-	if (disk_img_fname[0]) rb = malloc(mlen+dlen);
+	check_disk_image();
 	find_lib_file(bootstrap_fname);
 	(void)(getcwd(cwd,PATH_MAX-1)+1);
 

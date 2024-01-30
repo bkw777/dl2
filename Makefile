@@ -1,4 +1,4 @@
-# Makefile for DeskLink+
+# Makefile for DeskLink2
 
 OS ?= $(shell uname)
 CC ?= gcc
@@ -6,10 +6,12 @@ CFLAGS += -O2 -Wall
 #CFLAGS += -std=c99 -D_DEFAULT_SOURCE    # prove the code is still plain c
 #CFLAGS += SHOWBYTES_A # bootstrap() display non-printing bytes differently
 #CFLAGS += SHOWBYTES_B # bootstrap() display non-printing bytes differently
+#CFLAGS += NADSBOX_EXTENSIONS # placeholder but not implemented
 PREFIX ?= /usr/local
-APP_NAME := dl
-APP_LIB_DIR := $(PREFIX)/lib/$(APP_NAME)
-APP_DOC_DIR := $(PREFIX)/share/doc/$(APP_NAME)
+NAME := dl
+APP_NAME := DeskLink2
+APP_LIB_DIR := $(PREFIX)/lib/$(NAME)
+APP_DOC_DIR := $(PREFIX)/share/doc/$(NAME)
 APP_VERSION := $(shell git describe --long 2>&-)
 
 CLIENT_LOADERS := \
@@ -78,6 +80,7 @@ ifeq ($(OS),Windows_NT)
 endif
 
 DEFINES := \
+	-DAPP_NAME=\"$(APP_NAME)\" \
 	-DAPP_VERSION=\"$(APP_VERSION)\" \
 	-DAPP_LIB_DIR=\"$(APP_LIB_DIR)\" \
 	-DDEFAULT_CLIENT_TTY=\"$(DEFAULT_CLIENT_TTY)\"
@@ -87,12 +90,12 @@ ifdef DEBUG
 endif
 
 .PHONY: all
-all: $(APP_NAME)
+all: $(NAME)
 
-$(APP_NAME): $(SOURCES) $(HEADERS)
+$(NAME): $(SOURCES) $(HEADERS)
 	$(CC) $(CFLAGS) $(DEFINES) $(SOURCES) $(LDLIBS) -o $(@)
 
-install: $(APP_NAME) $(CLIENT_LOADERS) $(LIB_OTHER) $(DOCS)
+install: $(NAME) $(CLIENT_LOADERS) $(LIB_OTHER) $(DOCS)
 	mkdir -p $(APP_LIB_DIR)
 	for s in $(CLIENT_LOADERS) ;do \
 		d=$(APP_LIB_DIR)/$${s##*/} ; \
@@ -110,11 +113,11 @@ install: $(APP_NAME) $(CLIENT_LOADERS) $(LIB_OTHER) $(DOCS)
 		install $(INSTALLOWNER) -m 0644 $${s} $${d} ; \
 	done
 	mkdir -p $(PREFIX)/bin
-	install $(INSTALLOWNER) -m 0755 $(APP_NAME) $(PREFIX)/bin/$(APP_NAME)
+	install $(INSTALLOWNER) -m 0755 $(NAME) $(PREFIX)/bin/$(NAME)
 	install $(INSTALLOWNER) -m 0755 co2ba.sh $(PREFIX)/bin/co2ba
 
 uninstall:
-	rm -rf $(APP_LIB_DIR) $(APP_DOC_DIR) $(PREFIX)/bin/$(APP_NAME) $(PREFIX)/bin/co2ba
+	rm -rf $(APP_LIB_DIR) $(APP_DOC_DIR) $(PREFIX)/bin/$(NAME) $(PREFIX)/bin/co2ba
 
 clean:
-	rm -f $(APP_NAME)
+	rm -f $(NAME)
