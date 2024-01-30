@@ -15,7 +15,6 @@ $ sudo make uninstall
 ```
 $ dl -h
 DeskLink2 v2.0.000-61-g25f82e2
-dl - DeskLink2 v2.0.000-61-g25f82e2 - main help
 
 usage: dl [options] [tty_device] [share_path]
 

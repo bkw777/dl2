@@ -2020,9 +2020,7 @@ void show_config () {
 }
 
 void show_main_help() {
-	dbg(0,
-		//"%1$s - " APP_NAME " " APP_VERSION "\n\n"
-		"usage: %1$s [options] [tty_device] [share_path]\n"
+	dbg(0,"\nusage: %1$s [options] [tty_device] [share_path]\n"
 		"\n"
 		"options:\n"
 		"   -0       Raw mode - no filename munging, attr = ' '\n"
