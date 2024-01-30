@@ -2021,7 +2021,7 @@ void show_config () {
 
 void show_main_help() {
 	dbg(0,
-		"%1$s - " APP_NAME " " APP_VERSION " - main help\n\n"
+		//"%1$s - " APP_NAME " " APP_VERSION "\n\n"
 		"usage: %1$s [options] [tty_device] [share_path]\n"
 		"\n"
 		"options:\n"
