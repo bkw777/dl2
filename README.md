@@ -14,8 +14,8 @@ $ sudo make uninstall
 ## Manual
 ```
 $ dl -h
-DeskLink+ v1.5.010-90-gf089dd1
-dl - DeskLink+ v1.5.010-90-gf089dd1 - main help
+DeskLink2 v2.0.000-61-g25f82e2
+dl - DeskLink2 v2.0.000-61-g25f82e2 - main help
 
 usage: dl [options] [tty_device] [share_path]
 
@@ -30,43 +30,52 @@ options:
    -i file  Disk image file for raw sector access, TPDD1 only
    -l       List loader files and show bootstrap help
    -m model Model: 1 for TPDD1, 2 for TPDD2 (2)
-   -p dir   Share path - directory with files to be served (.)
+   -p dir   Share path - directory with files to be served (./)
    -r       RTS/CTS hardware flow control
    -s #     Speed - serial port baud rate 9600 or 19200 (19200)
    -u       Uppercase all filenames
    -v       Verbose/debug mode - more v's = more verbose
    -w       WP-2 mode - 8.2 filenames
-   -z #     Milliseconds per byte for bootstrap (7)
+   -z #     Milliseconds per byte for bootstrap (8)
 
 The 1st non-option argument is another way to specify the tty device.
 The 2nd non-option argument is another way to specify the share path.
 
    dl
-   dl -vvvu -p ~/Downloads/REX/ROMS
-   dl -vw ttyUSB1 ~/Documents/wp2files
+   dl -vvu -p ~/Downloads/REX/ROMS
+   dl -v -w ttyUSB1 ~/Documents/wp2files
 
 $ 
 ```
 ```
 $ dl -l
-dl - DeskLink+ v1.5.010-47-g93f3db4 - "bootstrap" help
+DeskLink2 v2.0.000-61-g25f82e2
+Available support files in /usr/local/lib/dl
 
-Available loader files (in /usr/local/lib/dl):
+Loader files for use with -b:
+-----------------------------
+TRS-80 Model 100/102 : PAKDOS.100 TINY.100 D.100 TEENY.100 TS-DOS.100 DSKMGR.100 TSLOAD.100
+TANDY Model 200      : PAKDOS.200 TEENY.200 TSLOAD.200 TS-DOS.200 DSKMGR.200
+NEC PC-8201/PC-8300  : TS-DOS.NEC TEENY.NEC
+Kyotronic KC-85      : Disk_Power.K85 DSKMGR.K85
+Olivetti M-10        : TEENY.M10 DSKMGR.M10
 
-TRS-80 Model 100 & 102 : TEENY.100 TINY.100 TS-DOS.100 DSKMGR.100
-TANDY Model 200        : TEENY.200 TS-DOS.200 DSKMGR.200
-NEC PC-8201(a)/PC-8300 : TEENY.NEC TS-DOS.NEC
-Kyotronic KC-85        : DSKMGR.K85 Disk_Power.K85
-Olivetti M-10          : DSKMGR.M10 TEENY.M10
+Disk image files for use with -i:
+---------------------------------
+Sardine_American_English.pdd1
+Disk_Power.K85.pdd1
 
-Filenames without any leading path are searched from above
-if not found in the current directory.
+
+Filenames given without any path are searched from /usr/local/lib/dl
+as well as the current dir.
 Examples:
 
    dl -b TS-DOS.100
-   dl -vb ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
-   dl -vb rxcini.DO
+   dl -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
+   dl -vb rxcini.DO && dl -vu
+   dl -vue -m 1 -i Sardine_American_English.pdd1
 
+$
 ```
 
 Several of the above settings can alternatively be supplied via environment variables, as well as a few other [hacky extra options](ref/advanced_options.txt)

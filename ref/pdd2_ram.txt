@@ -1,0 +1,36 @@
+TPDD2 2k ram map
+
+read sector 68 from disk into cache
+sector 68 is track 34 sector 0
+PDD(pdd2[0]:6.2,F)> cache 34 0 0
+
+read the entire 2k external ram
+PDD(pdd2[0]:6.2,F)> mem_read 1 0x8000 0x800
+
+2k ram includes both the 1280 byte DATA and the 19-byte ID section
+ram starts at 0x8000
+ID starts at 0x8004
+DATA aka Sector Cache starts at 0x8013
+
+8000: 05  length MSB   always 0x0513 = 1299  
+8001: 13  length LSB
+8002: 44  sector number  0x44 = 68 = track 34 sector 0
+8003: 00  side# or logical size code? always 00
+8004: 96  start of ID
+8005: FF  
+8006: 46  
+8007: 75  end of 4-byte ID from BACKUP.BA
+8008: 00  
+8009: 00  
+800A: 00  
+800B: 00  
+800C: 00  
+800D: 00  
+800E: 00  
+800F: 00  end of full 12-byte ID
+8010: 00  logical size code? always 00 but can be written and read back from disk.
+8011: EC  ??? maybe id-crc msb   changes when id data changes & saved & reloaded from disk
+8012: 8E  ??? maybe id-crc lsb
+8013:     start of DATA
+...
+
