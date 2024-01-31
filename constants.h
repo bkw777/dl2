@@ -197,8 +197,8 @@
 //#define MODEL                  0xE1
 
 // flags
-#define FE_FLAGS_NONE          0x00
-#define FE_FLAGS_DIR           0x01
+#define FE_FLAGS_NONE          0
+#define FE_FLAGS_DIR           1
 #define NO_RET                 0
 #define ALLOW_RET              1
 #define CACHE_LOAD             0
@@ -213,6 +213,6 @@
 #define LOCAL_EOL 0x0A
 
 #define OPR_CMD_SYNC 0x5A
-#define FDC_CMD_EOL 0x0D
+#define FDC_CMD_EOL  0x0D
 
 #endif // PDD_CONSTANTS_H

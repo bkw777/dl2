@@ -117,17 +117,17 @@ This allows you to keep the TS-DOS and/or Sardine executables on the disk instea
 Similarly, a stand-alone program called TSLOAD is available that does the same thing. TSLOAD allows you to install an executable in ram that is much smaller than TS-DOS, and leave the actual TS-DOS executable on the disk. Then when you want to use TS-DOS, to run TSLOAD, and it loads TS-DOS from the disk and runs it, but does not install it.
 
 On a real drive this requires keeping a copy of DOS100.CO (or DOS200.CO, or DOSNEC.CO, and/or SAR100.CO, SAR200.CO etc) on a disk, or on every disk if you want to avoid having to swap them all the time.  
-On an emulator like dlplus, the equivalent of that would mean keeping a copy of DOS100.CO in whatever directory you are sharing.  
-Additionally, since dlplus can CD into subdirectories, and since UR2 doesn't know about subdirectories, it means you would also have to keep a copy in every subdirectory.  
-(if you didn't , then what can happen is, you cd into some directory without a copy of DOS100.CO in it, exit TS-DOS, and then you can never get back in to TS-DOS because the UR2/TSLOAD don't know about cding up to the root directory, they just try to load DOS100.CO, which fails. The only fix is to restart dlplus so it's no longer cd'd in some subdirectory, or copying DOS100.CO to the subdirectory on the host side.)
+On an emulator like dl2, the equivalent of that would mean keeping a copy of DOS100.CO in whatever directory you are sharing.  
+Additionally, since dl2 can CD into subdirectories, and since UR2 doesn't know about subdirectories, it means you would also have to keep a copy in every subdirectory.  
+(if you didn't , then what can happen is, you cd into some directory without a copy of DOS100.CO in it, exit TS-DOS, and then you can never get back in to TS-DOS because the UR2/TSLOAD don't know about cding up to the root directory, they just try to load DOS100.CO, which fails. The only fix is to restart dl2 so it's no longer cd'd in some subdirectory, or copying DOS100.CO to the subdirectory on the host side.)
 
-But this version of dlplus has special support for this feature so that the TS-DOS and Sardine entries in UR-II always work "by magic" in any directory, even if the files don't exist in the current working directory, or the share root, or anywhere within the shared tree.
+But dl2 has special support for this feature so that the TS-DOS and Sardine entries in UR-II always work "by magic" in any directory, even if the files don't exist in the current working directory, or the share root, or anywhere within the shared tree.
 
-There are copies of [DOS100.CO](clients/ts-dos/DOS100.CO), [DOS200.CO](clients/ts-dos/DOS200.CO), [DOSNEC.CO](clients/ts-dos/DOSNEC.CO) ,[SAR100.CO](clients/ts-dos/SAR100.CO) and [SAR200.CO](clients/ts-dos/SAR200.CO) installed to ```/usr/local/lib/dl``` by ```sudo make install```. (Sadly, no SARNEC.CO . It is known to have existed, but is currently still lost to time. If you have a copy, please upload it! There may or may not have ever existed any versions of TS-DOS or Sardine for Olivetti M10 or Kyotronic KC-85, but the code in dlplus is ready to support them if they ever turn up, or any other files you may wish to work by magic like that.)
+There are copies of [DOS100.CO](clients/ts-dos/DOS100.CO), [DOS200.CO](clients/ts-dos/DOS200.CO), [DOSNEC.CO](clients/ts-dos/DOSNEC.CO) ,[SAR100.CO](clients/ts-dos/SAR100.CO) and [SAR200.CO](clients/ts-dos/SAR200.CO) installed to ```/usr/local/lib/dl``` by ```sudo make install```. (Sadly, no SARNEC.CO . It is known to have existed, but is currently still lost to time. If you have a copy, please upload it! There may or may not have ever existed any versions of TS-DOS or Sardine for Olivetti M10 or Kyotronic KC-85, but the code in dl2 is ready to support them if they ever turn up, or any other files you may wish to work by magic like that.)
 
-When the client machine requests any of these filenames, dlplus first looks in the current directory like normal. If a file matching the requested filename is there, that is what is used, just like for any other file. This can be used to override the files bundled with dlplus, just for the current working directory.  
-Failing that, then it looks in the root share dir. This is another way to override the files bundled with dlplus, for the entire shared directory tree.  
-Failing that, it gets the file from /usr/local/lib/dl. These files are bundled with dlplus, and means you never have to manually supply DOS100.CO or any of the others in any share paths.  
+When the client machine requests any of these filenames, dl2 first looks in the current directory like normal. If a file matching the requested filename is there, that is what is used, just like for any other file. This can be used to override the files bundled with dl2, just for the current working directory.  
+Failing that, then it looks in the root share dir. This is another way to override the files bundled with dl2, for the entire shared directory tree.  
+Failing that, it gets the file from /usr/local/lib/dl. These files are bundled with dl2, and means you never have to manually supply DOS100.CO or any of the others in any share paths.  
 This way the TS-DOS and Sardine options in Ultimate ROM II always work "by magic" without you having to do anything to provide the files like with a real drive & disk, yet if you want to use some other version of the files, you can, by just placing them in the share path just like placing them on a disk.
 
 There are bootstrap installers for TSLOAD for Model 100 and 200 bundled with the other client installers.
@@ -155,7 +155,7 @@ Those examples are both TPDD1 disks, but both TPDD1 and TPDD2 are supported. The
 Example, using Sardine with a Model 100 with [Ultimate ROM II](http://www.club100.org/library/librom.html):  
 One way to use Sardine is to let UR-II load/unload the program from disk into ram on the fly instead of installing permanently in ram like normal. Sardine uses raw sector access commands to read a special dictionary data disk.  
 For this to work, UR-II has to be able to load SAR100.CO from a normal filesystem disk using normal file/filesystem access, and then SAR100.CO needs to be able to read raw sectors from the special dictionary data disk.  
-This involves two features of dlplus. First, **magic files**. SAR100.CO is one of the "magic" files bundled with the app, which are always loadable from a client at any time from any directory even if there is no such file in the directory being served as the virtual "disk". When UR-II tries to load a file by that particular name, if there is a file by that name in the current working directory it is used, but if there is no such file, dlplus just serves up the one from /usr/local/lib/dl, and the client never knows the difference.  
+This involves two features of dl2. First, **magic files**. SAR100.CO is one of the "magic" files bundled with the app, which are always loadable from a client at any time from any directory even if there is no such file in the directory being served as the virtual "disk". When UR-II tries to load a file by that particular name, if there is a file by that name in the current working directory it is used, but if there is no such file, dl2 just serves up the one from /usr/local/lib/dl, and the client never knows the difference.  
 Second, **disk image files and sector-access commands**. If a disk image file is loaded with the **-i** option, then when a client tries to use sector-access commands, they work, and the data reads from / writes to the image file. If the specified filename does not exist it will be created if/when the client issues a format command. If the specified filename does not exist and, is not given with any leading path, then it is searched for in /usr/local/lib/dl, as a few special disks are bundled with the app, and the Sardine dictionary disk is one such.  
 
 To try it out,  
@@ -164,8 +164,8 @@ To try it out,
 ```
 $ dl -vue -m 1 -i Sardine_American_English.pdd1
 ```
-This set of flags tells dlplus to strictly emulate a TPDD1, disable some TPDD2 features and TS-DOS directory support which confuse SAR100.CO, and use the Sardine American English dictionary disk image file for any sector-access commands the client might issue.  
-SAR100.CO is always being provided by default regardless of any commandline options so you don't have to do anything extra for that, and assuming "Sardine_American_English.pdd1" doesn't exist in your current working directory, dlplus will use the copy in /usr/local/lib/dl.  
+This set of flags tells dl2 to strictly emulate a TPDD1, disable some TPDD2 features and TS-DOS directory support which confuse SAR100.CO, and use the Sardine American English dictionary disk image file for any sector-access commands the client might issue.  
+SAR100.CO is always being provided by default regardless of any commandline options so you don't have to do anything extra for that, and assuming "Sardine_American_English.pdd1" doesn't exist in your current working directory, dl2 will use the copy in /usr/local/lib/dl.  
 The disk image file is marked read-only and behaves the same as a normal disk with the write-protect notch open (write-protected).  
 
 2: Enter the UR-2 menu.  
@@ -178,13 +178,13 @@ Notice the SARDIN entry now says "ON" under it.
 3: Enter T-Word and start a new document and type some text.  
 
 4: Press GRPH+F to invoke Sardine to spell-check the document.  
-This will invoke the SAR100.CO previously loaded, which will try to use TPDD1 FDC-mode sector access commands, wich dlplus will respond to with data from the .pdd1 file.  
+This will invoke the SAR100.CO previously loaded, which will try to use TPDD1 FDC-mode sector access commands, wich dl2 will respond to with data from the .pdd1 file.  
 
 Another example, [installing Disk Power for Kyotronic KC-85](clients/disk_power/Disk_Power.txt)
 
 Disk image files may be created 2 ways:  
 * One method is you may use the **dd** command within [pdd.sh](https://github.com/bkw777/pdd.sh) to read a real TPDD1 or TPDD2 disk from a real TPDD1 or TPDD2 drive, and output a disk image file.  
-* Another method is you may run `dl -v -m 1 -i filename.pdd1` (for TPDD1) or `dl -v -m 2 -i filename.pdd2` (for TPDD2) where filename.pddN either doesn't exist or is zero bytes, and then use a client (like TS-DOS or pdd.sh) to format the "disk". The format command will cause dlplus to generate the empty disk image.  
+* Another method is you may run `dl -v -m 1 -i filename.pdd1` (for TPDD1) or `dl -v -m 2 -i filename.pdd2` (for TPDD2) where filename.pddN either doesn't exist or is zero bytes, and then use a client (like TS-DOS or pdd.sh) to format the "disk". The format command will cause dl2 to generate the empty disk image.  
 In the case of TPDD1, there is more than one kind of format command. If the client uses the "Operation-mode" format command, the generated disk image will be a valid filesystem disk, which just means it will have a particular logical sector size (64 bytes) and valid Space Management Table and File Control Blocks. If the client uses the "FDC-mode" format command then the generated image will be a raw data format not a filesystem disk. This just means it will have whatever logical sector size was specified by the parameters to the format command, and no SMT or FCB data, and won't be usable for saving files. In both cases, this mimics what a real drive does.  
 TPDD2 does not have an "FDC-mode" and there is only one kind of format command and only one kind of new empty disk format.
 

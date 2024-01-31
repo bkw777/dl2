@@ -1,13 +1,13 @@
 /*
-DeskLink+
+DeskLink2
 Extensions and enhancements Copyright (C) 2005 John R. Hogerhuis
 Copyright (c) 2022 Gabriele Gorla
 
-DeskLink+ is free software; you can redistribute it and/or modify it
+DeskLink2 is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License version 2 or any
 later as version as published by the Free Software Foundation.  
 
-DeskLink+ is distributed in the hope that it will be useful, but
+DeskLink2 is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 General Public License for more details.

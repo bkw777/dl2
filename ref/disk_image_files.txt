@@ -1,9 +1,6 @@
 Disk Image Files
 
-This feature is new and limited at present.
-
-The -i option takes a filename of a disk image file of a TPDD1/FB-100 or
-TPDD2 disk image.
+The -i option takes a filename of a disk image file.
 
 If the file does not already exist, and the client issues a format command,
 the file will be created and filled with nulls and sector headers.
@@ -21,59 +18,58 @@ A *.pdd2 TPDD2 disk image file is composed of 160 records.
 Each record is composed of 3 fields: ID, unknown, DATA
 
    +----------+------------------------------------------------+
-   |    ID    |    ?   |                DATA                   |
+   |    ID    |   ?    |                DATA                   |
    +----------+--------+---------------------------------------+
    | 12 bytes | 1 byte |             1280 bytes                |
    +----------+--------+---------------------------------------+
 
 The unknown byte on tpdd2 is an extra byte that isn't described in the
-manual, but exists in ram after the ID section, and it can be written
-and read back from disk, so it is part of the disk image format.
+manual, but exists in ram on a drive after the ID section, and it can be
+written and read back from disk, so it is part of the disk image format.
 
-There are no delimiters or other formatting bytes anywhere.
-
-See the software manual in the ref/ directory and github.com/bkw777/pdd.sh
-for the info about the contents of the fields and how they are accessed.
+There are no delimiters or other formatting or header.
 
 Currently, disk image files are only usable for sector access commands.
-Meaning you can not use dlplus to access the files within a disk image,
+Meaning you can not use dl2 to access the files within a disk image,
 only read and write the raw sectors.
 
 Two example uses so far are the dictionary disk for Sardine,
 and the install disk for Disk Power KC-85.
 
-Sardine's dictionary disk is a pure data disk with no filesystem.
+Sardine's dictionary disk is a pure data disk with no filesystem,
+and so Sardine uses FDC-mode to access the sectors like a database.
 
-Disk Power's install disk is a normal disk with a filesystem and files,
-but the installer uses sector-access commands to read 4 64-byte chunks
-of raw data from an unmarked sector.
+The install disk for Disk Power is seemingly a normal disk with a filesystem
+and files, but there is also non-file data in some sectors that the filesystem
+doesn't know about, and the installer uses sector-access commands to read
+4 64-byte chunks of raw data from an unmarked sector.
 
 Generally, you also need to use some extra commandline options to disable
-TS-DOS DME support (-e), and to force TPDD1-only or TPDD2-only emulation
-(-m 1) or (-m 2). Example:
+TS-DOS directory extensions support (-e), and to force stricter TPDD1-only
+or TPDD2-only emulation (-m 1) or (-m 2). Example:
 
 $ dl -vue -m 1 -i Sardine_American_English.pdd1
 
 It's not a requirement to use disk images in general, it's just that in both
-real examples known so far, the client software triggers unexpected responses
+of these real examples above, the client software triggers unexpected responses
 from the server that a real drive wouldn't do, so the extra options make the
 server act more like a real drive, as the client software expects.
 
 Disk image files can be created with https://github.co/bkw777/pdd.sh
 
-dlplus can also create new disk images from client-issued format and sector
+dl2 can also create new disk images from client-issued format and sector
 access commands. Example: run "$ dl -vve -m 1 -i ./newdisk.pdd1"
-and then use a client to "format" and write data with sector access commands.
+and then use a client to "format" the "disk".
 
-For TPDD1, both the fdc-mode the opr-mode format commands do what a real drive
-does. The fdc-mode format just generates all nulls and the one logical size
-code byte per record, which creates a raw data disk with no filesystem like the
-Sardine dictionary disk. The opr-mode format command does the same as fdc-mode
-format with logical size code 0 (64-byte logical sectors) and then writes the
-single byte of non-null data at the right address to create a valid Space
-Management Table, which makes the disk into a functioning filesystem disk.
-(If you took the generated .pdd1 or .pdd2 file and used pdd.sh to "restore" it
-to a real disk, that disk would be a functioning filesystem disk)
+For TPDD1, both the FDC-mode the Operation-mode format commands do what a real
+drive does. The FDC-mode format just generates all nulls and the one logical
+size code byte per record, which creates a raw data disk with no filesystem,
+like the Sardine dictionary disk. The Operation-mode format command does the
+same as FDC-mode format with logical size code 0 (64-byte logical sectors) and
+then writes the single byte of non-null data at the right address to create a
+valid Space Management Table, which makes the disk into a functioning filesystem
+disk. (If you took the generated .pdd1 or .pdd2 file and used pdd.sh to "restore"
+it to a real disk, that disk would be a functioning filesystem disk)
 
 Real disks can only be dumped or restored using the matching type of drive.  
 Although a real TPDD2 drive can at least read a TPDD1 disk, you must use a
