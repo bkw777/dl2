@@ -168,7 +168,7 @@
 #define PDD1_SMT              0x80
 #define PDD2_SMT              0xC0
 #define RAM_ADDR              0x8000
-#define RAM_LEN               0x1000
+#define RAM_LEN               0x0800
 #define PDD2_ID_ADDR          (RAM_ADDR+0x0004)
 #define PDD2_MEM_READ_MAX     252 // real drive absolute limit
 #define PDD2_MEM_WRITE_MAX    127 // real drive absolute limit
@@ -197,6 +197,8 @@
 //#define SECTOR_CACHE_LEN_LSB   0x00 // SECTOR_SIZE_LSB
 #define SYSINFO_CPU            0x10 // 0x10 = HD6301
 //#define MODEL                  0xE1
+
+#define PDD2_CACHE_ADDR (SECTOR_CACHE_START_MSB*256+SECTOR_CACHE_START_LSB)
 
 // flags
 #define FE_FLAGS_NONE          0
