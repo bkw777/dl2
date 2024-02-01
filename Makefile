@@ -61,7 +61,7 @@ SOURCES := dl.c dir_list.c
 HEADERS := dir_list.h constants.h
 
 ifeq ($(OS),Darwin)
- TTY_PREFIX := cu.
+ TTY_PREFIX := cu.usbserial
 else
  ifneq (,$(findstring BSD,$(OS)))
   TTY_PREFIX := ttyU
