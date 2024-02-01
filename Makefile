@@ -61,14 +61,14 @@ SOURCES := dl.c dir_list.c
 HEADERS := dir_list.h constants.h
 
 ifeq ($(OS),Darwin)
- #DEFAULT_CLIENT_TTY := cu.*
+ TTY_PREFIX := cu.
 else
  ifneq (,$(findstring BSD,$(OS)))
-  DEFAULT_CLIENT_TTY := ttyU0
+  TTY_PREFIX := ttyU
  else ifeq ($(OS),Linux)
-  DEFAULT_CLIENT_TTY := ttyUSB0
+  TTY_PREFIX := ttyUSB
  else
-  DEFAULT_CLIENT_TTY := ttyS0
+  TTY_PREFIX := ttyS
  endif
  LDLIBS += -lutil
 endif
@@ -83,7 +83,7 @@ DEFINES := \
 	-DAPP_NAME=\"$(APP_NAME)\" \
 	-DAPP_VERSION=\"$(APP_VERSION)\" \
 	-DAPP_LIB_DIR=\"$(APP_LIB_DIR)\" \
-	-DDEFAULT_CLIENT_TTY=\"$(DEFAULT_CLIENT_TTY)\"
+	-DTTY_PREFIX=\"$(TTY_PREFIX)\"
 
 ifdef DEBUG
  CFLAGS += -g

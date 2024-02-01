@@ -66,15 +66,15 @@ MA 02111, USA.
 
 
 #ifndef APP_NAME
-#define APP_NAME "DeskLink"
+#define APP_NAME "DeskLink2"
 #endif
 
 #ifndef APP_LIB_DIR
 #define APP_LIB_DIR "."
 #endif
 
-#ifndef DEFAULT_CLIENT_TTY
-#define DEFAULT_CLIENT_TTY "ttyS0"
+#ifndef TTY_PREFIX
+#define TTY_PREFIX "ttyS"
 #endif
 
 #ifndef DEFAULT_CLIENT_BAUD
@@ -129,7 +129,7 @@ bool rtscts = false;
 unsigned dot_offset = 6; // 0 for raw, 6 for KC-85, 8 for WP-2
 int client_baud = DEFAULT_CLIENT_BAUD;
 int BASIC_byte_us = DEFAULT_BASIC_BYTE_MS*1000;
-char client_tty_name[PATH_MAX] = DEFAULT_CLIENT_TTY;
+char client_tty_name[PATH_MAX] = {0x00};
 char disk_img_fname[PATH_MAX] = {0x00};
 char app_lib_dir[PATH_MAX] = APP_LIB_DIR;
 char dme_root_label[7] = DEFAULT_DME_ROOT_LABEL;
@@ -160,7 +160,7 @@ char ch[2] = {0xFF}; // 0x00 is a valid OPR command, so init to 0xFF
 //uint8_t img_header_len = SECTOR_HEADER_LEN;
 const uint16_t fdc_logical_size_codes[] = FDC_LOGICAL_SIZE_CODES;
 const char fdc_cmds[] = FDC_CMDS;
-uint8_t rb[2048] = {0x00}; // disk image record buffer / virtual pdd2 ram
+uint8_t rb[RAM_LEN] = {0x00}; // disk image record buffer / virtual pdd2 ram
 
 FILE_ENTRY* cur_file;
 int dir_depth=0;
@@ -302,9 +302,8 @@ int check_disk_image () {
 	if (disk_img_fname[0]) {
 		struct stat info;
 		stat(disk_img_fname, &info);
-		// allow missing or zero-byte file,
-		// we will create it if client issues format command
-		// but if file exists, sanity check based on size
+		// If file exists and >0 bytes, then sanity check based on the size,
+		// otherwise the format command will create it on the spot if needed.
 		if (info.st_size) {
 			if (model==1 && info.st_size != PDD1_IMG_LEN) {
 				dbg(0,"Expected TPDD1 disk image file size %u\n",PDD1_IMG_LEN);
@@ -316,37 +315,64 @@ int check_disk_image () {
 				dbg(0,"\"%s\" is %u\n",disk_img_fname,info.st_size);
 				return 1;
 			}
-			//printf("%s: size=%ld\n", disk_img_fname, info.st_size);
-			//if (model==2 && info.st_size == PDD2_TRACKS*PDD2_SECTORS*(OLD_PDD2_HEADER_LEN+SECTOR_DATA_LEN)) {
-			//	img_header_len = OLD_PDD2_HEADER_LEN;
-			//	dbg(0,"Detected OLD TPDD2 disk image file format\n");
-			//}
 		}
 	}
 	return 0;
 }
 
-// TODO - search for likely TTY(s) automatically
-/*
-void guess_client_tty () {
-	struct dirent *files;
+// search for TTY(s) matching prefix
+void find_ttys (char* f) {
+	dbg(3,"%s(%s)\n",__func__,f);
+
+	// open /dev
 	char path[] = "/dev/";
-	DIR *dir = opendir(path);
-	if (dir == NULL){dbg(0,"Cannot open \"%s\"",path); return;}
-	int i;
-	while ((files = readdir(dir)) != NULL) {
-		for (i=strlen(files->d_name);files->d_name[i]!='/';i--);
-		if (!strcmp(files->d_name+i+1,match)) dbg(0," %s",files->d_name);
+	DIR* dir = opendir(path);
+	if (!dir){dbg(0,"Cannot open \"%s\"\n",path); return;}
+
+	// read /dev
+	char** ttys = calloc(0,sizeof(*ttys));
+	struct dirent *files;
+	int i=0, l=strlen(f);
+	dbg(2,"Searching for \"%s%s*\"\n",path,f);
+	while ((files = readdir(dir))) {
+		if (files->d_type==DT_DIR) continue; // may do nothing on some systems but that's ok
+		if (strncmp(files->d_name,f,l)) continue;
+		ttys = realloc(ttys,++i*sizeof(*ttys));
+		ttys[i] = malloc(strlen(files->d_name)+1);
+		strcpy(ttys[i],files->d_name);
 	}
+
 	closedir(dir);
+
+	int n=0;
+	if (i==1) n=1;
+	while (!n) {
+		dbg(0,"\n");
+		for (n=1;n<=i;n++) dbg(0,"%d) %s\n",n,ttys[n]);
+		n=0; char a[6]={0};
+		dbg(0,"Which serial port is the TPDD client on (1-%d) ? ",i);
+		if (fgets(a,sizeof(a),stdin)) n=atoi(a);
+		if (n<1 || n>i) n=0;
+		if (a[0]=='q'||a[0]=='Q') break;
+	}
+
+	client_tty_name[0]=0x00;
+	if (n) {
+		strcpy(client_tty_name,path);
+		strcat(client_tty_name,ttys[n]);
+	}
+
+	free(ttys);
 }
-*/
 
 void resolve_client_tty_name () {
 	dbg(3,"%s()\n",__func__);
 	switch (client_tty_name[0]) {
-		case 0x00: break;
+		case 0x00:
+			find_ttys(TTY_PREFIX);
+			break;
 		case '-':
+			// stdin/stdout mode, silence all messages - untested
 			debug = 0;
 			strcpy (client_tty_name,"/dev/tty");
 			client_tty_fd=1;
@@ -376,10 +402,10 @@ void client_tty_vmt(int m,int t) {
 int open_client_tty () {
 	dbg(3,"%s()\n",__func__);
 
-	if (!strcmp(client_tty_name,"")) { show_main_help() ;dbg(0,"Error: No serial device specified\n"); return 1; }
+	if (!client_tty_name[0]) { show_main_help() ;dbg(0,"Error: No serial device specified\n"); return 1; }
 
 	dbg(0,"Opening \"%s\" ... ",client_tty_name);
-	// open with O_NONBLOCK to avoid hang from client not ready, then unset later.
+	// open with O_NONBLOCK to avoid hang if client not ready, then unset later.
 	if (client_tty_fd<0) client_tty_fd=open((char *)client_tty_name,O_RDWR|O_NOCTTY|O_NONBLOCK);
 	if (client_tty_fd<0) { dbg(0,"%s\n",strerror(errno)); return 1; }
 	dbg(0,"OK\n");
@@ -391,7 +417,7 @@ int open_client_tty () {
 #if !defined(_WIN)
 	if (getty_mode) {
 		debug = 0;
-		if (login_tty(client_tty_fd)==0) client_tty_fd = STDIN_FILENO;
+		if (!login_tty(client_tty_fd)) client_tty_fd = STDIN_FILENO;
 		else (void)(daemon(1,1)+1);
 	}
 #endif
@@ -1644,8 +1670,8 @@ void ret_sysinfo() {
 	gb[1]=0x06;
 	gb[2]=SECTOR_CACHE_START_MSB;
 	gb[3]=SECTOR_CACHE_START_LSB;
-	gb[4]=SECTOR_CACHE_LEN_MSB;
-	gb[5]=SECTOR_CACHE_LEN_LSB;
+	gb[4]=SECTOR_SIZE_MSB;
+	gb[5]=SECTOR_SIZE_LSB;
 	gb[6]=SYSINFO_CPU;
 	gb[7]=MODEL;
 	gb[8]=checksum(gb);
@@ -1709,7 +1735,7 @@ void req_format() {
 	if (e) { ret_std(e); return; }
 
 	// write the image
-	// Real drive TPDD1 fresh OPR-mode format is strange.
+	// Real drive TPDD1 fresh Operation-mode format is strange.
 	// Any sector with any data gets LSC 0, and all others get LSC 1.
 	// Later, any sector that gets used by a file gets changed from LSC 1 to
 	// LSC 0, and never changed back even when files are deleted.
@@ -2026,7 +2052,7 @@ void show_main_help() {
 		"   -0       Raw mode - no filename munging, attr = ' '\n"
 		"   -a c     Attr - attribute used for all files (%2$c)\n"
 		"   -b file  Bootstrap - send loader file to client\n"
-		"   -d tty   Serial device connected to client (" DEFAULT_CLIENT_TTY ")\n"
+		"   -d tty   Serial device connected to the client\n"
 		"   -e       Disable TS-DOS directory extension (enabled)\n"
 #if !defined(_WIN)
 		"   -g       Getty mode - run as daemon\n"
@@ -2118,7 +2144,9 @@ int main(int argc, char** argv) {
 
 	// auto-completes & fixups
 	if (model<1||model>2) model=2;
+
 	resolve_client_tty_name();
+
 	check_disk_image();
 	find_lib_file(bootstrap_fname);
 	(void)(getcwd(cwd,PATH_MAX-1)+1);
