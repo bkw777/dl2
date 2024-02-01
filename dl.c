@@ -156,11 +156,10 @@ char bootstrap_fname[PATH_MAX] = {0x00};
 int opr_mode = 1;
 uint8_t dme = 0;
 bool dme_disabled = false;
-char ch[2] = {0xFF}; // 0x00 is a valid OPR command, so init to 0xFF
-//uint8_t img_header_len = SECTOR_HEADER_LEN;
+char ch[2] = {0xFF}; // 0x00 is a valid Operation-mode command, so init to 0xFF
 const uint16_t fdc_logical_size_codes[] = FDC_LOGICAL_SIZE_CODES;
 const char fdc_cmds[] = FDC_CMDS;
-uint8_t rb[2048] = {0x00}; // disk image record buffer / virtual pdd2 ram
+uint8_t rb[RAM_LEN] = {0x00}; // disk image record buffer / virtual pdd2 ram
 
 FILE_ENTRY* cur_file;
 int dir_depth=0;
@@ -302,9 +301,8 @@ int check_disk_image () {
 	if (disk_img_fname[0]) {
 		struct stat info;
 		stat(disk_img_fname, &info);
-		// allow missing or zero-byte file,
-		// we will create it if client issues format command
-		// but if file exists, sanity check based on size
+		// If file exists >0 bytes, sanity check based on size,
+		// otherwise allow missing/empty, & format command will create as needed
 		if (info.st_size) {
 			if (model==1 && info.st_size != PDD1_IMG_LEN) {
 				dbg(0,"Expected TPDD1 disk image file size %u\n",PDD1_IMG_LEN);
@@ -316,31 +314,10 @@ int check_disk_image () {
 				dbg(0,"\"%s\" is %u\n",disk_img_fname,info.st_size);
 				return 1;
 			}
-			//printf("%s: size=%ld\n", disk_img_fname, info.st_size);
-			//if (model==2 && info.st_size == PDD2_TRACKS*PDD2_SECTORS*(OLD_PDD2_HEADER_LEN+SECTOR_DATA_LEN)) {
-			//	img_header_len = OLD_PDD2_HEADER_LEN;
-			//	dbg(0,"Detected OLD TPDD2 disk image file format\n");
-			//}
 		}
 	}
 	return 0;
 }
-
-// TODO - search for likely TTY(s) automatically
-/*
-void guess_client_tty () {
-	struct dirent *files;
-	char path[] = "/dev/";
-	DIR *dir = opendir(path);
-	if (dir == NULL){dbg(0,"Cannot open \"%s\"",path); return;}
-	int i;
-	while ((files = readdir(dir)) != NULL) {
-		for (i=strlen(files->d_name);files->d_name[i]!='/';i--);
-		if (!strcmp(files->d_name+i+1,match)) dbg(0," %s",files->d_name);
-	}
-	closedir(dir);
-}
-*/
 
 void resolve_client_tty_name () {
 	dbg(3,"%s()\n",__func__);
@@ -685,7 +662,7 @@ void req_fdc_read_sector(uint8_t tp,uint8_t tl) {
 	ret_fdc_std(ERR_FDC_SUCCESS,tp,l); // 1st stage response
 	char t=0x00;
 	read_client_tty(&t,1);  // read 1 byte from client
-	if (t==0x0D) write_client_tty(rb,l); // if it's \r send data
+	if (t==0x0D) write_client_tty(rb,l); // if it's \r send data, else silently abort
 }
 
 // ref/search_id_section.txt
@@ -1644,8 +1621,8 @@ void ret_sysinfo() {
 	gb[1]=0x06;
 	gb[2]=SECTOR_CACHE_START_MSB;
 	gb[3]=SECTOR_CACHE_START_LSB;
-	gb[4]=SECTOR_CACHE_LEN_MSB;
-	gb[5]=SECTOR_CACHE_LEN_LSB;
+	gb[4]=SECTOR_SIZE_MSB;
+	gb[5]=SECTOR_SIZE_LSB;
 	gb[6]=SYSINFO_CPU;
 	gb[7]=MODEL;
 	gb[8]=checksum(gb);
