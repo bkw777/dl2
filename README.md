@@ -14,26 +14,26 @@ $ sudo make uninstall
 ## Manual
 ```
 $ dl -h
-DeskLink2 v2.1.001-1-g4e64d0a
+DeskLink2 v2.1.001-2-gabcc469
 
 usage: dl [options] [tty_device] [share_path]
 
 options:
    -0       Raw mode - no filename munging, attr = ' '
-   -a c     Attr - attribute used for all files (F)
+   -a c     Attribute - attribute byte used for all files (F)
    -b file  Bootstrap - send loader file to client
    -d tty   Serial device connected to the client (ttyUSB*)
-   -e       Disable TS-DOS directory extension (enabled)
+   -n       Disable support for TS-DOS directories (enabled)
    -g       Getty mode - run as daemon
    -h       Print this help
-   -i file  Disk image file for raw sector access, TPDD1 only
+   -i file  Disk image filename for raw sector access
    -l       List loader files and show bootstrap help
-   -m model Model: 1 for FB-100/TPDD1, 2 for TPDD2 (2)
-   -p dir   Share path - directory with files to be served (./)
+   -m #     Model - 1 = FB-100/TPDD1, 2 = TPDD2 (2)
+   -p dir   Path - /path/to/dir with files to be served (./)
    -r       RTS/CTS hardware flow control
    -s #     Speed - serial port baud rate (19200)
    -u       Uppercase all filenames
-   -v       Verbose/debug mode - more v's = more verbose
+   -v       Verbosity - more v's = more verbose
    -w       WP-2 mode - 8.2 filenames
    -z #     Milliseconds per byte for bootstrap (8)
 
@@ -41,22 +41,22 @@ The 1st non-option argument is another way to specify the tty device.
 The 2nd non-option argument is another way to specify the share path.
 
    dl
-   dl -vvu -p ~/Downloads/REX/ROMS
+   dl -vv -p ~/Downloads/REX/ROMS
    dl -v -w ttyUSB1 ~/Documents/wp2files
 
 $ 
 ```
 ```
 $ dl -l
-DeskLink2 v2.1.001-1-g4e64d0a
+DeskLink2 v2.1.001-2-gabcc469
 Available support files in /usr/local/lib/dl
 
 Loader files for use with -b:
 -----------------------------
-TRS-80 Model 100/102 : D.100 TEENY.100 TSLOAD.100 TS-DOS.100 DSKMGR.100 TINY.100 PAKDOS.100
-TANDY Model 200      : TEENY.200 DSKMGR.200 TSLOAD.200 TS-DOS.200 PAKDOS.200
-NEC PC-8201/PC-8300  : TEENY.NEC TS-DOS.NEC
-Kyotronic KC-85      : DSKMGR.K85 Disk_Power.K85
+TRS-80 Model 100/102 : PAKDOS.100 TINY.100 D.100 TEENY.100 DSKMGR.100 TSLOAD.100 TS-DOS.100
+TANDY Model 200      : PAKDOS.200 TEENY.200 DSKMGR.200 TSLOAD.200 TS-DOS.200
+NEC PC-8201/PC-8300  : TS-DOS.NEC TEENY.NEC
+Kyotronic KC-85      : Disk_Power.K85 DSKMGR.K85
 Olivetti M-10        : TEENY.M10 DSKMGR.M10
 
 Disk image files for use with -i:
@@ -72,7 +72,7 @@ Examples:
    dl -b TS-DOS.100
    dl -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
    dl -vb rxcini.DO && dl -vu
-   dl -vue -m 1 -i Sardine_American_English.pdd1
+   dl -vun -m 1 -i Sardine_American_English.pdd1
 
 $
 ```
