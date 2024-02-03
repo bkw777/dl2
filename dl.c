@@ -1917,12 +1917,12 @@ void show_bootstrap_help() {
 	dbg(0,
 		"\n"
 		"Filenames given without any path are searched from %2$s\n"
-		"as well as the current dir.\n"
+		"as well as the current directory.\n"
 		"Examples:\n\n"
 		"   %1$s -b TS-DOS.100\n"
 		"   %1$s -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100\n"
 		"   %1$s -vb rxcini.DO && %1$s -vu\n"
-		"   %1$s -vue -m 1 -i Sardine_American_English.pdd1\n\n"
+		"   %1$s -vun -m 1 -i Sardine_American_English.pdd1\n\n"
 	,args[0],app_lib_dir);
 }
 
@@ -2054,22 +2054,22 @@ void show_main_help() {
 		"\n"
 		"options:\n"
 		"   -0       Raw mode - no filename munging, attr = ' '\n"
-		"   -a c     Attr - attribute used for all files (%2$c)\n"
+		"   -a c     Attribute - attribute byte used for all files (%2$c)\n"
 		"   -b file  Bootstrap - send loader file to client\n"
-		"   -d tty   Serial device connected to the client\n"
-		"   -e       Disable TS-DOS directory extension (enabled)\n"
+		"   -d tty   Serial device connected to the client (%4$s*)\n"
+		"   -n       Disable support for TS-DOS directories (enabled)\n"
 #if !defined(_WIN)
 		"   -g       Getty mode - run as daemon\n"
 #endif
 		"   -h       Print this help\n"
-		"   -i file  Disk image file for raw sector access, TPDD1 only\n"
+		"   -i file  Disk image filename for raw sector access\n"
 		"   -l       List loader files and show bootstrap help\n"
-		"   -m model Model: 1 for TPDD1, 2 for TPDD2 (2)\n"
-		"   -p dir   Share path - directory with files to be served (./)\n"
+		"   -m #     Model - 1 = FB-100/TPDD1, 2 = TPDD2 (2)\n"
+		"   -p dir   Path - /path/to/dir with files to be served (./)\n"
 		"   -r       RTS/CTS hardware flow control\n"
-		"   -s #     Speed - serial port baud rate 9600 or 19200 (19200)\n"
+		"   -s #     Speed - serial port baud rate (19200)\n"
 		"   -u       Uppercase all filenames\n"
-		"   -v       Verbose/debug mode - more v's = more verbose\n"
+		"   -v       Verbosity - more v's = more verbose\n"
 		"   -w       WP-2 mode - 8.2 filenames\n"
 		"   -z #     Milliseconds per byte for bootstrap (%3$d)\n"
 		"\n"
@@ -2077,9 +2077,9 @@ void show_main_help() {
 		"The 2nd non-option argument is another way to specify the share path.\n"
 		"\n"
 		"   %1$s\n"
-		"   %1$s -vvu -p ~/Downloads/REX/ROMS\n"
+		"   %1$s -vv -p ~/Downloads/REX/ROMS\n"
 		"   %1$s -v -w ttyUSB1 ~/Documents/wp2files\n\n"
-	,args[0],DEFAULT_ATTR,DEFAULT_BASIC_BYTE_MS);
+	,args[0],DEFAULT_ATTR,DEFAULT_BASIC_BYTE_MS,TTY_PREFIX);
 }
 
 int main(int argc, char** argv) {
@@ -2104,16 +2104,16 @@ int main(int argc, char** argv) {
 
 	// commandline
 #if defined(_WIN)
-	while ((i = getopt (argc, argv, ":0a:b:d:ehi:lm:p:rs:uvwz:^")) >=0)
+	while ((i = getopt (argc, argv, ":0a:b:d:nhi:lm:p:rs:uvwz:^")) >=0)
 #else
-	while ((i = getopt (argc, argv, ":0a:b:d:eghi:lm:p:rs:uvwz:^")) >=0)
+	while ((i = getopt (argc, argv, ":0a:b:d:nghi:lm:p:rs:uvwz:^")) >=0)
 #endif
 		switch (i) {
 			case '0': dot_offset=0; upcase=false; default_attr=RAW_ATTR;  break;
 			case 'a': default_attr=*strndup(optarg,1);                    break;
 			case 'b': strcpy(bootstrap_fname,optarg);                     break;
 			case 'd': strcpy(client_tty_name,optarg);                     break;
-			case 'e': dme_disabled = true;                                break;
+			case 'n': dme_disabled = true;                                break;
 #if !defined(_WIN)
 			case 'g': getty_mode = true; debug = 0;                       break;
 #endif
