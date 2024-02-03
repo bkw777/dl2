@@ -106,16 +106,8 @@ $ dl -vb TS-DOS.100
 
 ## "Magic Files" / Ultimate ROM II / TSLOAD
 There is a short list of filenames that are specially recognized:  
-  DOS100.CO
-  DOS200.CO
-  DOSNEC.CO
-  DOSM10.CO
-  DOSK85.CO
-  SAR100.CO
-  SAR200.CO
-  SARNEC.CO
-  SARM10.CO
-  SARK85.CO
+DOS100.CO, DOS200.CO, DOSNEC.CO, DOSM10.CO, DOSK85.CO  
+SAR100.CO, SAR200.CO, SARNEC.CO, SARM10.CO, SARK85.CO
 
 When a client requests any of these filenames, dl2 first looks in the current directory (the current directory that the client is CD'd into within the share path). If a file matching the requested filename is there, it is used, the same as for any other file.
 
@@ -124,11 +116,8 @@ Failing that, it looks in the root of the share path
 Failing that, it looks in /usr/local/lib/dl
 
 And some of those files are bundled with dl2 and installed in /usr/local/lib/dl:  
-  DOS100.CO
-  DOS200.CO
-  DOSNEC.CO
-  SAR100.CO
-  SAR200.CO
+DOS100.CO, DOS200.CO, DOSNEC.CO  
+SAR100.CO, SAR200.CO
 
 SARNEC.CO is known to have existed, but is currently lost.  
 The others probably never existed, but dl2 will recognize and serve them up if available just for completeness.
