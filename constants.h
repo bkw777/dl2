@@ -216,7 +216,13 @@
 #define BASIC_EOF 0x1A
 #define LOCAL_EOL 0x0A
 
+// drive command seperators
 #define OPR_CMD_SYNC 0x5A
 #define FDC_CMD_EOL  0x0D
+
+// terminal emulation
+#define SSO "\033[7m" // set standout
+#define RSO "\033[m"  // reset standout
+#define D8C "\033 F"  // disable 8-bit vtxx control bytes (0x80-0x9F)
 
 #endif // PDD_CONSTANTS_H

@@ -4,9 +4,6 @@ OS ?= $(shell uname)
 CC ?= gcc
 CFLAGS += -O2 -Wall
 #CFLAGS += -std=c99 -D_DEFAULT_SOURCE    # prove the code is still plain c
-#CFLAGS += SHOWBYTES_A # bootstrap() display non-printing bytes differently
-#CFLAGS += SHOWBYTES_B # bootstrap() display non-printing bytes differently
-#CFLAGS += NADSBOX_EXTENSIONS # placeholder but not implemented
 PREFIX ?= /usr/local
 NAME := dl
 APP_NAME := DeskLink2
@@ -83,7 +80,9 @@ DEFINES := \
 	-DAPP_NAME=\"$(APP_NAME)\" \
 	-DAPP_VERSION=\"$(APP_VERSION)\" \
 	-DAPP_LIB_DIR=\"$(APP_LIB_DIR)\" \
-	-DTTY_PREFIX=\"$(TTY_PREFIX)\"
+	-DTTY_PREFIX=\"$(TTY_PREFIX)\" \
+#	-DPRINT_8BIT \
+#	-DNADSBOX_EXTENSIONS \
 
 ifdef DEBUG
  CFLAGS += -g

@@ -87,13 +87,14 @@ MA 02111, USA.
 // TEENY.M10 requires 8-10
 #define DEFAULT_BASIC_BYTE_MS 8
 
-#define DEFAULT_TPDD_FILE_ATTR 0x46 // F
+#define DEFAULT_ATTR 0x46 // F
+#define RAW_ATTR     0x20 // space
 
 // To mimic the original Desk-Link from Travelling Software:
 //#define DEFAULT_DME_ROOT_LABEL   "ROOT  "
 //#define DEFAULT_DME_PARENT_LABEL "PARENT" // environment variables:
-#define DEFAULT_DME_ROOT_LABEL   "0:    "   // ROOT_LABEL='0:'   '-root-' 'C:\'
-#define DEFAULT_DME_PARENT_LABEL "^     "   // PARENT_LABEL='^:' '-back-' 'UP:'
+#define DEFAULT_DME_ROOT_LABEL   "0:    "   // ROOT_LABEL='0:'  '-root-' 'C:\'
+#define DEFAULT_DME_PARENT_LABEL "^     "   // PARENT_LABEL='^' '-back-' 'UP:'
 // this you can't change unless you also hack ts-dos
 #define DEFAULT_DME_DIR_LABEL    "<>"       // DIR_LABEL='/'
 
@@ -110,9 +111,9 @@ char * magic_files [] = {
 	"DOSNEC.CO",
 	"SAR100.CO",
 	"SAR200.CO",
-	"SARNEC.CO", // This is known to have existed, but is currently lost.
-	"DOSM10.CO", // The rest may have never existed,
-	"DOSK85.CO", // and the filenames are just guesses.
+	"SARNEC.CO", // SARNEC.CO is known to have existed, but is currently lost.
+	"DOSM10.CO", // From here down probably never existed.
+	"DOSK85.CO", //
 	"SARM10.CO", //
 	"SARK85.CO"  //
 };
@@ -120,6 +121,11 @@ char * magic_files [] = {
 // termios VMIN & VTIME
 #define C_CC_VMIN 1
 #define C_CC_VTIME 5
+
+// terminal emulation
+#define SSO "\033[7m" // set standout
+#define RSO "\033[m"  // reset standout
+#define D8C "\033 F"  // disable 8-bit vtxx control bytes (0x80-0x9F)
 
 /*************************************************************/
 
@@ -135,12 +141,11 @@ char app_lib_dir[PATH_MAX] = APP_LIB_DIR;
 char dme_root_label[7] = DEFAULT_DME_ROOT_LABEL;
 char dme_parent_label[7] = DEFAULT_DME_PARENT_LABEL;
 char dme_dir_label[3] = DEFAULT_DME_DIR_LABEL;
-char default_attr = DEFAULT_TPDD_FILE_ATTR;
+char default_attr = DEFAULT_ATTR;
 bool enable_magic_files = true;
 #if !defined(_WIN)
 bool getty_mode = false;
 #endif
-bool bootstrap_mode = false;
 int model = 2;
 
 char** args;
@@ -320,7 +325,7 @@ int check_disk_image () {
 	return 0;
 }
 
-// search for TTY(s) matching prefix
+// search for TTY(s) matching TTY_PREFIX
 void find_ttys (char* f) {
 	dbg(3,"%s(%s)\n",__func__,f);
 
@@ -329,7 +334,8 @@ void find_ttys (char* f) {
 	DIR* dir = opendir(path);
 	if (!dir){dbg(0,"Cannot open \"%s\"\n",path); return;}
 
-	// read /dev
+	// read /dev, look for all files beginning with prefix
+	// add any matches to ttys[]
 	char** ttys = calloc(0,sizeof(*ttys));
 	struct dirent *files;
 	int i=0, l=strlen(f);
@@ -345,8 +351,8 @@ void find_ttys (char* f) {
 	closedir(dir);
 
 	int n=0;
-	if (i==1) n=1;
-	while (!n) {
+	if (i==1) n=1; // if there is only one element in ttys[], use it
+	while (!n) {   // otherwise dislplay a menu of ttys[] and ask user to pick one
 		dbg(0,"\n");
 		for (n=1;n<=i;n++) dbg(0,"%d) %s\n",n,ttys[n]);
 		n=0; char a[6]={0};
@@ -356,6 +362,7 @@ void find_ttys (char* f) {
 		if (a[0]=='q'||a[0]=='Q') break;
 	}
 
+	// set client_tty_name[] with the final result
 	client_tty_name[0]=0x00;
 	if (n) {
 		strcpy(client_tty_name,path);
@@ -365,10 +372,12 @@ void find_ttys (char* f) {
 	free(ttys);
 }
 
+// take the user-supplied tty arg and figure out the actual /dev/ttyfoo
 void resolve_client_tty_name () {
 	dbg(3,"%s()\n",__func__);
 	switch (client_tty_name[0]) {
 		case 0x00:
+			// nothing supplied, scan for any ttys matching the default prefix
 			find_ttys(TTY_PREFIX);
 			break;
 		case '-':
@@ -378,6 +387,7 @@ void resolve_client_tty_name () {
 			client_tty_fd=1;
 			break;
 		default:
+			// something given, try with and without prepending /dev/
 			if (!access(client_tty_name,F_OK)) break;
 			char t[PATH_MAX]={0x00};
 			int i = 0;
@@ -519,9 +529,9 @@ char* collapse_padded_fname(char* fname) {
 void lsx (char* path,char* match,char* fmt) {
 	struct dirent *files;
 	DIR *dir = opendir(path);
-	if (dir == NULL){dbg(0,"Cannot open \"%s\"",path); return;}
+	if (!dir){dbg(0,"Cannot open \"%s\"",path); return;}
 	int i;
-	while ((files = readdir(dir)) != NULL) {
+	while ((files = readdir(dir))) {
 		for (i=strlen(files->d_name);files->d_name[i]!='.';i--);
 		if (!strcmp(files->d_name+i+1,match)) dbg(0,fmt,files->d_name);
 	}
@@ -531,7 +541,6 @@ void lsx (char* path,char* match,char* fmt) {
 int check_magic_file(char* b) {
 	dbg(3,"%s(\"%s\")\n",__func__,b);
 	if (!enable_magic_files) return 1;
-	if (dot_offset!=6) return 1; // UR2/TSLOAD only exists on a few KC-85 clones
 	int l = sizeof(magic_files)/sizeof(magic_files[0]);
 	for (int i=0;i<l;++i) if (!strcmp(magic_files[i],b)) return 0;
 	return 1;
@@ -1921,28 +1930,26 @@ void slowbyte(uint8_t b) {
 	write_client_tty(&b,1);
 	tcdrain(client_tty_fd);
 	usleep(BASIC_byte_us);
-	if (debug) { // local display nicely regardless if CR, LF, or CRLF
-		if (ch[0]==BASIC_EOL) {
-			 ch[0]=0x00;
-			 dbg(0,"%c",LOCAL_EOL);
-			 if (b==LOCAL_EOL) return;
-		}
-		if (b==BASIC_EOL) { ch[0]=BASIC_EOL; return; }
-#if defined(SHOWBYTES_A)
-		// show <32 as inverse "^X", >126 as inverse hex pair
-		if (b<32) { dbg(0,"\033[7m^%c\033[m",b+64); return; }
-		if (b>126) { dbg(0,"\033[7m%02X\033[m",b); return; }
-#elseif defined(SHOWBYTES_B)
-		// show <32 and 127 as inverse ctrl char without ^
-		// show everything else as-is, requires disable 8bit vt ctrl codes
-		if (b<32) { dbg(0,"\033[7m%c\033[m",b+64); return; }
-		if (b==127) { dbg(0,"\033[7m?\033[m"); return; }
-#else
-		// show all non-ascii as inverse hex pair
-		if (b<32||b>126) { dbg(0,"\033[7m%02X\033[m",b); return; }
-#endif
-		dbg(0,"%c",b);
+
+	// line-endings - convert CR, LF, CRLF to local eol
+	if (ch[0]==BASIC_EOL) {
+		 ch[0]=0x00;
+		 dbg(0,"%c",LOCAL_EOL);
+		 if (b==LOCAL_EOL) return;
 	}
+	if (b==BASIC_EOL) { ch[0]=BASIC_EOL; return; }
+
+#if defined(PRINT_8BIT)
+	// display <32 and 127 as inverse ctrl char without ^
+	// print everything else, requires disable 8-bit vt codes
+	if (b<32) { dbg(0,SSO"%c"RSO,b+64); return; }
+	if (b==127) { dbg(0,SSO"?"RSO); return; }
+#else
+	// display <32 >126 as inverse hex
+	if (b<32||b>126) { dbg(0,SSO"%02X"RSO,b); return; }
+#endif
+
+	dbg(0,"%c",b);
 }
 
 int send_BASIC(char* f) {
@@ -1950,15 +1957,14 @@ int send_BASIC(char* f) {
 	uint8_t b;
 
 	if ((fd=open(f,O_RDONLY))<0) {
-		dbg(1,"Could not open \"%s\" : %s\n",f,errno);
+		dbg(0,"Could not open \"%s\" : %s\n",f,errno);
 		return 9;
 	}
 
-	dbg(0,"Sending \"%s\" ... ",f);
-#if defined(SHOWBYTES_B)
-	dbg(1,"%c F",27); // disable 8-bit vtxx control codes (0x80-0x9F) so we can display them
+#if defined(PRINT_8BIT)
+	dbg(1,D8C); // disable 8-bit vt codes (0x80-0x9F) so we can print them
 #endif
-	dbg(1,"\n");
+	dbg(0,"-- start --\n");
 	ch[0]=0x00;
 	while(read(fd,&b,1)==1) slowbyte(b);
 	close(fd);
@@ -1967,8 +1973,7 @@ int send_BASIC(char* f) {
 		if (b!=BASIC_EOF) slowbyte(BASIC_EOF);
 	}
 	close(client_tty_fd);
-	dbg(1,"\n");
-	dbg(0,"DONE\n\n");
+	dbg(0,"\n-- end --\n\n");
 	return 0;
 }
 
@@ -2029,7 +2034,6 @@ void show_config () {
 	dbg(0,"model           : %d\n",model);
 	dbg(0,"dot_offset      : %d\n",dot_offset);
 	dbg(0,"BASIC_byte_ms   : %d\n",BASIC_byte_us/1000);
-	dbg(0,"bootstrap_mode  : %s\n",bootstrap_mode?"true":"false");
 	dbg(0,"bootstrap_fname : \"%s\"\n",bootstrap_fname);
 	dbg(0,"app_lib_dir     : \"%s\"\n",app_lib_dir);
 	dbg(0,"client_tty_name : \"%s\"\n",client_tty_name);
@@ -2075,7 +2079,7 @@ void show_main_help() {
 		"   %1$s\n"
 		"   %1$s -vvu -p ~/Downloads/REX/ROMS\n"
 		"   %1$s -v -w ttyUSB1 ~/Documents/wp2files\n\n"
-	,args[0],DEFAULT_TPDD_FILE_ATTR,DEFAULT_BASIC_BYTE_MS);
+	,args[0],DEFAULT_ATTR,DEFAULT_BASIC_BYTE_MS);
 }
 
 int main(int argc, char** argv) {
@@ -2105,9 +2109,9 @@ int main(int argc, char** argv) {
 	while ((i = getopt (argc, argv, ":0a:b:d:eghi:lm:p:rs:uvwz:^")) >=0)
 #endif
 		switch (i) {
-			case '0': dot_offset=0; upcase=false; default_attr=0x20;      break;
+			case '0': dot_offset=0; upcase=false; default_attr=RAW_ATTR;  break;
 			case 'a': default_attr=*strndup(optarg,1);                    break;
-			case 'b': bootstrap_mode=true; strcpy(bootstrap_fname,optarg);break;
+			case 'b': strcpy(bootstrap_fname,optarg);                     break;
 			case 'd': strcpy(client_tty_name,optarg);                     break;
 			case 'e': dme_disabled = true;                                break;
 #if !defined(_WIN)
@@ -2131,8 +2135,8 @@ int main(int argc, char** argv) {
 				else dbg(0,"Unknown option character \"0x%02X\"\n",optopt);
 			default: show_main_help();                                 return 1;
 		}
-	// commandline non-option arguments
 
+	// commandline non-option arguments
 	for (i=0; optind < argc; optind++) {
 		if (x) dbg(1,"non-option arg %u: \"%s\"\n",i,argv[optind]);
 		switch (i++) {
@@ -2144,9 +2148,8 @@ int main(int argc, char** argv) {
 
 	// auto-completes & fixups
 	if (model<1||model>2) model=2;
-
+	if (dot_offset!=6) enable_magic_files=false; // only applies to UR2/TSLOAD
 	resolve_client_tty_name();
-
 	check_disk_image();
 	find_lib_file(bootstrap_fname);
 	(void)(getcwd(cwd,PATH_MAX-1)+1);
@@ -2159,7 +2162,7 @@ int main(int argc, char** argv) {
 	if ((i=open_client_tty())) return i;
 
 	// send loader and exit
-	if (bootstrap_mode) return (bootstrap(bootstrap_fname));
+	if (bootstrap_fname[0]) return (bootstrap(bootstrap_fname));
 
 	// initialize the file list
 	file_list_init();
