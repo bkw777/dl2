@@ -1200,9 +1200,18 @@ void dirent_set_name() {
 		dbg(3,"filename: \"%-*.*s\"\n",TPDD_FILENAME_LEN,TPDD_FILENAME_LEN,gb+2);
 		dbg(3,"    attr: \"%c\" (%1$02X)\n",gb[26]);
 	}
-	// update before every set-name for at least 2 reasons
-	// * clients may open files without ever listing (teeny, ur2, etc)
+	// Update the local file list before every set-name.
+	// * clients may open files any time without ever listing first
 	// * local files may be changed at any time by other processes
+	// and we need to have the tpdd version of all filenames ready to compare
+	// against, to respond correctly if it exists/doesn't/writable/not etc.
+	// TODO - Do we really need to do it that way?
+	// What about examining each local file on the spot instead of
+	// pre/re-generating a stored list of converted filenames?
+	// Maybe one thing a pre-generated list might be good for is the eventual
+	// filesystem access to disk images where we would model the FCB and SMT
+	// tables and disk sectors and update them the same way a real drive
+	// does when files are added/removed/read/written.
 	update_file_list(ALLOW_RET);
 	strncpy(filename,(char*)gb+2,TPDD_FILENAME_LEN);
 	filename[TPDD_FILENAME_LEN]=0;
@@ -2013,21 +2022,26 @@ void get_opr_cmd() {
 		return; // real drive does not return anything
 	}
 
+	// Preserve the original packet for reference "just because" even though
+	// we could actually get away with modifying gb[0] at this point.
 	uint8_t c = gb[0];
 
 	// decode bit 6 in the FMT byte b[0] for bank0 vs bank1
 	if (model==2) {
-		//bank = 0; if (c&0x40) { bank = 1; c-=0x40; } // alternative method
-		bank = (c >> 6) & 1; // read bit 6
-		c &= ~(1 << 6);      // clear bit 6
+		//bank = 0; if (c&0x40) { bank = 1; c-=0x40; } // alternative
+		bank = (c >> 6) & 1; // read bit 6 to set bank 0 or 1
+		c &= ~(1 << 6);      // clear bit 6 so incoming 0x4# matches 0x0# case
 	}
 
-	// TODO double-check this
-	// another note says sysinfo is 0x33 but the drive also responds to 0x11
-	// so maybe this is backwards? maybe it's both?
-	// For FMT 0x30-0x34 pdd2 accepts FMT or FMT+0x22. Unknown function.
-	// For now just treat them as synonyms by subtracting 0x22 if present.
-	//if ( c>0x51 && c<0x57 ) c-=0x22;
+	// translate the undocumented synonyms
+	// https://www.mail-archive.com/m100@lists.bitchin100.com/msg18555.html
+	if ( c>0x0D && c<0x13 ) c+=0x22;
+
+	// TODO
+	// Test combinations of both of the above things on a real drive.
+	// Example, what does 0x51 do? Is it right that we test for 0x11
+	// after subtracting 0x40, so that we end up doing 0x33?
+	// Does tpdd1 do the 0x22 thing?
 
 	// dispatch
 	switch(c) {
