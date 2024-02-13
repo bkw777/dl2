@@ -504,11 +504,11 @@ int open_client_tty () {
 	if (getty_mode) {
 		debug = -1;
 		if (!login_tty(client_tty_fd)) client_tty_fd = STDIN_FILENO;
-		else (void)(daemon(1,1)+1);
+		else (void)!daemon(1,1);
 	}
 #endif
 
-	(void)(tcflush(client_tty_fd, TCIOFLUSH)+1);
+	(void)!tcflush(client_tty_fd, TCIOFLUSH);
 
 	// unset O_NONBLOCK
 	fcntl(client_tty_fd, F_SETFL, fcntl(client_tty_fd, F_GETFL, NULL) & ~O_NONBLOCK);
