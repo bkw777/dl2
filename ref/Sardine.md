@@ -12,11 +12,16 @@ An image of the dictionary disk is also bundled with dl2, and the **-i file.pdd1
 
 1: Run dl with the following commandline arguments,
 ```
-$ dl -vun -i Sardine_American_English.pdd1
+$ dl -i Sardine_American_English.pdd1
 ```
 
-This tells dl2 to emulate a TPDD1, disable some TPDD2 features and TS-DOS directory support which would confuse `SAR100.CO`, and use the Sardine American English dictionary disk image file for any sector-access commands.  
+This tells dl2 to emulate a TPDD1 and use the Sardine American English dictionary disk image file for any sector-access commands.  
 Both `SAR100.CO` and `Sardine_American_English.pdd1` are bundled with dl2, installed in /usr/local/lib/dl, so you don't have to do anything for SAR100.CO, and for the disk image you don't have to specify the full path.  
+
+At present, [Sardine is uniquely picky about the usb-serial adapter](https://github.com/bkw777/dl2/issues/9). Even ensuring you have a real FTDI chip isn't good enough, but certain adapters work and others don't.  
+Any adapter works for ordinary file transfers, even big random binary files that fill the entire disk copy without a hitch. It's only Sardine that has a problem.  
+Currently the safe bet is Startech ICUSB232C  
+The fault is probably really a timing issue in dl2, that may eventually be fixable to work with more hardware. But at present, it may or may not work depending on your serial port hardware.
 
 2: Enter the UR-2 menu.  
 Notice the "SARDIN" entry with the word "OFF" under it.  
