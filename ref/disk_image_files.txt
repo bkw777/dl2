@@ -23,9 +23,15 @@ Each record is composed of 3 fields: ID, unknown, DATA
    | 12 bytes | 1 byte |             1280 bytes                |
    +----------+--------+---------------------------------------+
 
-The unknown byte on tpdd2 is an extra byte that isn't described in the
-manual, but exists in ram on a drive after the ID section, and it can be
-written and read back from disk, so it is part of the disk image format.
+for tpdd2 these correspond to these ram addresses:
+ID    0x8004 to 0x800F
+?     0x8010
+DATA  0x8013 to 0x8512
+
+The "?" byte on tpdd2 is an extra byte that isn't described in the manual,
+but exists in the drives ram after the ID section. It's normally just 0x00,
+but you can write it in ram, commit to disk, and read it back from disk,
+so it's included in the disk image format.
 
 There are no delimiters or other formatting or header.
 
@@ -39,26 +45,27 @@ and the install disk for Disk Power KC-85.
 Sardine's dictionary disk is a pure data disk with no filesystem,
 and so Sardine uses FDC-mode to access the sectors like a database.
 
-The install disk for Disk Power is seemingly a normal disk with a filesystem
-and files, but there is also non-file data in some sectors that the filesystem
-doesn't know about, and the installer uses sector-access commands to read
-4 64-byte chunks of raw data from an unmarked sector.
+The install disk for Disk Power is designed to look like a normal disk with a
+filesystem, but the installer uses fdc-mode sector access to read sectret data
+from some sectors that aren't marked as in-use in the FCB ot SMT tables.
 
 Generally, you also need to use some extra commandline options to disable
-TS-DOS directory extensions support (-e), and to force stricter TPDD1-only
+TS-DOS directory extensions support (-n), and to force stricter TPDD1-only
 or TPDD2-only emulation (-m 1) or (-m 2). Example:
 
-$ dl -vue -m 1 -i Sardine_American_English.pdd1
+$ dl -vun -m 1 -i Sardine_American_English.pdd1
 
-It's not a requirement to use disk images in general, it's just that in both
-of these real examples above, the client software triggers unexpected responses
-from the server that a real drive wouldn't do, so the extra options make the
-server act more like a real drive, as the client software expects.
+That isn't required to use disk images in general, it's just that in both
+of these real examples, the client software does things that trigger unexpected
+responses from the server that a real drive wouldn't do, so the extra options
+make the server act more like a real drive, as the client software expects.
+Some other client software may or may not do wierd things and may or may not
+need the stricter emulation.
 
 Disk image files can be created with https://github.co/bkw777/pdd.sh
 
 dl2 can also create new disk images from client-issued format and sector
-access commands. Example: run "$ dl -vve -m 1 -i ./newdisk.pdd1"
+access commands. Example: run "$ dl -vvn -m 1 -i ./newdisk.pdd1"
 and then use a client to "format" the "disk".
 
 For TPDD1, both the FDC-mode the Operation-mode format commands do what a real
@@ -68,10 +75,10 @@ like the Sardine dictionary disk. The Operation-mode format command does the
 same as FDC-mode format with logical size code 0 (64-byte logical sectors) and
 then writes the single byte of non-null data at the right address to create a
 valid Space Management Table, which makes the disk into a functioning filesystem
-disk. (If you took the generated .pdd1 or .pdd2 file and used pdd.sh to "restore"
-it to a real disk, that disk would be a functioning filesystem disk)
+disk. If you took the generated .pdd1 or .pdd2 file and used pdd.sh to "restore"
+it to a real disk, that disk would be a functioning filesystem disk.
 
-Real disks can only be dumped or restored using the matching type of drive.  
+Real disks can only be dumped or restored using the matching type of drive.
 Although a real TPDD2 drive can at least read a TPDD1 disk, you must use a
 TPDD1 drive to dump a TPDD1 disk to a .pdd1 image file, or to restore a .pdd1
 image file to a real disk, and a TPDD2 drive for .pdd2 files.

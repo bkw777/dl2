@@ -72,7 +72,7 @@ Examples:
    dl -b TS-DOS.100
    dl -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
    dl -vb rxcini.DO && dl -vu
-   dl -vun -m 1 -i Sardine_American_English.pdd1
+   dl -vun -i Sardine_American_English.pdd1
 
 $
 ```
@@ -129,54 +129,23 @@ You can override the bundled versions of these files without touching the /usr/l
 [More details](ref/ur2.txt)
 
 ## Sector Access / Disk Images
-For a TPDD1 disk image
-`$ dl -v -m 1 -i disk_image.pdd1`  
-
-For a TPDD2 disk image
-`$ dl -v -m 2 -i disk_image.pdd2`
+`$ dl -i disk_image.pdd1`  
+or  
+`$ dl -i disk_image.pdd2`
 
 This is support for disk image files that allow use of raw sector access commands on a virtual disk image file.
 
 Limitations: Only supports using the disk image for sector access. It doesn't provide access to the files in a disk image as files, just as raw sectors.
 
-Useful working examples: Sardine_American_English.pdd1, Disk_Power_KC-85.pdd1
+If the file exists, it's size is used to set the emulation mode to tpdd1 vs tpdd2.  
+If the file doesn't exist or is zero bytes, then the last 5 characters in the filename are used, ".pdd1" or ".pdd2", case insensitive.
 
-Those examples are both TPDD1 disks, but both TPDD1 and TPDD2 are supported.  
-There are just no known raw data applications like Sardine that use TPDD2 sector access to provide a TPDD2 example here.  
-You can still view or edit the raw sectors of any ordinary TPDD2 disk image such as the TPDD2 Utility Disk included with [pdd.sh](https://github.com/bkw777/pdd.sh) just to see that it works.
+One example usage is the [Sardine](ref/Sardine.md) spell checker.  
+Another is [installing Disk Power for Kyotronic KC-85](clients/disk_power/Disk_Power.txt)
 
-Example, using Sardine with a Model 100 with [Ultimate ROM II](http://www.club100.org/library/librom.html):  
-One way to use Sardine is to let Ultimate ROM II load & unload the program from disk into ram on the fly instead of installing permanently in ram like normal. Sardine uses raw sector access commands to read a special dictionary data disk.  
-For this to work, UR-II has to be able to load `SAR100.CO` from a normal filesystem disk using normal file/filesystem access, and then `SAR100.CO` needs to be able to use TPDD1 FDC-mode commands to read raw sectors from the special dictionary data disk.  
-This uses both the **magic files** and **disk image file** features.  
-
-To try it out,  
-
-1: Run dl with the following commandline arguments,
-```
-$ dl -vun -m 1 -i Sardine_American_English.pdd1
-```
-
-This set of flags tells dl2 to strictly emulate a TPDD1, disable some TPDD2 features and TS-DOS directory support which confuses `SAR100.CO`, and use the Sardine American English dictionary disk image file for any sector-access commands.  
-Both `SAR100.CO` and `Sardine_American_English.pdd1` are bundled with dl2, installed in /usr/local/lib/dl, so you don't have to do anything for SAR100.CO, and for the disk image you don't have to specify the full path.  
-
-2: Enter the UR-2 menu.  
-Notice the "SARDIN" entry with the word "OFF" under it.  
-Hit enter on SARDIN.  
-If you get a prompt about HIMEM, answer Y.  
-This loads SAR100.CO into ram.
-Now notice the SARDIN entry changed from "OFF" to "ON" under it.
-
-3: Enter T-Word and start a new document and type some text.  
-
-4: Press GRPH+F to invoke Sardine to spell-check the document.  
-This will invoke the SAR100.CO previously loaded, which will try to use TPDD1 FDC-mode sector access commands, wich dl2 will respond to with data from the .pdd1 file.  
-
-Another example, [installing Disk Power for Kyotronic KC-85](clients/disk_power/Disk_Power.txt)
-
-Disk image files may be created 2 ways:  
-* One method is you may use the **dd** command in [pdd.sh](https://github.com/bkw777/pdd.sh) to read a real disk from a real drive, and output a disk image file.  
-* Another method is you may run `dl -v -m 1 -i filename.pdd1` or `dl -v -m 2 -i filename.pdd2`, where filename.pddN either doesn't exist or is zero bytes, and then use a client (like TS-DOS or pdd.sh) to format the "disk". The format command will cause dl2 to generate the empty disk image.
+There are 2 ways to create disk image files so far:  
+* One way is to use [pdd.sh](https://github.com/bkw777/pdd.sh) to read a real disk from a real drive, and output a disk image file.  
+* Another way is to run `dl -i filename`, where the file either doesn't exist or is zero bytes, and then use a client (like TS-DOS or pdd.sh) to format the "disk". When dl2 gets the format command, it will create the disk image.
 
 More details about the disk image format [disk_image_files.txt](ref/disk_image_files.txt)
 
@@ -195,6 +164,7 @@ Sadly, `..` can not be used, but here are a few examples that do work.
 
 `$ ROOT_LABEL=/ PARENT_LABEL=^ dl`  
 `$ ROOT_LABEL='-root-' PARENT_LABEL='-back-' dl`  
+`$ ROOT_LABEL='-top-' PARENT_LABEL='-up-' dl`  
 `$ ROOT_LABEL='0:' PARENT_LABEL='^:' dl`  
 or you can confuse someone...  
 `$ ROOT_LABEL='C:\' PARENT_LABEL='UP:' dl`
@@ -209,9 +179,13 @@ See [co2ba](co2ba.md)
 ## OS Compatibility
 Tested on Linux, [Mac](ref/mac.md), [FreeBSD](ref/freebsd.md), and [Windows](ref/windows.md).
 
-## TODO
-* support big-endian platforms  
-* file/filesystem access on disk images - currently can only use for sector access
+## TODO - not all necessarily serious
+* Store the actual attr byte given by clients when they save a file, rather than faking with hardwired DEFAULT_ATTR=0x46. Store in xattr so that it stays part of the file when it is copied/moved/renamed.
+* File/filesystem access on disk images - Currently can only use disk images for sector access.
+* Verify if the code works on a big-endian platform - There are a lot of 2-byte values and a lot of direct byte manipulations because the protocol & drive uses MSB-first everywhere while most platforms today do not.
+* Figure out and emulate more of the special memory addresses accessible in tpdd2 mode. We already do some.
+* Fake sector 0 based on the files in the current share path so that if a client tries to read the FCB table directly it works.
+* Fake entire disk image in ram based on current share path files. Option to save the image as long as we're there.
 
 ## History / Credits
 [DeskLink for ms-dos](https://ftp.whtech.com/club100/com/dl-arc.exe.gz) 1987 Travelling Software  

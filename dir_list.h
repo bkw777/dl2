@@ -29,7 +29,7 @@ MA 02111, USA.
 typedef struct
 {
 	char     client_fname[TPDD_FILENAME_LEN+1];
-	char     local_fname[LOCAL_FILENAME_MAX];
+	char     local_fname[LOCAL_FILENAME_MAX+1];
 	uint16_t len;
 	uint8_t  flags;
 } FILE_ENTRY;

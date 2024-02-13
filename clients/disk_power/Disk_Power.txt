@@ -13,9 +13,9 @@ pdd.sh so that dl2 can act as a virtual drive for sector access to it.
 
 Installation: Just run the following command:
 
- $ dl -vb Disk_Power.K85 && dl -vue -m 1 -i Disk_Power.K85.pdd1
+ $ dl -vb Disk_Power.K85 && dl -vun -i Disk_Power.K85.pdd1
 
-(dl2 will get both files from /usr/local/lib/dl)
+(both files are bundled with dl2 and will be loaded from /usr/local/lib/dl)
 
 When the installer on the KC-85 prompts to insert the disk, just hit [Enter].
 

@@ -10,7 +10,7 @@ are Sardine and the installer for Disk-Power, and neither of those uses this com
 
 So there is no client software I know of to test if we are emulating this function well enough.
 What we do have is, pdd.sh was used to probe out what a real drive does,
-and then both pdd.sh and dlplus do that.
+and then both pdd.sh and dl2 do that.
 So *maybe* we are emulating the real drives "S" command more or less?
 
 The software manual explains almost nothing about this command. It only says:
@@ -27,12 +27,12 @@ The process goes like this (as far as I can tell):
  0 - client sends the Operation-mode command for "switch to FDC-mode"
      0x5A 0x5A 0x08 0x00 0xDC
      (ZZ 0x08 NULL checksum)
- 
+
      "Search ID Section" is an FDC-mode command, and a real drive always starts
      in Operation-mode at power-on by default. So if not done already,
      the drive must first be switched from Operation-mode to FDC-mode before
      you can issue any FDC-mode commands.
-  
+
      https://archive.org/details/tandy-service-manual-26-3808-s-software-manual-for-portable-disk-drive/page/21/
 
      The drive does not send back any response to this command.
@@ -42,17 +42,17 @@ The process goes like this (as far as I can tell):
      (S carriage-return)
 
      This command takes no parameters after the S.
-     dlplus silently ignores any extra characters,
-     but a real drive gives error 61 if there are any extra bytes after the S.
+     dl2 silently ignores any extra characters,
+     but a real drive gives error 0x61 if there are any extra bytes after the S.
 
  2 - drive sends a standard FDC-mode response block(a)
      (8 bytes, all ascii "0"s if there was no hardware fault or other error)
 
      If the command was valid and no hardware problem: err:0 dat:0 len:0
-     (0x30 0x30 0x30 0x30 0x30 0x30 0x30 0x30 = "00000000" = err:0 = success)
+     (0x30 0x30 0x30 0x30 0x30 0x30 0x30 0x30 = "00000000" = err:0x00 = success)
 
-     If the command was malformed: err:61 dat:0 len:0
-     (0x36 0x31 0x30 0x30 0x30 0x30 0x30 0x30 = "61000000" = err:61 = error)
+     If the command was malformed: err:0x61 dat:0 len:0
+     (0x36 0x31 0x30 0x30 0x30 0x30 0x30 0x30 = "61000000" = err:0x61 = error)
 
      client parses the response block
 
@@ -62,6 +62,7 @@ The process goes like this (as far as I can tell):
      otherwise, if err==0, proceed...
 
  3 - client sends exactly 12 bytes of data
+     no less or more
      right-pad with 0x00 or truncate to 12 bytes as necessary
      to search for "abc" send 0x61 0x62 0x63 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
 
@@ -71,18 +72,17 @@ The process goes like this (as far as I can tell):
      wait at least 20 seconds and abort if no response by 30 seconds
 
  4 - drive sends another FDC-mode response block
-     If a match was found:     err:0  dat:sector-number len:logical-sector-size-bytes
-     If a match was not found: err:60 dat:255 len:logical-sector-size-bytes
+     If a match was found:     err:0x00  dat:sector-number len:logical-sector-size-bytes
+     If a match was not found: err:0x60  dat:0xFF len:logical-sector-size-bytes
 
-There seems to be no way to search for multiple matching records.
-For instance, as far as I can tell you can't supply any sector-number parameter to start searching at the next sector after a previously found match to find the next match,
-and repeating the same search just produces the same result which is the first match counting from physical sector 0.
+There seems to be no way to search for multiple sectors with the same ID.
+(other than using READ ID and reading them all yourself instead of using SEARCH ID)
+The search always only returns the 1st match, and there is no way to tell it to start at some other sector than 0.
 
 github/bkw777/pdd.sh has an implementation of the client side of this and is working with real TPDD drives.
+dl2 has an implementation of the server side of this and is working with pdd.sh at least.
 
-dlplus has an implementation of the server side of this and is working with pdd.sh.
-
-(a) FDC-mode 8-byte response block common to all FDC-mode commands:
-  2 bytes = ascii hex pair representing a uint_8 for error/status code (err:#) 0=success, >0 = various errors & conditions
-  2 bytes = ascii hex pair representing a uint_8 for result data (dat:#),  meaning depends on command
-  4 bytes = 2 ascii hex pairs representing a uint_16 (msb-first) for length or offset (len:#),  meaning depends on command
+(a) all FDC-mode commands use this 8-byte response format:
+  2 bytes = 1 ascii hex pair  representing a uint8_t  for error/status code (err:#) 0=success, >0 = various errors & conditions
+  2 bytes = 1 ascii hex pair  representing a uint8_t  for result data (dat:#),  meaning depends on command
+  4 bytes = 2 ascii hex pairs representing a uint16_t (msb-first) for length or address or offset (len:#),  meaning depends on command

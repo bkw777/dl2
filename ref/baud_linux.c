@@ -1,4 +1,19 @@
-// the TPDD drive has a dip switch setting for 76800 baud
+// The TPDD1 drive has a dip switch setting for 76800 baud.
+// 76800 is a native rate on some odd or old platforms like sparc,
+// but is weird and not directly/natively supported on others.
+// On a typical linux on intel it requires termios2 and BOTHER
+// It will probably need several #ifdefs to support different platforms.
+
+// https://stackoverflow.com/a/39924923/5754855
+/*
+	struct termios2 t;
+	ioctl(fd, TCGETS2, &t); // Read current settings
+	t.c_cflag &= ~CBAUD;    // Remove current baud rate
+	t.c_cflag |= BOTHER;    // Allow arbitrary int baud rate
+	t.c_ispeed = 76800;     // Set the input baud rate (int)
+	t.c_ospeed = 76800;     // Set the output baud rate (int)
+	ioctl(fd, TCSETS2, &t); // Apply new settings
+*/
 
 /* set weird baud rates on linux
  *

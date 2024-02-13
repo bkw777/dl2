@@ -31,17 +31,16 @@
 #define REQ_SYSINFO       0x33 // TPDD2 Get System Information
 #define REQ_EXEC          0x34 // TPDD2 Execute Program
 
-// TPDD return block formats
+// TPDD return block formats                {fmt,len}
 #define RET_READ          0x10
-#define RET_DIRENT        0x11
-#define RET_STD           0x12 // shared return format for: error open close delete status write
-#define RET_VERSION       0x14 // TPDD2
-#define RET_CONDITION     0x15 // TPDD2
-#define RET_CACHE         0x38 // TPDD2 shared return format for: cache mem_write cond_list
+static const unsigned char RET_DIRENT[2]    = {0x11,0x1C};
+static const unsigned char RET_STD[2]       = {0x12,0x01}; // shared return format for: error open close delete status write
+static const unsigned char RET_VERSION[2]   = {0x14,0x0F}; // TPDD2
+static const unsigned char RET_CONDITION[2] = {0x15,0x01}; // TPDD2
+static const unsigned char RET_CACHE[2]     = {0x38,0x01}; // TPDD2 shared return format for: cache mem_write cond_list
 #define RET_MEM_READ      0x39 // TPDD2
-#define RET_SYSINFO       0x3A // TPDD2
-#define RET_EXEC          0x3B // TPDD2
-
+static const unsigned char RET_SYSINFO[2]   = {0x3A,0x06}; // TPDD2
+static const unsigned char RET_EXEC[2]      = {0x3B,0x03}; // TPDD2
 
 // directory entry request types
 #define DIRENT_SET_NAME   0x00
@@ -57,15 +56,19 @@
 #define F_OPEN_READ       0x03
 
 // TPDD Operation-mode error codes
+// Normal
 #define ERR_SUCCESS       0x00 // 'Operation Complete'
+// File
 #define ERR_NO_FILE       0x10 // 'File Not Found'
 #define ERR_EXISTS        0x11 // 'File Exists'
+// Sequence
 #define ERR_NO_FNAME      0x30 // 'Missing Filename'
 #define ERR_DIR_SEARCH    0x31 // 'Directory Search Error'
 #define ERR_BANK          0x35 // 'Bank Error'
 #define ERR_PARAM         0x36 // 'Parameter Error'
 #define ERR_FMT_MISMATCH  0x37 // 'Open Format Mismatch'
 #define ERR_EOF           0x3F // 'End of File'
+// Disk I/O
 #define ERR_NO_START      0x40 // 'No Start Mark'
 #define ERR_ID_CRC        0x41 // 'ID CRC Check Error'
 #define ERR_SECTOR_LEN    0x42 // 'Sector Length Error'
@@ -77,14 +80,22 @@
 #define ERR_SECTOR_NUM    0x4A // 'Sector Number Error'
 #define ERR_READ_TIMEOUT  0x4B // 'Read Data Timeout'
 #define ERR_SECTOR_NUM2   0x4D // 'Sector Number Error'
+// Protect
 #define ERR_WRITE_PROTECT 0x50 // 'Write-Protected Disk'
 #define ERR_DISK_NOINIT   0x5E // 'Disk Not Formatted'
+#define ERR_WP_TPDD1_DISK 0x5F // TPDD2 'Write Protect to 26-3808 Diskette'
+// File Territory
 #define ERR_DIR_FULL      0x60 // 'Disk Full or Max File Size Exceeded or Directory Full' / TPDD2 'Directory Full'
 #define ERR_DISK_FULL     0x61 // 'Disk Full'
 #define ERR_FILE_LEN      0x6E // 'File Too Long' (real drive limits to 65534, we exceed for REXCPM)
-#define ERR_NO_DISK       0x70 // 'No Disk'
-#define ERR_DISK_CHG      0x71 // 'Disk Not Inserted or Disk Change Error' / TPDD2 'Disk Change Error'
-#define ERR_DEFECTIVE     0x83 // 'Defective Disk'  (real drive needs a power-cycle to clear this error)
+// Diskette Condition
+#define ERR_NO_DISK       0x70 // 'Disk Not Inserted'
+#define ERR_DISK_CHG      0x71 // 'Disk Change Error'
+// Sensor
+#define ERR_NO_INDEX_SIGNAL 0x80
+#define ERR_ABNORMAL_TRACK_ZERO 0x81
+#define ERR_ABNORMAL_INDEX_SIGNAL 0x82
+#define ERR_DEFECTIVE     0x83 // 'Defective Disk' - real drive needs a power-cycle to clear this error - not in the manual
 
 // TPDD1 FDC-mode commands
 #define FDC_SET_MODE        'M' // set Operation-mode or FDC-mode
@@ -98,7 +109,7 @@
 #define FDC_WRITE_ID_NV     'C' // write sector ID without verify
 #define FDC_WRITE_SECTOR    'W' // write sector data
 #define FDC_WRITE_SECTOR_NV 'X' // write sector data without verify
-#define FDC_CMDS {FDC_SET_MODE,FDC_CONDITION,FDC_FORMAT,FDC_FORMAT_NV,FDC_READ_ID,FDC_READ_SECTOR,FDC_SEARCH_ID,FDC_WRITE_ID,FDC_WRITE_ID_NV,FDC_WRITE_SECTOR,FDC_WRITE_SECTOR_NV,0x00}
+static const char FDC_CMDS[] = {FDC_SET_MODE,FDC_CONDITION,FDC_FORMAT,FDC_FORMAT_NV,FDC_READ_ID,FDC_READ_SECTOR,FDC_SEARCH_ID,FDC_WRITE_ID,FDC_WRITE_ID_NV,FDC_WRITE_SECTOR,FDC_WRITE_SECTOR_NV,0x00};
 
 // TPDD1 FDC-mode error codes
 // There is no documentation for FDC error codes.
@@ -120,41 +131,38 @@
 #define ERR_FDC_NO_DISK       209 // 'Disk Not Inserted'
 #define ERR_FDC_INTERRUPTED   216 // 'Operation Interrupted'
 
-// TPDD1 FDC Condition bits
-#define FDC_COND_NOTINS       0x80 // bit 7 : disk not inserted
-#define FDC_COND_CHANGED      0x40 // bit 6 : disk changed
-#define FDC_COND_WPROT        0x20 // bit 5 : disk write-protected
-#define FDC_COND_b4           0x10
-#define FDC_COND_b3           0x08
-#define FDC_COND_b2           0x04
-#define FDC_COND_b1           0x02
-#define FDC_COND_b0           0x01
-#define FDC_COND_NONE         0x00 // no conditions
-
 // TPDD1 FDC Logical Sector Length Codes
-#define FDC_LOGICAL_SIZE_CODES {64,80,128,256,512,1024,1280}
+static const unsigned short FDC_LOGICAL_SECTOR_SIZE[7] = {64,80,128,256,512,1024,1280};
+
+// TPDD1 Condition bits
+#define PDD1_COND_BIT_NOTINS   7 // disk not inserted
+#define PDD1_COND_BIT_CHANGED  6 // disk changed
+#define PDD1_COND_BIT_WPROT    5 // disk write-protected
+#define PDD1_COND_BIT_4        4
+#define PDD1_COND_BIT_3        3
+#define PDD1_COND_BIT_2        2
+#define PDD1_COND_BIT_1        1
+#define PDD1_COND_BIT_0        0
+#define PDD1_COND_NONE         0x00 // no conditions
 
 // TPDD2 Condition bits
-#define PDD2_COND_b7          0x80
-#define PDD2_COND_b6          0x40
-#define PDD2_COND_b5          0x20
-#define PDD2_COND_b4          0x10
-#define PDD2_COND_CHANGED     0x08 // bit 3 : disk changed
-#define PDD2_COND_NOTINS      0x04 // bit 2 : disk not inserted
-#define PDD2_COND_WPROT       0x02 // bit 1 : write protected disk
-#define PDD2_COND_POWER       0x01 // bit 0 : low power
-#define PDD2_COND_NONE        0x00 // no conditions
+#define PDD2_COND_BIT_7        7
+#define PDD2_COND_BIT_6        6
+#define PDD2_COND_BIT_5        5
+#define PDD2_COND_BIT_4        4
+#define PDD2_COND_BIT_CHANGED  3 // disk changed
+#define PDD2_COND_BIT_NOTINS   2 // disk not inserted
+#define PDD2_COND_BIT_WPROT    1 // disk write protected
+#define PDD2_COND_BIT_POWER    0 // low power
+#define PDD2_COND_NONE         0x00 // no conditions
 
 // lengths & addresses
 #define PDD1_TRACKS           40
 #define PDD1_SECTORS          2
 #define PDD2_TRACKS           80
 #define PDD2_SECTORS          2
-#define TPDD_DATA_MAX         260  // largest theoretical packet is 256+3
+#define DIRENTS               40
 #define REQ_RW_DATA_MAX       128  // largest chunk size in req_read() req_write()
-#define LEN_RET_STD           0x01
-#define LEN_RET_DME           0x0B
-#define LEN_RET_DIRENT        0x1C
 #define TPDD_FILENAME_LEN     24
 #define LOCAL_FILENAME_MAX    256
 #define SECTOR_ID_LEN         12
@@ -167,38 +175,55 @@
 #define SMT_OFFSET            1240
 #define PDD1_SMT              0x80
 #define PDD2_SMT              0xC0
-#define RAM_ADDR              0x8000
-#define RAM_LEN               0x0800
-#define PDD2_ID_ADDR          (RAM_ADDR+0x0004)
 #define PDD2_MEM_READ_MAX     252 // real drive absolute limit
 #define PDD2_MEM_WRITE_MAX    127 // real drive absolute limit
+#define TPDD_MSG_MAX          256 // largest theoretical packet is 256+3, largest actual is 252+3
+
+// cpu memory map
+#define IOPORT_ADDR           0x00
+#define IOPORT_LEN            0x1F
+#define CPURAM_ADDR           0x80
+#define CPURAM_LEN            0x7F
+#define GA_ADDR               0x4000
+#define GA_LEN                0x03
+#define RAM_ADDR              0x8000
+#define RAM_LEN               0x0800
+#define ROM_ADDR              0xF000
+#define ROM_LEN               0x1000
+
+// sector cache
+#define PDD2_ID_REL           0x04
+#define PDD2_ID_ADDR          (RAM_ADDR+PDD2_ID_REL)
+#define PDD2_DATA_REL         0x13
+#define PDD2_DATA_ADDR        (RAM_ADDR+PDD2_DATA_REL)
+#define PDD2_CACHE_LEN        (PDD2_DATA_REL+SECTOR_DATA_LEN)
+#define PDD2_CACHE_LEN_MSB    ((PDD2_CACHE_LEN>>0x08)&0xFF) // 0x05
+#define PDD2_CACHE_LEN_LSB    (PDD2_CACHE_LEN&0xFF)      // 0x13
 
 // TPDD2 version data: 41 10 01 00 50 05 00 02 00 28 00 E1 00 00 00
 #define VERSION_MSB       0x41
 #define VERSION_LSB       0x10
 #define SIDES             0x01
-#define TRACKS_MSB        0x00
-#define TRACKS_LSB        0x50
-#define SECTOR_SIZE_MSB   0x05
-#define SECTOR_SIZE_LSB   0x00
+#define TRACKS_MSB        ((PDD2_TRACKS>>0x08)&0xFF)
+#define TRACKS_LSB        (PDD2_TRACKS&0xFF)
+#define SECTOR_SIZE_MSB   ((SECTOR_DATA_LEN>>0x08)&0xFF)
+#define SECTOR_SIZE_LSB   (SECTOR_DATA_LEN&0xFF)
 #define SECTORS_PER_TRACK 0x02
-#define DIRENTS_MSB       0x00
-#define DIRENTS_LSB       0x28
-#define MAX_FD            0x00
-#define MODEL             0xE1     // E1 = TPDD2
+#define DIRENTS_MSB       ((DIRENTS>>0x08)&0xFF)
+#define DIRENTS_LSB       (DIRENTS&0xFF)
+#define MAX_FD            0x00      // it's 0 but it means the highest fd# is 0, meaning max 1 open file
+#define MODEL_CODE        0xE1      // E1 = TPDD2
 #define VERSION_R0        0x00
 #define VERSION_R1        0x00
 #define VERSION_R2        0x00
 
 // TPDD2 sysinfo data: 80 13 05 00 10 E1
-#define SECTOR_CACHE_START_MSB 0x80
-#define SECTOR_CACHE_START_LSB 0x13
-//#define SECTOR_CACHE_LEN_MSB   0x05 // SECTOR_SIZE_MSB
-//#define SECTOR_CACHE_LEN_LSB   0x00 // SECTOR_SIZE_LSB
-#define SYSINFO_CPU            0x10 // 0x10 = HD6301
-//#define MODEL                  0xE1
-
-#define PDD2_CACHE_ADDR (SECTOR_CACHE_START_MSB*256+SECTOR_CACHE_START_LSB)
+#define SECTOR_CACHE_START_MSB ((PDD2_DATA_ADDR>>0x08)&0xFF) // 0x80
+#define SECTOR_CACHE_START_LSB (PDD2_DATA_ADDR&0xFF)         // 0x13
+// sysinfo[2] = SECTOR_SIZE_MSB
+// sysinfo[3] = SECTOR_SIZE_LSB
+#define SYSINFO_CPU_CODE       0x10 // 0x10 = HD6301
+// sysinfo[5] = MODEL_CODE
 
 // flags
 #define FE_FLAGS_NONE          0
@@ -219,10 +244,5 @@
 // drive command seperators
 #define OPR_CMD_SYNC 0x5A
 #define FDC_CMD_EOL  0x0D
-
-// terminal emulation
-#define SSO "\033[7m" // set standout
-#define RSO "\033[m"  // reset standout
-#define D8C "\033 F"  // disable 8-bit vtxx control bytes (0x80-0x9F)
 
 #endif // PDD_CONSTANTS_H

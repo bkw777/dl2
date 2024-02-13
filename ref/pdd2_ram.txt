@@ -1,5 +1,7 @@
 TPDD2 2k ram map
 
+pick a random disk sctor, say 68
+
 read sector 68 from disk into cache
 sector 68 is track 34 sector 0
 PDD(pdd2[0]:6.2,F)> cache 34 0 0
@@ -7,7 +9,7 @@ PDD(pdd2[0]:6.2,F)> cache 34 0 0
 read the entire 2k external ram
 PDD(pdd2[0]:6.2,F)> mem_read 1 0x8000 0x800
 
-2k ram includes both the 1280 byte DATA and the 19-byte ID section
+2k ram includes both the 1280 byte DATA and the 12-byte ID section
 ram starts at 0x8000
 ID starts at 0x8004
 DATA aka Sector Cache starts at 0x8013
@@ -33,4 +35,6 @@ DATA aka Sector Cache starts at 0x8013
 8012: 8E  ??? maybe id-crc lsb
 8013:     start of DATA
 ...
-
+8512:     end of DATA
+...
+87FF:     end of 2k ram

@@ -66,8 +66,8 @@ which is loaded by the SARDIN button in UR-II.
     exist. The rest of the recognized filenames are DOSM10.CO, DOSK85.CO,
     SARNEC.CO, SARM10.CO, and SARK85.CO.
 
-    \*M10.CO & \*K85.CO would be TS-DOS & Sardine for Olivetti and Kyotronic,
-     which may not have ever existed. If they did exist, these are just my
+     M10.CO & K85.CO would be TS-DOS & Sardine for Olivetti and Kyotronic,
+     which probably never existed. If they did exist, these are just my
      guesses what the filenames would be. Maybe they will turn up some day.
 
 (2) *Not quite possible*
