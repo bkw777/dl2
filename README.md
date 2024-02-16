@@ -202,6 +202,7 @@ Enable by building with `-DUSE_XATTR`
 
 Test with [pdd.sh](https://github.com/bkw777/pdd.sh)
 
+Only tested on Linux. Probably doesn't work on mac or freebsd yet.  
 [more info & example](ref/xattr.md)
 
 ## History / Credits
