@@ -53,25 +53,26 @@ MA 02111, USA.
 
 #if defined(__APPLE__) || defined(__NetBSD__) || defined(OpenBSD)
 #include <util.h>
-//#if defined(USE_XATTR)
-//#include <sys/xattr.h>
-//#endif
 #endif
 
 #if defined(__FreeBSD__)
 #include <libutil.h>
-//#if defined(USE_XATTR)
-//#include <attr/xattr.h>
-//#endif
 #endif
 
 #if defined(__linux__)
 #include <utmp.h>
-#if defined(USE_XATTR)
-#include <sys/xattr.h>
-#endif
 #endif
 
+#if defined(USE_XATTR)
+#include <sys/xattr.h>
+#if defined(__APPLE__)
+#define XATTR_PREFIX ""
+#define XATTR_SUFFIX "#S"
+#else
+#define XATTR_PREFIX "user."
+#define XATTR_SUFFIX ""
+#endif
+#endif
 
 /*** config **************************************************/
 
@@ -113,10 +114,9 @@ MA 02111, USA.
 #ifndef RAW_ATTR
 #define RAW_ATTR     0x20 // space
 #endif
-#if defined(USE_XATTR)
-#ifndef XATTR_NAME
-#define XATTR_NAME "user.pdd.attr"
-#endif
+
+#if defined(USE_XATTR) && !defined(XATTR_NAME)
+#define XATTR_NAME "pdd.attr"
 #endif
 
 #define DEFAULT_TPDD1_IMG_SUFFIX ".pdd1"
@@ -131,11 +131,11 @@ MA 02111, USA.
 #endif
 
 #ifndef DEFAULT_DOTPOS
-#define DEFAULT_DOTPOS 6
+#define DEFAULT_DOTPOS DOT_FLOPPY
 #endif
 
 #ifndef DEFAULT_OPERATION_MODE
-#define DEFAULT_OPERATION_MODE 1
+#define DEFAULT_OPERATION_MODE MODE_OPR
 #endif
 
 #ifndef DEFAULT_TILDES
@@ -217,7 +217,7 @@ char dme_dir_label[3] = TSDOS_DIR_LABEL;
 char default_attr = DEFAULT_ATTR;
 
 #if defined(USE_XATTR)
-char* xattr_name = XATTR_NAME;
+char* xattr_name = XATTR_PREFIX XATTR_NAME XATTR_SUFFIX;
 #endif
 
 bool enable_magic_files = true;
@@ -474,9 +474,10 @@ void find_ttys (char* f) {
 		dbg(0,"\n");
 		for (i=1;i<=nttys;i++) dbg(0,"%d) %s\n",i,ttys[i]);
 		i=0; char a[6]={0};
-		dbg(0,"Which serial port is the TPDD client on (1-%d) ? ",nttys);
+		dbg(0,"Which serial port is the TPDD client on (1-%d or q) ? ",nttys);
 		if (fgets(a,sizeof(a),stdin)) i=atoi(a);
 		if (i<1 || i>nttys) i=0;
+		dbg(0,"\n");
 		if (a[0]=='q'||a[0]=='Q') break;
 	}
 
@@ -530,7 +531,11 @@ void client_tty_vmt(int m,int t) {
 int open_client_tty () {
 	dbg(3,"%s()\n",__func__);
 
-	if (!client_tty_name[0]) { show_main_help() ;dbg(0,"Error: No serial device specified\n(searched: /dev/%s*)\n",TTY_PREFIX); return 1; }
+	if (!client_tty_name[0]) {
+		show_main_help();
+		dbg(0,"Error: No serial device specified\n(searched: /dev/%s*)\n",TTY_PREFIX);
+		return 1;
+	}
 
 	dbg(0,"Opening \"%s\" ... ",client_tty_name);
 	// open with O_NONBLOCK to avoid hang if client not ready, then unset later.
@@ -750,7 +755,7 @@ int open_disk_image (int p, int m) {
 void req_fdc_set_mode(int m) {
 	dbg(2,"%s(%d)\n",__func__,m);
 	operation_mode = m; // no response, just switch modes
-	if (m==1) dbg(2,"Switched to \"Operation\" mode\n");
+	if (m==MODE_OPR) dbg(2,"Switched to \"Operation\" mode\n");
 }
 
 // disk state
@@ -1095,9 +1100,9 @@ FILE_ENTRY* make_file_entry(char* namep, uint8_t attr, uint16_t len, char flags)
 		char en[3] = {0};
 		f.client_fname[dot_offset]='.';
 
-		if (dot_offset==6 && flags&FE_FLAGS_DIR) {
+		if (dot_offset==DOT_FLOPPY && flags&FE_FLAGS_DIR) {
 			// TS-DOS directories
-			if (!strcmp(f.local_fname,"..")) memcpy (f.client_fname, dme_parent_label, 6);
+			if (!strcmp(f.local_fname,"..")) memcpy (f.client_fname, dme_parent_label, DOT_FLOPPY);
 			en[0] = dme_dir_label[0];
 			en[1] = dme_dir_label[1];
 			f.len = 0;
@@ -1370,9 +1375,9 @@ void update_dme_cwd() {
 			if (cwd[i]=='/') break;
 			if (upcase && cwd[i]>='a' && cwd[i]<='z') cwd[i]=cwd[i]-32;
 		}
-		snprintf(dme_cwd,7,"%-6.6s",cwd+1+i);
+		snprintf(dme_cwd,DOT_FLOPPY+1,"%-*.*s",DOT_FLOPPY,DOT_FLOPPY,cwd+1+i);
 	} else {
-		memcpy(dme_cwd,dme_root_label,6);
+		memcpy(dme_cwd,dme_root_label,DOT_FLOPPY);
 	}
 }
 
@@ -1384,7 +1389,7 @@ void ret_dme_cwd() {
 	gb[0] = RET_STD[0];
 	gb[1] = 0x0B;   // not RET_STD[1] because TS-DOS DME violates the spec
 	gb[2] = 0x00;   // don't know why this byte is 0
-	memcpy(gb+3,dme_cwd,6); // 6 bytes 3-8 display in top-right corner
+	memcpy(gb+3,dme_cwd,DOT_FLOPPY); // 6 bytes 3-8 display in top-right corner
 	gb[9] = 0x00;   // gb[9]='.';  // remaining contents don't matter but length does
 	gb[10] = 0x00;  // gb[10]=dme_dir_label[0];
 	gb[11] = 0x00;  // gb[11]=dme_dir_label[1];
@@ -1445,7 +1450,7 @@ void req_fdc() {
 	if (dme>1) {
 		ret_dme_cwd();
 	} else {
-		operation_mode = 0;
+		operation_mode = MODE_FDC;
 		dbg(2,"Switched to \"FDC\" mode\n"); // no response to client, just switch modes
 	}
 }
@@ -2290,8 +2295,8 @@ void show_config () {
 	dbg(2,"operation_mode  : %d\n",operation_mode);
 	dbg(2,"baud            : %d\n",baud);
 	dbg(0,"dme_disabled    : %s\n",dme_disabled?"true":"false");
-	dbg(2,"dme_root_label  : \"%-6.6s\"\n",dme_root_label);
-	dbg(2,"dme_parent_label: \"%-6.6s\"\n",dme_parent_label);
+	dbg(2,"dme_root_label  : \"%-*.*s\"\n",DOT_FLOPPY,DOT_FLOPPY,dme_root_label);
+	dbg(2,"dme_parent_label: \"%-*.*s\"\n",DOT_FLOPPY,DOT_FLOPPY,dme_parent_label);
 	dbg(2,"dme_dir_label   : \"%-2.2s\"\n",dme_dir_label);
 	dbg(0,"magic_files     : %s\n",enable_magic_files?"enabled":"disabled");
 	dbg(2,"default_attr    : '%c' (0x%1$02X)\n",default_attr);
@@ -2306,7 +2311,11 @@ void show_main_help() {
 		"\n"
 		"Options     Description (default setting)\n"
 		"   -0       Raw mode - no filename munging, attr = ' '\n"
+#if defined(USE_XATTR)
+		"   -a c     Attribute - default attr byte used when no xattr (%2$c)\n"
+#else
 		"   -a c     Attribute - attribute byte used for all files (%2$c)\n"
+#endif
 		"   -b file  Bootstrap - send loader file to client\n"
 		"   -d tty   Serial device connected to the client (%4$s*)\n"
 		"   -n       Disable TS-DOS directories (enabled)\n"
@@ -2364,8 +2373,8 @@ int main(int argc, char** argv) {
 	if (getenv("DOT_OFFSET")) dot_offset = atoi(getenv("DOT_OFFSET"));
 	if (getenv("CLIENT_TTY")) strcpy(client_tty_name,getenv("CLIENT_TTY"));
 	if (getenv("BAUD")) baud = atoi(getenv("BAUD"));
-	if (getenv("ROOT_LABEL")) snprintf(dme_root_label,7,"%-6.6s",getenv("ROOT_LABEL"));
-	if (getenv("PARENT_LABEL")) snprintf(dme_parent_label,7,"%-6.6s",getenv("PARENT_LABEL"));
+	if (getenv("ROOT_LABEL")) snprintf(dme_root_label,DOT_FLOPPY+1,"%-*.*s",DOT_FLOPPY,DOT_FLOPPY,getenv("ROOT_LABEL"));
+	if (getenv("PARENT_LABEL")) snprintf(dme_parent_label,DOT_FLOPPY+1,"%-*.*s",DOT_FLOPPY,DOT_FLOPPY,getenv("PARENT_LABEL"));
 	if (getenv("DIR_LABEL")) snprintf(dme_dir_label,3,"%-2.2s",getenv("DIR_LABEL"));
 	if (getenv("ATTR")) default_attr = *getenv("ATTR");
 #if defined(USE_XATTR)
@@ -2397,7 +2406,7 @@ int main(int argc, char** argv) {
 			case 's': baud = atoi(optarg);                                break;
 			case 'u': upcase = true;                                      break;
 			case 'v': debug++;                                            break;
-			case 'w': dot_offset = 8;                                     break;
+			case 'w': dot_offset = DOT_WP2;                               break;
 			case 'z': BASIC_byte_us=atoi(optarg)*1000;                    break;
 			case '^': x = true;                                           break;
 			case ':': dbg(0,"\"-%c\" requires a value\n",optopt);         break;
@@ -2430,12 +2439,6 @@ int main(int argc, char** argv) {
 	if (x) { show_config(); return 0; }
 
 	dbg(0,    "Serial Device: %s\n",client_tty_name);
-	if (model==2) {
-		dbg(0,"Bank 0 Dir   : %s\n",share_path[0]);
-		dbg(0,"Bank 1 Dir   : %s\n",share_path[1]);
-	} else {
-		dbg(0,"Working Dir  : %s\n",cwd);
-	}
 
 	if ((i=open_client_tty())) return i;
 
@@ -2443,14 +2446,32 @@ int main(int argc, char** argv) {
 	if (bootstrap_fname[0]) return (bootstrap(bootstrap_fname));
 
 	// further setup that's only needed for tpdd
-	if (check_disk_image()) return 1; // may change model based on disk image size or name
+	if (check_disk_image()) return 1; // this may set model=1 or 2 based on disk image size or name
+	if (model==2) { load_rom(TPDD2_ROM); dme_disabled=true; }
+	if (dot_offset!=DOT_FLOPPY) { enable_magic_files=false; dme_disabled=true; } // only applies to UR2/TSLOAD
+	if (!dme_disabled) memcpy(dme_cwd,dme_root_label,DOT_FLOPPY);
+
+	dbg(0,"\n");
+
 	dbg(2,"Emulating %s\n",(model==2)?"TANDY 26-3814 (TPDD2)":"Brother FB-100 (TPDD1)");
-	if (model==2) {load_rom(TPDD2_ROM); dme_disabled=true; }
-	dbg(2,"TS-DOS directories %s\n",(dme_disabled)?"disabled":"enabled");
 	dbg(2,"TPDD2 banks %s\n",(model==2)?"enabled":"disabled");
-	if (!dme_disabled) memcpy(dme_cwd,dme_root_label,6);
-	if (dot_offset!=6) enable_magic_files=false; // only applies to UR2/TSLOAD
+	dbg(2,"TS-DOS directories %s\n",(dme_disabled)?"disabled":"enabled");
 	dbg(2,"Magic files for UR-II/TSLOAD %s\n",(enable_magic_files)?"enabled":"disabled");
+	if (model==2) dbg(0,"Bank 0 Dir: %s\nBank 1 Dir: %s\n",share_path[0],share_path[1]);
+	dbg(2,"Filenames: ");
+	switch (dot_offset) {
+		case DOT_FLOPPY: dbg(2,"%d.2 space-padded \"Model T\" compatible\n",dot_offset); break;
+		case DOT_WP2: dbg(2,"%d.2 space-padded WP-2 compatible\n",dot_offset); break;
+		case 0: dbg(2,"%d byte unformatted\n",TPDD_FILENAME_LEN); break;
+		default: dbg(2,"%d.2 space-padded\n",dot_offset); break;
+	}
+	if (tildes) dbg(2,"Truncated filenames end in \"~\"\n");
+#if defined(USE_XATTR)
+	dbg(2,"Attribute: Stored in xattr \"%s\", default \"%c\" when absent",xattr_name,default_attr);
+#else
+	dbg(2,"Attribute: \"%c\"",default_attr);
+#endif
+	dbg(2,"\n");
 
 	// initialize the file list
 	file_list_init();
@@ -2462,7 +2483,10 @@ int main(int argc, char** argv) {
 	if (debug) update_file_list(NO_RET);
 
 	// process commands forever
-	while (1) if (operation_mode) get_opr_cmd(); else get_fdc_cmd();
+	while (1) switch (operation_mode) {
+		case MODE_FDC: get_fdc_cmd(); break;
+		default: get_opr_cmd(); break;
+	}
 
 	// file_list_cleanup()
 	return 0;

@@ -23,7 +23,7 @@ DEFAULT_DOTPOS := 6    # default 6.2 filenames compatible with Floppy/TS-DOS/etc
 DEFAULT_TILDES := true
 DEFAULT_ATTR := 0x46   # default attribute 'F' compatible with Floppy/TS-DOS/etc.
 RAW_ATTR := 0x20       # attr for "raw" mode, 0x00, 0x20, 0x46 are all plausible.
-XATTR_NAME := user.pdd.attr
+XATTR_NAME := pdd.attr
 DEFAULT_DME_ROOT_LABEL := "0:    "
 DEFAULT_DME_PARENT_LABEL := "^     "
 
@@ -124,7 +124,7 @@ endif
 all: $(NAME)
 
 $(NAME): $(SOURCES) $(HEADERS)
-	$(CC) $(CFLAGS) $(DEFINES) $(SOURCES) $(LDLIBS) -o $(@)
+	$(CC) $(CFLAGS) $(CXXFLAGS) $(DEFINES) $(SOURCES) $(LDLIBS) -o $(@)
 
 install: $(NAME) $(CLIENT_LOADERS) $(LIB_OTHER) $(DOCS)
 	mkdir -p $(APP_LIB_DIR)

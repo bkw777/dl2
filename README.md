@@ -14,38 +14,44 @@ $ sudo make uninstall
 ## Manual
 ```
 $ dl -h
-DeskLink2 v2.1.001-2-gabcc469
+DeskLink2 v2.1.001-11-g361baa4
 
-usage: dl [options] [tty_device] [share_path]
+Usage: dl [options] [tty_device] [share_path]
 
-options:
+Options     Description (default setting)
    -0       Raw mode - no filename munging, attr = ' '
-   -a c     Attribute - attribute byte used for all files (F)
+   -a c     Attribute - default attr byte used when no xattr (F)
    -b file  Bootstrap - send loader file to client
    -d tty   Serial device connected to the client (ttyUSB*)
-   -n       Disable support for TS-DOS directories (enabled)
+   -n       Disable TS-DOS directories (enabled)
    -g       Getty mode - run as daemon
    -h       Print this help
    -i file  Disk image filename for raw sector access
    -l       List loader files and show bootstrap help
-   -m #     Model - 1 = FB-100/TPDD1, 2 = TPDD2 (2)
+   -m #     Model - 1 = FB-100/TPDD1, 2 = TPDD2 (1)
    -p dir   Path - /path/to/dir with files to be served (./)
-   -r       RTS/CTS hardware flow control
+   -r       RTS/CTS hardware flow control (false)
    -s #     Speed - serial port baud rate (19200)
-   -u       Uppercase all filenames
+   -u       Uppercase all filenames (false)
    -v       Verbosity - more v's = more verbose
-   -w       WP-2 mode - 8.2 filenames
+   -w       WP-2 mode - 8.2 filenames for TANDY WP-2
    -z #     Milliseconds per byte for bootstrap (8)
 
 The 1st non-option argument is another way to specify the tty device.
 The 2nd non-option argument is another way to specify the share path.
+TPDD2 mode accepts a 2nd share path for bank 1.
+TPDD2 mode does not support TS-DOS dfirectories.
 
-   dl
-   dl -vv -p ~/Downloads/REX/ROMS
-   dl -v -w ttyUSB1 ~/Documents/wp2files
+Examples:
+   $ dl
+   $ dl ttyUSB1
+   $ dl -vu -p ~/Downloads/REX
+   $ dl -w /dev/cu.usbserial-AB0MQNN1 ~/Documents/wp2
+   $ dl -m2 -p /tmp/bank0 -p /tmp/bank1
 
 $ 
 ```
+
 ```
 $ dl -l
 DeskLink2 v2.1.001-2-gabcc469
@@ -186,36 +192,17 @@ Tested on Linux, [Mac](ref/mac.md), [FreeBSD](ref/freebsd.md), and [Windows](ref
 * Fake sector 0 based on the files in the current share path so that if a client tries to read the FCB table directly it works.
 * Fake entire disk image in ram based on current share path files. Option to save the image as long as we're there.
 
-### testing
-* Real attribute byte handling.  
-  Saves & retrieves the actual attr value submitted by the client in an
-  xattr instead of just hard-coding attr=F.
-  
-  Enable by building with `-DUSE_XATTR`  
-  `$ make clean all CFLAGS+=" -DUSE_XATTR" && sudo make install`
+## New Feature Testing
+Real attr byte handling.
 
-  Test with [pdd.sh](https://github.com/bkw777/pdd.sh)
+Store & retrieve the actual attr value submitted by the client in an xattr instead of just hard-coding attr=F.
 
-```
-bkw@fw:~/tmp/pdd$ echo test >0.do
-bkw@fw:~/tmp/pdd$ pdd "save 0.do 1.do;save 0.do 2.do A;save 0.do 3.do Q;ls"
-1) /dev/ttyUSB0
-2) /dev/ttyUSB2
-Which serial port is the TPDD drive on (1-2) ? 2
-Saving TPDD:1.do (F)
-[########################################] 100% (5/5 bytes)                    
-Saving TPDD:2.do (A)
-[########################################] 100% (5/5 bytes)                    
-Saving TPDD:3.do (Q)
-[########################################] 100% (5/5 bytes)                    
---------  Directory Listing  --------
-1.do                     | F |      5
-2.do                     | A |      5
-3.do                     | Q |      5
--------------------------------------
-102400 bytes free                    
-bkw@fw:~/tmp/pdd$ 
-```
+Enable by building with `-DUSE_XATTR`  
+`$ make clean all CXXFLAGS=-DUSE_XATTR && sudo make install`
+
+Test with [pdd.sh](https://github.com/bkw777/pdd.sh)
+
+[more info & example](ref/xattr.md)
 
 ## History / Credits
 [DeskLink for ms-dos](https://ftp.whtech.com/club100/com/dl-arc.exe.gz) 1987 Travelling Software  
