@@ -1,6 +1,8 @@
 #ifndef PDD_CONSTANTS_H
 #define PDD_CONSTANTS_H
 
+#include <stdint.h>
+
 // TPDD drive firmware/protocol constants
 
 // TPDD request block formats
@@ -33,14 +35,14 @@
 
 // TPDD return block formats                {fmt,len}
 #define RET_READ          0x10
-static const unsigned char RET_DIRENT[2]    = {0x11,0x1C};
-static const unsigned char RET_STD[2]       = {0x12,0x01}; // shared return format for: error open close delete status write
-static const unsigned char RET_VERSION[2]   = {0x14,0x0F}; // TPDD2
-static const unsigned char RET_CONDITION[2] = {0x15,0x01}; // TPDD2
-static const unsigned char RET_CACHE[2]     = {0x38,0x01}; // TPDD2 shared return format for: cache mem_write cond_list
+static const uint8_t RET_DIRENT[2]    = {0x11,0x1C};
+static const uint8_t RET_STD[2]       = {0x12,0x01}; // shared return format for: error open close delete status write
+static const uint8_t RET_VERSION[2]   = {0x14,0x0F}; // TPDD2
+static const uint8_t RET_CONDITION[2] = {0x15,0x01}; // TPDD2
+static const uint8_t RET_CACHE[2]     = {0x38,0x01}; // TPDD2 shared return format for: cache mem_write cond_list
 #define RET_MEM_READ      0x39 // TPDD2
-static const unsigned char RET_SYSINFO[2]   = {0x3A,0x06}; // TPDD2
-static const unsigned char RET_EXEC[2]      = {0x3B,0x03}; // TPDD2
+static const uint8_t RET_SYSINFO[2]   = {0x3A,0x06}; // TPDD2
+static const uint8_t RET_EXEC[2]      = {0x3B,0x03}; // TPDD2
 
 // directory entry request types
 #define DIRENT_SET_NAME   0x00
@@ -115,24 +117,24 @@ static const char FDC_CMDS[] = {FDC_SET_MODE,FDC_CONDITION,FDC_FORMAT,FDC_FORMAT
 // There is no documentation for FDC error codes.
 // These are guesses from experimenting.
 // These appear in the first hex pair of an 8-byte FDC-mode response.
-#define ERR_FDC_SUCCESS         0 // 'OK'
-#define ERR_FDC_LSN_LO         17 // 'Logical Sector Number Below Range'
-#define ERR_FDC_LSN_HI         18 // 'Logical Sector Number Above Range'
-#define ERR_FDC_PSN_HI         19 // 'Physical Sector Number Above Range'
-#define ERR_FDC_PARAM          33 // 'Parameter Invalid, Wrong Type'
-#define ERR_FDC_LSSC_LO        50 // 'Invalid Logical Sector Size Code'
-#define ERR_FDC_LSSC_HI        51 // 'Logical Sector Size Code Above Range'
-#define ERR_FDC_ID_NOT_FOUND   60 // 'ID Not Found'
-#define ERR_FDC_S_BAD_PARAM    61 // 'Search ID Unexpected Parameter'
-#define ERR_FDC_NOT_FORMATTED 160 // 'Disk Not Formatted'
-#define ERR_FDC_READ          161 // 'Read Error'
-#define ERR_FDC_WRITE_PROTECT 176 // 'Write-Protected Disk'
-#define ERR_FDC_COMMAND       193 // 'Invalid Command'
-#define ERR_FDC_NO_DISK       209 // 'Disk Not Inserted'
-#define ERR_FDC_INTERRUPTED   216 // 'Operation Interrupted'
+#define ERR_FDC_SUCCESS        0x00 // 'OK'
+#define ERR_FDC_LSN_LO         0x11 // 'Logical Sector Number Below Range'
+#define ERR_FDC_LSN_HI         0x12 // 'Logical Sector Number Above Range'
+#define ERR_FDC_PSN_HI         0x13 // 'Physical Sector Number Above Range'
+#define ERR_FDC_PARAM          0x21 // 'Parameter Invalid, Wrong Type'
+#define ERR_FDC_LSSC_LO        0x32 // 'Invalid Logical Sector Size Code'
+#define ERR_FDC_LSSC_HI        0x33 // 'Logical Sector Size Code Above Range'
+#define ERR_FDC_ID_NOT_FOUND   0x3C // 'ID Not Found'
+#define ERR_FDC_S_BAD_PARAM    0x3D // 'Search ID Unexpected Parameter'
+#define ERR_FDC_NOT_FORMATTED  0xA0 // 'Disk Not Formatted'
+#define ERR_FDC_READ           0xA1 // 'Read Error'
+#define ERR_FDC_WRITE_PROTECT  0xB0 // 'Write-Protected Disk'
+#define ERR_FDC_COMMAND        0xC1 // 'Invalid Command'
+#define ERR_FDC_NO_DISK        0xD1 // 'Disk Not Inserted'
+#define ERR_FDC_INTERRUPTED    0xD8 // 'Operation Interrupted'
 
 // TPDD1 FDC Logical Sector Length Codes
-static const unsigned short FDC_LOGICAL_SECTOR_SIZE[7] = {64,80,128,256,512,1024,1280};
+static const uint16_t FDC_LOGICAL_SECTOR_SIZE[7] = {64,80,128,256,512,1024,1280};
 
 // TPDD1 Condition bits
 #define PDD1_COND_BIT_NOTINS   7 // disk not inserted

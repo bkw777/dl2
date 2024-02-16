@@ -24,12 +24,13 @@ MA 02111, USA.
 #include <stdint.h>
 #include "constants.h"
 
-#define FEQ  10 // number of FILE_ENTRYs to malloc for at a time
+#define FEQ DIRENTS // number of FILE_ENTRYs to malloc for at a time
 
 typedef struct
 {
 	char     client_fname[TPDD_FILENAME_LEN+1];
 	char     local_fname[LOCAL_FILENAME_MAX+1];
+	uint8_t  attr;
 	uint16_t len;
 	uint8_t  flags;
 } FILE_ENTRY;
@@ -40,7 +41,7 @@ int file_list_cleanup ();
 void file_list_clear_all ();
 int  add_file (FILE_ENTRY* fe);
 
-FILE_ENTRY* find_file (char* client_fname);
+FILE_ENTRY* find_file (char* client_fname, uint8_t attr);
 FILE_ENTRY* get_first_file (void);
 FILE_ENTRY* get_next_file (void);
 FILE_ENTRY* get_prev_file (void);

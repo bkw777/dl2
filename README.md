@@ -180,12 +180,42 @@ See [co2ba](co2ba.md)
 Tested on Linux, [Mac](ref/mac.md), [FreeBSD](ref/freebsd.md), and [Windows](ref/windows.md).
 
 ## TODO - not all necessarily serious
-* Store the actual attr byte given by clients when they save a file, rather than faking with hardwired DEFAULT_ATTR=0x46. Store in xattr so that it stays part of the file when it is copied/moved/renamed.
 * File/filesystem access on disk images - Currently can only use disk images for sector access.
 * Verify if the code works on a big-endian platform - There are a lot of 2-byte values and a lot of direct byte manipulations because the protocol & drive uses MSB-first everywhere while most platforms today do not.
 * Figure out and emulate more of the special memory addresses accessible in tpdd2 mode. We already do some.
 * Fake sector 0 based on the files in the current share path so that if a client tries to read the FCB table directly it works.
 * Fake entire disk image in ram based on current share path files. Option to save the image as long as we're there.
+
+### testing
+* Real attribute byte handling.  
+  Saves & retrieves the actual attr value submitted by the client in an
+  xattr instead of just hard-coding attr=F.
+  
+  Enable by building with `-DUSE_XATTR`  
+  `$ make clean all CFLAGS+=" -DUSE_XATTR" && sudo make install`
+
+  Test with [pdd.sh](https://github.com/bkw777/pdd.sh)
+
+```
+bkw@fw:~/tmp/pdd$ echo test >0.do
+bkw@fw:~/tmp/pdd$ pdd "save 0.do 1.do;save 0.do 2.do A;save 0.do 3.do Q;ls"
+1) /dev/ttyUSB0
+2) /dev/ttyUSB2
+Which serial port is the TPDD drive on (1-2) ? 2
+Saving TPDD:1.do (F)
+[########################################] 100% (5/5 bytes)                    
+Saving TPDD:2.do (A)
+[########################################] 100% (5/5 bytes)                    
+Saving TPDD:3.do (Q)
+[########################################] 100% (5/5 bytes)                    
+--------  Directory Listing  --------
+1.do                     | F |      5
+2.do                     | A |      5
+3.do                     | Q |      5
+-------------------------------------
+102400 bytes free                    
+bkw@fw:~/tmp/pdd$ 
+```
 
 ## History / Credits
 [DeskLink for ms-dos](https://ftp.whtech.com/club100/com/dl-arc.exe.gz) 1987 Travelling Software  

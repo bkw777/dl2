@@ -74,10 +74,14 @@ int add_file(FILE_ENTRY* fe) {
 	return 0;
 }
 
-FILE_ENTRY* find_file(char* client_fname) {
+FILE_ENTRY* find_file(char* client_fname, uint8_t attr) {
 	int i;
 	for (i=0;i<ndx;i++) {
-		if (strcmp(client_fname,tblp[i].client_fname)==0) return &tblp[i];
+		if (
+				!strcmp(client_fname,tblp[i].client_fname)
+				&&
+				tblp[i].attr==attr
+			) return &tblp[i];
 	}
 	return 0;
 }

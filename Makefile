@@ -13,14 +13,17 @@ APP_VERSION := $(shell git describe --long 2>&-)
 #FB100_ROM := Brother_FB-100.rom # no use yet
 TPDD2_ROM := TANDY_26-3814.rom
 
-DEFAULT_BASIC_BYTE_MS := 8 # ms-per-byte in -b file.100
-DEFAULT_MODEL := 1     # 1=tpdd1  2=tpdd2  (TS-DOS FOO.<> dirs requires tpdd1)
+DEFAULT_BASIC_BYTE_MS := 8  # ms per byte in bootstrap
+DEFAULT_MODEL := 1          # 1=tpdd1  2=tpdd2  (TS-DOS directory support requires tpdd1)
+DEFAULT_OPERATION_MODE := 1 # 0=FDC-mode 1=Operation-mode
 DEFAULT_BAUD := 19200
 DEFAULT_RTSCTS := false
 DEFAULT_UPCASE := false
 DEFAULT_DOTPOS := 6    # default 6.2 filenames compatible with Floppy/TS-DOS/etc.
+DEFAULT_TILDES := true
 DEFAULT_ATTR := 0x46   # default attribute 'F' compatible with Floppy/TS-DOS/etc.
 RAW_ATTR := 0x20       # attr for "raw" mode, 0x00, 0x20, 0x46 are all plausible.
+XATTR_NAME := user.pdd.attr
 DEFAULT_DME_ROOT_LABEL := "0:    "
 DEFAULT_DME_PARENT_LABEL := "^     "
 
@@ -100,12 +103,16 @@ DEFINES := \
 	-DTPDD2_ROM=\"$(TPDD2_ROM)\" \
 	-DDEFAULT_BASIC_BYTE_MS=$(DEFAULT_BASIC_BYTE_MS) \
 	-DDEFAULT_MODEL=$(DEFAULT_MODEL) \
+	-DDEFAULT_OPERATION_MODE=$(DEFAULT_OPERATION_MODE) \
 	-DDEFAULT_BAUD=$(DEFAULT_BAUD) \
 	-DDEFAULT_RTSCTS=$(DEFAULT_RTSCTS) \
 	-DDEFAULT_UPCASE=$(DEFAULT_UPCASE) \
 	-DDEFAULT_DOTPOS=$(DEFAULT_DOTPOS) \
+	-DDEFAULT_TILDES=$(DEFAULT_TILDES) \
 	-DDEFAULT_ATTR=$(DEFAULT_ATTR) \
 	-DRAW_ATTR=$(RAW_ATTR) \
+	-DXATTR_NAME=\"$(XATTR_NAME)\" \
+#	-DUSE_XATTR \
 #	-DPRINT_8BIT \
 #	-DNADSBOX_EXTENSIONS \
 

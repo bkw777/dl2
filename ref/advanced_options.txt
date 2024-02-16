@@ -14,111 +14,266 @@ Commandline switches:
 
 Environment variables:
 
-To use these, just put them in the environment. The simples is just type
-them on the same command line , before the executable.
+To use these, just put them in the environment. The simplest is just type
+them on the same command line before the executable name.
 
 Example:
 
 	$ ROOT_LABEL=/ PARENT_LABEL=^ dl
 
 
- ROOT_LABEL    '/'  '0:'  'dlplus'  '  <>  '  'C:\'  '-root-'  etc... 
+ ROOT_LABEL="0:"
+	examples:
+		'ROOT'
+		'/'
+		'0:'
+		'-root-'
+		' ROOT '
+		'_ROOT_'
 
 	The original Desk-Link, and so, most other emulators also,
 	puts the string "ROOT  " in the top-right corner of the TS-DOS
 	display when the user is in the top level share directory.
 
-	This variable lets you put whatever you want there. If you give
-	it a string shorter than 6 bytes, it will be left justified.
-	If you give a string longer than 6 bytes it will be truncated.
-	If you want a shorter string to be centered, just include all 6 bytes
-	in the value within quotes. You can even make it blank with ''.
+	This variable lets you put whatever you want there.
 
- PARENT_LABEL    '^'  '^:'  '______'  '-back-'  'UP:'  etc...
+	The field in TS-DOS is exactly 6 characters.
+
+	Shorter than 6 bytes will be left-justified.
+	Longer than 6 bytes will be truncated.
+
+	If you want a shorter string to be centered,
+	use quotes and include the spaces.
+
+ PARENT_LABEL="^"
+	examples:
+		'PARENT'
+		'^'
+		'^:'
+		'  up  '
+		'__up__'
+		'-back-'
+		'UP:'
 
 	Similar to ROOT_LABEL, Desk-Link used the word "PARENT" for the
 	the "go back up one level" directory entry in the top-left file
-	slot in the directory listing screen. This is the Desk-Link
-	equivalent to ".."
+	slot in the directory listing screen.
+	This was Desk-Links equivalent to ".."
 
 	This variable lets you put whatever you want there instead of
 	"PARENT", with limitations. Unfortunately, since this appears
-	in the file list like any other file, TS-DOS is picky about
+	in the file list like any other file, and TS-DOS is picky about
 	what it considers a "bad" filename, and you can't put just
-	anything here. Most notably, you can't use ".." :/ DAMMIT!
+	anything here. Most notably, you can't use "..", because normally
+	"." would be an illegal character in a Model 100 filename except
+	the one in the 7th byte.
 
-	This is a TS-DOS limitation. You CAN actually use "..", in that,
-	dlplus will send it to TS-DOS, and TS-DOS will even display it
-	properly in the file listing, but if you try to hit enter on
-	it to move back up a directory, TS-DOS just beeps and says bad
-	filename. TS-DOS never sends anything to the server, so the error
-	is coming from TS-DOS, not from the server.
+	This is a TS-DOS limitation. You CAN actually use "..", in that dl2
+	will send it to TS-DOS, and TS-DOS will even display it properly in
+	the file listing, but if you try to select it to move back up a
+	directory, TS-DOS just beeps and says "bad filename". The error is not
+	dl2 rejectimng the command, TS-DOS rejects the filename and never tries
+	to send any command.
 
 	However a lot of other things do work fine. Generally, for something
 	to work, it has to be left-justified like a real filename would be.
 	It takes some trial & error to figure out what works.
 
- ATTR     'F'   ' '   any single character
+ ATTR="F"
+	examples: 'F', ' ', any single byte
 
-	The TPDD drive has a single-character field along with every filename.
-	It's just a text field that the drive can use to return a a group of
+	A real TPDD drive has a one-byte field along with every filename.
+
+	It's just a text field that the drive can use to return a group of
 	matching files all together before the rest during file listings.
 	It's not really used by any software I know of, but the field is
-	there, and Floppy always writes an 'F' there for every file. It doesn't
-	really matter or do anything. Everything still works if it's blank
-	for instance. But because Floppy always writes an F there, so does
-	every other client and emulator.
+	there, and when a client gives a dirent() command, it must include
+	the field with some value in it, and if trying to access an existing
+	file on disk, the value must match the value on disk.
+
+	Floppy and TS-DOS and all other KC-85 platform tpdd client software
+	always writes an 'F' there, hard-coded for every file, reading or writing,
+	and does not display the field to the user or give any way to change it.
+	This essentially no-ops the field.
 
 	When an emulator is serving files, usually there is no actual attribute
 	byte stored with the file, so all emulators just fabricate an F there for
 	every file when they give filenames to clients.
 
-	But a real drive doesn't care, and TS-DOS is not the only client
-	that uses TPDD drives or emulators, so here is a way to modify
-	that if you want.
+	But a real drive lets you put anything you want in that field, and actually
+	matches the value in a dirent() request from a client against the values
+	in the directory entries on the disk.
 
 	All this setting does is, when the client requests a file or directory
-	listing, and we're sending a file name and size to the client, it uses
-	this instead of 'F' for the attribute byte.
+	listing, and we're sending a filename and filesize to the client, it uses
+	the specified value instead of the built-in default 'F' for the attribute byte.
 
-	Who/what ever cares? Who knows.
+	Who/what ever cares? Who knows. It's possible the Cambridge Z88 doesn't
+	write 'F' in the attr field the way Floppy does, and so for those machines
+	maybe you may need to specify ' ' or something else.
+	Possibly also the Brother knitting machines used the field for actual file
+	classification/grouping and wrote various values there.
 
- DOT_OFFSET   0 to 25, but really only 0, 6, or 8 are useful.
+	pdd.sh exposes the field and let's you see it and write whatever
+	you want in it and search whatever you want in it.
 
-	Just another way to do the same thing as the -w or -0 options.
+ DOT_OFFSET=6
+	valid values: 0 to 24, but really only 0, 6, or 8 are useful.
 
-	Default behavior is dot_offset=6 , which makes 6.2 space-padded filenames.
-	The -w option for WP-2 does the same thing but 8.2
-	The -0 option does dot_offset=0 plus disables all other forms of name editing or filtering.
+	Just another way to do the same thing as the -w or -0 options, except
+	you can specify any value from 0-24.
 
-	This variable would let you set some arbitrary value anywhere in the 0-25
-	size of the field (24 plus just beyond to make another version of 0 basically)
-	There is no reason to do that.
+	Default behavior is DOT_OFFSET=6, aka "Floppy/TS-DOS mode".
+	This makes 6.2 space-padded filenames.
 
-	It's possibly useful as just as an alternative way to set 0, 6, or 8 though,
-	which would essentially change the default behavior instead of having to
-	specify all the special options you want every time.
+	The -w option is DOT_OFFSET=8, aka "WP-2 mode".
+	This makes 8.2 space-padded filenames.
 
- OPR_MODE    0 or 1, default is 1
+	The -0 option does DOT_OFFSET=0, aka "raw mode".
+	This makes filenames truncated to 24 bytes but otherwise not modified.
+	There is no special meaning or handling of dots or any other characters.
+
+	It's possibly useful as just as an alternative way to set 0 or 8 as
+	default instead of having to include the -0 or -w commandline options
+	every time.
+
+ OPERATION_MODE=1
+	valid values: 0 or 1
 
 	A TPDD1 / FB-100 drive has two main modes of operation called
-	Operation-mode and FDC-mode (actually the software manual calls
-	them Operation mode and FDC-Emulation mode)
+	Operation-mode and FDC-mode.
 
 	These are basically two entire different sets of commands to
 	use the drive.
 
-	The drive is usually in Operation mode, but a few things do use FDC mode.
-	You can switch the starting default state by setting this to 0.
+	A real drive has dip switches that let you set either mode to be the
+	default mode at power-on.
 
- BAUD       9600 or 19200    19200 is default
+	This setting lets you emulate the dip switch settings for starting up
+	in FDC-mode instead of Operation-mode.
 
-	If for whatever reason you want to force the server to run at 9600
-	instead of 19200, this how you can. Some drives like Purple Computing
-	are actually hard wired to run at 9600. This would let you emulate
-	one of those, perhaps for testing software against it.
+	Default is OPERATION_MODE=1, meaning dl2 starts up in Operation-mode.
+	This matches the TPDD1 default dip switch settings, the TPDD2 (tpdd2 has
+	no other mode), and the hard-wired solder-blob settings on FB-100 and
+	Purple-Computing drives.
 
-CLIENT_TTY
+	Regardless which mode is the default at start-up, the drive (and dl2) still
+	responds to the commands to switch between modes, and clients like
+	TS-DOS always send a little set/reset sequence to ensure the drive gets
+	put into Operation-mode before it tries to use Operation-mode commands.
+	So mostly it almost doesn't matter which mode is the power-on default.
 
-	The device name of the tty that the client is connected to.  
-	Examples: ttyUSB0, ttyS6
+ BAUD=19200
+	valid values:
+		75       model-t supports, drive does not
+		110      model-t supports, drive does not
+		150      drive supports, model-t does not
+		300
+		600
+		1200
+		2400
+		4800
+		9600     default Brother FB-100, KnitKing FDD19, Purple Computing D103
+		19200    default TANDY 26-3808, TANDY 26-3814
+		38400
+		76800    drive supports, host platform usually does not
+
+	Set the baud rate. Same as the "-s" commandline flag.
+	Default is 19200.
+
+	The TPDD1 has dip switches to support several different baud rates from
+	75 to 76800. The default setting from the factory and in the user manual
+	is 19200.
+
+	The Brother FB-100 and re-badges like Purple Computing D103 have a set of
+	solder-jumper pads instead of dip switches. They support all the same baud
+	rates as TPDD1 but require soldering the jumper pads or installing a dip
+	switch to change the baud rate. From the factory they are all hard-wired
+	to run at 9600 baud with a solder blob on one of the dip switch positions.
+
+	The TPDD2 has no dip switches or other means to set a different baud rate,
+	and only runs at 19200 baud.
+
+	Most tpdd client software just tries to run at 19200.
+
+	Although the drive has a dip switch setting for 76800 baud, that is a weird
+	rate that a typical linux/bsd machine today does not natively support.
+	But some platforms like linux on Sparc do (apparently) support this baud
+	rate. So the option is there in dl2 but isn't available unless you compiled
+	on a system that supports it.
+
+ CLIENT_TTY=ttyUSB0
+	examples: ttyUSB0, ttyS2, cu.usbserial-AL03RAXP
+
+	The device name of the tty that the client is connected to,
+	with or without the leading "/dev/".
+	Same as the "-d" commandline flag.
+
+	For osx/macos always use the "/dev/cu.*" interface and not the
+	"/dev/tty.*" interface to the same device. The cu.* interface
+	provides exclusive access to the port and avoids data corruption.
+
+ DISABLE_DME=false
+	valid values: 0, false, off, no, 1, true, on, yes
+	case-insensitive, 0 = all values <1 = false, 1 = all values >0 = true
+
+	Enable/Disable TS-DOS directory support.
+	Default is enabled, use this to disable.
+
+	TS-DOS/Desk-Link directory mode extensions technically violate the tpdd spec,
+	which could theoretically break some legitimate tpdd client software that
+	is playing by the rules, and just happens to do the same thing as what TS-DOS
+	does for a "DME request".
+
+	The only things likely to break would be things that switch between
+	Operation-mode and FDC-mode on TPDD1, and the only things found so far that
+	use FDC-mode at all are Sardine and the installer for Disk-Power, and both
+	of those are working on dl2 without needing this option.
+
+ MAGIC_FILES=true
+	valid values: 0, false, off, no, 1, true, on, yes
+	case-insensitive, 0 = all values <1 = false, 1 = all values >0 = true
+
+	Enable/Disable the "magic files" feature. (default enabled)
+	In case you specifically do not want the special filenames like "DOS100.CO"
+	to be recognized and work by magic even if there is no file by that name.
+
+ TILDES=true
+	valid values: 0, false, off, no, 1, true, on, yes
+	case-insensitive, 0 = all values <1 = false, 1 = all values >0 = true
+
+	When long local filenames are truncated down to the tpdd limits,
+	distinguish truncated filenames from naturally short filenames
+	by ending the truncated names with '~'.
+
+	The basename and extension parts of the filenames are evaluated
+	individually.
+	areallylongname.ba -> "areal~.ba"
+	a.bas -> "a     .b~"
+	areallylongname.basic -> "areal~.b~"
+
+	Basename and ext also end at the first and last dots if there are
+	multiple dots, and in that case, if the part before the first dot is
+	short enough to fit, but there was more filename removed after a dot,
+	then a tilde is added to indicate that even though the name looks short
+	the original name was actually longer.
+	a.ba -> "a     .ba"
+	a.long.name.ba -> "a~    .ba"
+
+	By default the basename.ext limits are 6.2, compatible with Floppy,
+	TS-DOS, and all other KC-85 platform tpdd client software.
+
+	The "-w" option limits are 8.2, compatible with the TANDY WP-2 firmware.
+
+	The "-0" option is "raw mode" and allows using the entire 24 bytes
+	in the filename field like a real drive, with no special meaning to dots
+	or any other character. There is no "extension". The local filename is
+	simply copied verbatim up to it's first 24 bytes (or 23 if a ~ is needed).
+	a.twenty-four.bytes.name -> "a.twenty-four.bytes.name"
+	this.name.is.over.24.bytes.long -> "this.name.is.over.24.by~"
+
+XATTR_NAME=user.pdd.attr
+
+	If compiled with -DUSE_XATTR, then this environment variable can be used
+	to specify a different xattr name than the default "user.pdd.attr" for
+	storing and retrieving the ATTR byte for each file.
