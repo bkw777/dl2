@@ -302,7 +302,7 @@ void dl_getxattr(const char* path, uint8_t* value) {
 #  if defined(__linux__)
 	getxattr(path, xattr_name, value, 1);
 #  elif defined(__APPLE__)
-	getxattr(path, xattr_name, value, 1, 0, NULL);
+	getxattr(path, xattr_name, value, 1, 0, 0);
 #  elif defined(__FreeBSD__)
 	extattr_get_file(path, EXTATTR_NAMESPACE_USER, xattr_name, value, 1);
 #  endif
@@ -314,7 +314,7 @@ void dl_fgetxattr(int fd, uint8_t* value) {
 #  if defined(__linux__)
 	fgetxattr(fd, xattr_name, value, 1);
 #  elif defined(__APPLE__)
-	fgetxattr(fd, xattr_name, value, 1, 0, NULL);
+	fgetxattr(fd, xattr_name, value, 1, 0, 0);
 #  elif defined(__FreeBSD__)
 	extattr_get_fd(fd, EXTATTR_NAMESPACE_USER, xattr_name, value, 1);
 #  endif
@@ -326,7 +326,7 @@ void dl_fsetxattr(int fd, const uint8_t* value) {
 #  if defined(__linux__)
 	fsetxattr(fd, xattr_name, value, 1, 0);
 #  elif defined(__APPLE__)
-	fsetxattr(fd, xattr_name, value, 1, 0, NULL);
+	fsetxattr(fd, xattr_name, value, 1, 0, 0);
 #  elif defined(__FreeBSD__)
 	extattr_set_fd(fd, EXTATTR_NAMESPACE_USER, xattr_name, value, 1);
 #  endif

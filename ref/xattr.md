@@ -1,7 +1,55 @@
 ## Storing the ATTR byte from the tpdd client in local xattr
 
-Example:  
- Create a small text file `T0.DO`  
+If compiled with -DUSE_XATTR then the ATTR field of a TPDD directory entry is stored in and retrieved from an extended attribute named "pdd.attr", instead of just hard-coded with 'F' at all times.
+
+On Linux the xattr name is prefixed with "user." to become "user.pdd.attr"  
+On Mac the xattr name is suffixed with "#S" to become "pdd.attr#S"  
+On FreeBSD the name is unchanged and the namespace used is EXTATTR_NAMESPACE_USER  
+The xattr name is not something like "com.dl2.attr" because it is intended to be generic and not tied just to dl2, so other tpdd clients and servers might use the same name and the files would be compatible across different software.  
+
+The attr field is a single byte, and may contain any value, 0x00 to 0xFF.  
+The field is normally never shown to users because TRS-80 Model 100 software doesn't use the field and just hard-codes 'F' in that field behind the scenes.  
+And because of that, most drive emulators also ignore the field except to just hard-code the same 'F' there at all times.  
+But a real drive is actually recording and checking that data with every file access, and other software could use it.
+
+So the idea is to more accurately emulate a real drive by actually recording the attr byte supplied by the client, and actually checking it later.  
+If the client is creating a new file, save the given attr value as part of the local file in the fom of an xattr field.  
+If looking for an existing file, read the attr for each local file from the xattr, and compare with the attr given by the client along with the filename.  
+Only use the default attr value when the xattr doesn't exist.  
+
+Example using [pdd.sh](https://github.com/bkw777/pdd.sh)
+
+First the help reference for the load and save commands.  
+You don't normally use the attr argument but there is one.
+
+```
+PDD(opr:6.2,F)> help save
+
+ save src_filename [dest_filename] [attr]
+    Copy a file from local to disk
+PDD(opr:6.2,F)> help load
+
+ load src_filename [dest_filename] [attr]
+    Copy a file from disk to local
+
+PDD(opr:6.2,F)> help delete
+
+ rm | del | delete filename [attr]
+    Delete filename [attr] from disk
+
+PDD(opr:6.2,F)> 
+
+```
+
+The parameters are simple position dependant, so in order to use the 3rd argument you have to supply the 2nd.
+
+Normally to save a file you only need to say "save filename"
+
+But if you want to override the default attr and specify an arbitrary one like X, you need to say "save filename filename X"
+
+So to show the attr actually being stored and retrieved:
+  
+ Create a small text local file `T0.DO`  
  Save `T0.DO` as `T1.DO` without specifying any attr  
  Save `T0.DO` as `T2.DO` with attr `X`  
  Save `T0.DO` as `T3.DO` with attr `d`  
@@ -31,27 +79,21 @@ $
 
 The directory listing shows that the attr values were written to "disk" and then read back out.
 
-You can do the same process with a real drive.
-
 As with a real drive, both the filename and attr must match in order to access a file.  
-For instance to delete one of these files, you have to specify the attr the same way:  
-`$ pdd "rm T3.DO d"`
+filename "foo" with attr "a"  
+and  
+filename "foo" with attr "b"  
+are two different files.
 
+For instance to load or delete one of these files that has a non-default attr, you have to specify both the filename and the attr :  
+`PDD(opr:6.2,F)> rm T3.DO d`
 
 ## misc references
-Interesting but not used because it's c++ not plain c.
+Wrapper to provide a single interface to the different platforms xattr interfaces.  
+Interesting but not used because it's c++ not plain c.  
+Maybe it can be ported to plain c.  
 https://github.com/edenzik/pxattr
 
+Macos info  
+https://eclecticlight.co/2019/10/01/how-to-preserve-metadata-stored-in-a-custom-extended-attribute/
 
-https://eclecticlight.co/2019/10/01/how-to-preserve-metadata-stored-in-a-custom-extended-attribute/  
-on macos suffix xattr name with "#S"
-
-on linux prefix xattr name with "user."
-
-Base xattr name is "pdd.attr"
-
-On macos it becomes "pdd.attr#S"
-On linux it becomes "user.pdd.attr"
-
-On macos might need to be changed to something like "org.dl2.attr#S"
-Ideally would like to keep the name generic and not tied to dl2 by name, so that other tpdd server and client software could all use the same xattr name.

@@ -203,7 +203,7 @@ Test with [pdd.sh](https://github.com/bkw777/pdd.sh)
 
 [more info & example](ref/xattr.md)
 
-Only enabled on Linux. Macos & Freebsd are coming.
+Tested on Linux & Mac. FreeBSD written but not tested.
 For any platform that isn't supported, or on any filesystem that doesn't have extended attributes, or any new local files that weren't created by a tpdd client, it will just transparently work the old way. Attr will be 'F' or whatever the "-a" commandline flag or the ATTR environment variable says.
 
 ## History / Credits
