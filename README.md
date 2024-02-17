@@ -199,11 +199,12 @@ Read/write/search/match the attr byte from the client in an xattr metadata field
 Enable by building with `-DUSE_XATTR`  
 `$ make clean all CXXFLAGS=-DUSE_XATTR && sudo make install`
 
-Test with [pdd.sh](https://github.com/bkw777/pdd.sh)
+Test with [pdd.sh](https://github.com/bkw777/pdd.sh)  
+
+[more info & example](ref/xattr.md)
 
 Only enabled on Linux. Macos & Freebsd are coming.
 For any platform that isn't supported, or on any filesystem that doesn't have extended attributes, or any new local files that weren't created by a tpdd client, it will just transparently work the old way. Attr will be 'F' or whatever the "-a" commandline flag or the ATTR environment variable says.
-[more info & example](ref/xattr.md)
 
 ## History / Credits
 [DeskLink for ms-dos](https://ftp.whtech.com/club100/com/dl-arc.exe.gz) 1987 Travelling Software  
