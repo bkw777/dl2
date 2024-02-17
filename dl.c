@@ -2213,7 +2213,7 @@ void show_bootstrap_help() {
 		"   %1$s -b TS-DOS.100\n"
 		"   %1$s -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100\n"
 		"   %1$s -vb rxcini.DO && %1$s -vu\n"
-		"   %1$s -vun -i Sardine_American_English.pdd1\n\n"
+		"   %1$s -vu -i Sardine_American_English.pdd1\n\n"
 	,args[0],app_lib_dir);
 }
 
