@@ -193,18 +193,10 @@ Tested on Linux, [Mac](ref/mac.md), [FreeBSD](ref/freebsd.md), and [Windows](ref
 * Fake entire disk image in ram based on current share path files. Option to save the image as long as we're there.
 
 ## New Feature Testing
-Real attr handling.  
-Read/write/search/match the attr byte from the client in an xattr metadata field on each local file.  
+[real attr handling using xattr](ref/xattr.md)
 
 Enable by building with `-DUSE_XATTR`  
 `$ make clean all CXXFLAGS=-DUSE_XATTR && sudo make install`
-
-Test with [pdd.sh](https://github.com/bkw777/pdd.sh)  
-
-[more info & example](ref/xattr.md)
-
-Tested on Linux & Mac. FreeBSD written but not tested.
-For any platform that isn't supported, or on any filesystem that doesn't have extended attributes, or any new local files that weren't created by a tpdd client, it will just transparently work the old way. Attr will be 'F' or whatever the "-a" commandline flag or the ATTR environment variable says.
 
 ## History / Credits
 [DeskLink for ms-dos](https://ftp.whtech.com/club100/com/dl-arc.exe.gz) 1987 Travelling Software  

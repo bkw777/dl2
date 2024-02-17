@@ -1,6 +1,8 @@
 ## Storing the ATTR byte from the tpdd client in local xattr
 
-If compiled with -DUSE_XATTR then the ATTR field of a TPDD directory entry is stored in and retrieved from an extended attribute named "pdd.attr", instead of just hard-coded with 'F' at all times.
+If compiled with -DUSE_XATTR  
+`$ make clean all CXXFLAGS=-DUSE_XATTR && sudo make install`  
+then the ATTR field of a TPDD directory entry is stored in and retrieved from an extended attribute named "pdd.attr", instead of just hard-coded with 'F' at all times.
 
 On Linux the xattr name is prefixed with "user." to become "user.pdd.attr"  
 On Mac the xattr name is suffixed with "#S" to become "pdd.attr#S"  
@@ -87,6 +89,12 @@ are two different files.
 
 For instance to load or delete one of these files that has a non-default attr, you have to specify both the filename and the attr :  
 `PDD(opr:6.2,F)> rm T3.DO d`
+
+
+Tested on Linux & Macos.  
+FreeBSD written but not tested.  
+
+For any platform that isn't supported, or on any filesystem that doesn't have extended attributes, or any new local files that weren't created by a tpdd client, it will just transparently work the old way. Attr will be 'F' or whatever the "-a" commandline flag or the ATTR environment variable says.
 
 ## misc references
 Wrapper to provide a single interface to the different platforms xattr interfaces.  
