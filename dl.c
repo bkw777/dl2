@@ -288,6 +288,48 @@ void dbg_p(const int v, unsigned char* b) {
 	dbg_b(v,b+2,b[1]);
 }
 
+/** xattr **************************************************/
+// ugly but papers over the platform differences here
+// and avoids a bunch of #ifdefs everywhere else
+
+ssize_t dl_getxattr(const char* path, uint8_t* value) {
+#if defined(USE_XATTR)
+#if defined(__APPLE__)
+#else
+	return getxattr(path, xattr_name, value, 1);
+#endif
+#else
+	return 0;
+#endif
+}
+
+int dl_fgetxattr(int fd, uint8_t* value) {
+#if defined(USE_XATTR)
+#if defined(__APPLE__)
+#else
+	return fgetxattr(fd, xattr_name, value, 1);
+#endif
+#else
+	return 0;
+#endif
+}
+
+int dl_fsetxattr(int fd, const uint8_t* value) {
+#if defined(USE_XATTR)
+#if defined(__APPLE__)
+#else
+	return fsetxattr(fd, xattr_name, value, 1, 0);
+#endif
+#else
+	return 0;
+#endif
+}
+
+/***********************************************************/
+
+
+
+
 // string-to-bool
 bool stobool (const char* s) {
 	return (
@@ -1147,7 +1189,6 @@ int read_next_dirent(DIR* dir,int m) {
 	struct stat st;
 	struct dirent* dire;
 	int flags;
-	uint8_t atr;
 
 	if (dir == NULL) {
 		dire=NULL;
@@ -1179,11 +1220,9 @@ int read_next_dirent(DIR* dir,int m) {
 		// REXCPM violates the tpdd protocol to load a large CP/M disk image.
 		if (st.st_size>UINT16_MAX) st.st_size=0;
 
-		atr = default_attr;
-#if defined(USE_XATTR)
-		getxattr(dire->d_name, xattr_name, &atr, 1);
-#endif
-		add_file(make_file_entry(dire->d_name, atr, st.st_size, flags));
+		uint8_t attr = default_attr;
+		dl_getxattr(dire->d_name, &attr);
+		add_file(make_file_entry(dire->d_name, attr, st.st_size, flags));
 		break;
 	}
 
@@ -1490,9 +1529,7 @@ int req_open() {
 					ret_std(ERR_FMT_MISMATCH);
 				else {
 					f_open_mode=omode;
-#if defined(USE_XATTR)
-					fsetxattr(o_file_h, xattr_name, &cur_file->attr, 1, 0);
-#endif
+					dl_fsetxattr(o_file_h, &cur_file->attr);
 					dbg(1,"Open for write: \"%s\" (%c)\n",cur_file->local_fname,cur_file->attr);
 					ret_std(ERR_SUCCESS);
 				}
@@ -1513,9 +1550,7 @@ int req_open() {
 				ret_std(ERR_FMT_MISMATCH);
 			else {
 				f_open_mode=omode;
-#if defined(USE_XATTR)
-					fsetxattr(o_file_h, xattr_name, &cur_file->attr, 1, 0);
-#endif
+				dl_fsetxattr(o_file_h, &cur_file->attr);
 				dbg(1,"Open for append: \"%s\" (%c)\n",cur_file->local_fname,cur_file->attr);
 				ret_std(ERR_SUCCESS);
 			}
@@ -1555,9 +1590,7 @@ int req_open() {
 					ret_std(ERR_NO_FILE);
 				else {
 					f_open_mode = omode;
-#if defined(USE_XATTR)
-					fgetxattr(o_file_h, xattr_name, &cur_file->attr, 1);
-#endif
+					dl_fgetxattr(o_file_h, &cur_file->attr);
 					dbg(1,"Open for read: \"%s\" (%c)\n",cur_file->local_fname,cur_file->attr);
 					ret_std(ERR_SUCCESS);
 				}
