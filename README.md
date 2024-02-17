@@ -14,7 +14,7 @@ $ sudo make uninstall
 ## Manual
 ```
 $ dl -h
-DeskLink2 v2.1.001-11-g361baa4
+DeskLink2 v2.1.001-19-g14a2925
 
 Usage: dl [options] [tty_device] [share_path]
 
@@ -49,20 +49,20 @@ Examples:
    $ dl -w /dev/cu.usbserial-AB0MQNN1 ~/Documents/wp2
    $ dl -m2 -p /tmp/bank0 -p /tmp/bank1
 
-$ 
+$
 ```
 
 ```
 $ dl -l
-DeskLink2 v2.1.001-2-gabcc469
+DeskLink2 v2.1.001-19-g14a2925
 Available support files in /usr/local/lib/dl
 
 Loader files for use with -b:
 -----------------------------
-TRS-80 Model 100/102 : PAKDOS.100 TINY.100 D.100 TEENY.100 DSKMGR.100 TSLOAD.100 TS-DOS.100
-TANDY Model 200      : PAKDOS.200 TEENY.200 DSKMGR.200 TSLOAD.200 TS-DOS.200
-NEC PC-8201/PC-8300  : TS-DOS.NEC TEENY.NEC
-Kyotronic KC-85      : Disk_Power.K85 DSKMGR.K85
+TRS-80 Model 100/102 : DSKMGR.100 TINY.100 D.100 TEENY.100 TSLOAD.100 TS-DOS.100 PAKDOS.100
+TANDY Model 200      : TEENY.200 DSKMGR.200 TSLOAD.200 TS-DOS.200 PAKDOS.200
+NEC PC-8201/PC-8300  : TEENY.NEC TS-DOS.NEC
+Kyotronic KC-85      : DSKMGR.K85 Disk_Power.K85
 Olivetti M-10        : TEENY.M10 DSKMGR.M10
 
 Disk image files for use with -i:
@@ -78,9 +78,9 @@ Examples:
    dl -b TS-DOS.100
    dl -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
    dl -vb rxcini.DO && dl -vu
-   dl -vun -i Sardine_American_English.pdd1
+   dl -vu -i Sardine_American_English.pdd1
 
-$
+$ 
 ```
 
 Several of the above settings can alternatively be supplied via environment variables, as well as a few other [hacky extra options](ref/advanced_options.txt)
