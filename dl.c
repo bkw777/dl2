@@ -64,14 +64,21 @@ MA 02111, USA.
 #endif
 
 #if defined(USE_XATTR)
-#include <sys/xattr.h>
-#if defined(__APPLE__)
-#define XATTR_PREFIX ""
-#define XATTR_SUFFIX "#S"
-#else
-#define XATTR_PREFIX "user."
-#define XATTR_SUFFIX ""
-#endif
+#  if defined(__FreeBSD__)
+#    include <sys/extattr.h>
+#  else
+#    include <sys/xattr.h>
+#  endif
+#  if defined(__linux__)
+#    define XATTR_PREFIX "user."
+#    define XATTR_SUFFIX ""
+#  elif defined(__APPLE__)
+#    define XATTR_PREFIX ""
+#    define XATTR_SUFFIX "#S"
+#  else
+#    define XATTR_PREFIX ""
+#    define XATTR_SUFFIX ""
+#  endif
 #endif
 
 /*** config **************************************************/
@@ -289,39 +296,40 @@ void dbg_p(const int v, unsigned char* b) {
 }
 
 /** xattr **************************************************/
-// ugly but papers over the platform differences here
-// and avoids a bunch of #ifdefs everywhere else
 
-ssize_t dl_getxattr(const char* path, uint8_t* value) {
+void dl_getxattr(const char* path, uint8_t* value) {
 #if defined(USE_XATTR)
-#if defined(__APPLE__)
-#else
-	return getxattr(path, xattr_name, value, 1);
-#endif
-#else
-	return 0;
+#  if defined(__linux__)
+	getxattr(path, xattr_name, value, 1);
+#  elif defined(__APPLE__)
+	getxattr(path, xattr_name, value, 1, 0, NULL);
+#  elif defined(__FreeBSD__)
+	extattr_get_file(path, EXTATTR_NAMESPACE_USER, xattr_name, value, 1);
+#  endif
 #endif
 }
 
-int dl_fgetxattr(int fd, uint8_t* value) {
+void dl_fgetxattr(int fd, uint8_t* value) {
 #if defined(USE_XATTR)
-#if defined(__APPLE__)
-#else
-	return fgetxattr(fd, xattr_name, value, 1);
-#endif
-#else
-	return 0;
+#  if defined(__linux__)
+	fgetxattr(fd, xattr_name, value, 1);
+#  elif defined(__APPLE__)
+	fgetxattr(fd, xattr_name, value, 1, 0, NULL);
+#  elif defined(__FreeBSD__)
+	extattr_get_fd(fd, EXTATTR_NAMESPACE_USER, xattr_name, value, 1);
+#  endif
 #endif
 }
 
-int dl_fsetxattr(int fd, const uint8_t* value) {
+void dl_fsetxattr(int fd, const uint8_t* value) {
 #if defined(USE_XATTR)
-#if defined(__APPLE__)
-#else
-	return fsetxattr(fd, xattr_name, value, 1, 0);
-#endif
-#else
-	return 0;
+#  if defined(__linux__)
+	fsetxattr(fd, xattr_name, value, 1, 0);
+#  elif defined(__APPLE__)
+	fsetxattr(fd, xattr_name, value, 1, 0, NULL);
+#  elif defined(__FreeBSD__)
+	extattr_set_fd(fd, EXTATTR_NAMESPACE_USER, xattr_name, value, 1);
+#  endif
 #endif
 }
 
