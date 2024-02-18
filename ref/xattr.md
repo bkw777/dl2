@@ -90,9 +90,7 @@ are two different files.
 For instance to load or delete one of these files that has a non-default attr, you have to specify both the filename and the attr :  
 `PDD(opr:6.2,F)> rm T3.DO d`
 
-
-Tested on Linux & Macos.  
-FreeBSD written but not tested.  
+Working on Linux, Macos, & FreeBSD.
 
 For any platform that isn't supported, or on any filesystem that doesn't have extended attributes, or any new local files that weren't created by a tpdd client, it will just transparently work the old way. Attr will be 'F' or whatever the "-a" commandline flag or the ATTR environment variable says.
 

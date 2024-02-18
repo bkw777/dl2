@@ -507,10 +507,17 @@ void find_ttys (char* f) {
 	char** ttys = malloc(sizeof(char*));
 	struct dirent *files;
 	uint16_t nttys = 0, l=strlen(f);
+#if defined(__FreeBSD__)
+	int p = 0;
+#endif
 
 	dbg(2,"Searching for \"%s%s*\"\n",path,f);
 	while ((files = readdir(dir))) {
 		if (strncmp(files->d_name,f,l)) continue;
+#if defined(__FreeBSD__)
+		p = strrchr(files->d_name,'.');
+		if (p!=NULL) if (!strcmp(p,".init") || !strcmp(p,".lock")) continue;
+#endif
 		nttys++;
 		ttys = realloc(ttys, (nttys+1) * sizeof(char(*)));
 		ttys[nttys] = files->d_name;
