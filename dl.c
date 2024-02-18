@@ -508,7 +508,7 @@ void find_ttys (char* f) {
 	struct dirent *files;
 	uint16_t nttys = 0, l=strlen(f);
 #if defined(__FreeBSD__)
-	int p = 0;
+	char* p;
 #endif
 
 	dbg(2,"Searching for \"%s%s*\"\n",path,f);
