@@ -47,8 +47,10 @@ The parameters are simple position dependant, so in order to use the 3rd argumen
 
 Normally to save a file without also renaming it along the way, you only need to say "save filename"
 
-But if you want to override the default attr and specify an arbitrary attr like X, you need to say "save filename filename X"
-or you can give "" for the destination filename so: `save filename "" X` and in that case it will use the source filename without having to type it out twice.
+But if you want to override the default attr and specify an arbitrary attr like X,  
+you need to say "save filename filename X".  
+Or you can give "" for the destination filename so: `save filename "" X`  
+and in that case it will use the source filename without having to type it out twice.
 
 So to show the attr actually being stored and retrieved:
   
