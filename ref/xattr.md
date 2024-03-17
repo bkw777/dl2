@@ -45,9 +45,10 @@ PDD(opr:6.2,F)>
 
 The parameters are simple position dependant, so in order to use the 3rd argument you have to supply the 2nd.
 
-Normally to save a file you only need to say "save filename"
+Normally to save a file without also renaming it along the way, you only need to say "save filename"
 
-But if you want to override the default attr and specify an arbitrary one like X, you need to say "save filename filename X"
+But if you want to override the default attr and specify an arbitrary attr like X, you need to say "save filename filename X"
+or you can give "" for the destination filename so: `save filename "" X` and in that case it will use the source filename without having to type it out twice.
 
 So to show the attr actually being stored and retrieved:
   
@@ -90,7 +91,7 @@ are two different files.
 For instance to load or delete one of these files that has a non-default attr, you have to specify both the filename and the attr :  
 `PDD(opr:6.2,F)> rm T3.DO d`
 
-Working on Linux, Macos, & FreeBSD.
+This is working on Linux, Macos, & FreeBSD.
 
 For any platform that isn't supported, or on any filesystem that doesn't have extended attributes, or any new local files that weren't created by a tpdd client, it will just transparently work the old way. Attr will be 'F' or whatever the "-a" commandline flag or the ATTR environment variable says.
 
