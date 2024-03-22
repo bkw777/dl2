@@ -1,8 +1,10 @@
 # Notes for Windows
 
-## Install either Cygwin or MSYS2
+## 1 - Install either Cygwin or MSYS2
+Cygwin and MSYS2 are pretty similar systems. Pick either one.  
+MSYS2 is more convenient. If you don't already have any opinion, use MSYS2.
 
-### Cygwin
+### for Cygwin
 * Install [Cygwin](https://www.cygwin.com/)  
   When it gets to the **Select Packages** screen,  
   select these additional packages to install:  
@@ -14,7 +16,7 @@
   * Repeat for: **gcc-g++**, **make**, **git**  
 * Launch a Cygwin terminal window
 
-### MSYS2
+### for MSYS2
 * Install [MSYS2](https://www.msys2.org/)  
 * Close the URCT window that opens after install  
 * Launch an MSYS window  
@@ -24,10 +26,10 @@
 * Update again: ```$ pacman -Syu```  
 * Install git, gcc, & make:  ```$ pacman -Sy git gcc make```  
 
-## Download, build, & install
+## 2 - Download, build, & install dl2
 ```
-git clone https://github.com/bkw777/dlplus.git
-cd dlplus
+git clone https://github.com/bkw777/dl2.git
+cd dl2
 make clean all && make install
 ```
 
@@ -39,7 +41,7 @@ make clean all && make install
 Use ```ls /dev/tty*``` to find the serial tty device after plugging in a usb-serial adapter.  
 Then use ```ttyS4``` (for example) as the last argument on the dl command line.
 
-* The Windows user may need to be in the Administrator group, I haven't done much testing.
+* The Windows user might need to be in the Administrator group, I haven't done much testing.
 
 ## Example usage session - initialize a REXCPM
 Initializing a REXCPM excersizes both the bootstrap and normal file access functions.
