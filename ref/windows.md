@@ -21,32 +21,38 @@ MSYS2 is more convenient. If you don't already have any opinion, use MSYS2.
 * Close the URCT window that opens after install  
 * Launch an MSYS window  
   Start -> MSYS2 -> MSYS2 MSYS  
-* Update the installed packages: ```$ pacman -Syu```  
+* Update the installed packages: `$ pacman -Syu`  
 * If the window closed, launch new MSYS window  
-* Update again: ```$ pacman -Syu```  
-* Install git, gcc, & make:  ```$ pacman -Sy git gcc make```  
+* Update again: `$ pacman -Syu`  
+* Install git, gcc, & make:  `$ pacman -Sy git gcc make`  
 
 ## 2 - Download, build, & install dl2
 ```
-git clone https://github.com/bkw777/dl2.git
-cd dl2
-make clean all && make install
+$ git clone https://github.com/bkw777/dl2.git
+$ cd dl2
+$ make clean all && make install
 ```
 
 ## Platform notes
 
-* Getty/daemon mode is #ifdef'd out at compile-time on Windows. No getty option.
+* Getty/daemon mode is #ifdef'd out at compile-time on Windows, so there is no -g getty option.
 
 * Serial tty devices are named like ttyS#  
-Use ```ls /dev/tty*``` to find the serial tty device after plugging in a usb-serial adapter.  
-Then use ```ttyS4``` (for example) as the last argument on the dl command line.
+Use `ls /dev/tty*` to find the serial tty device after plugging in a usb-serial adapter.  
+Then use `ttyS4` (for example) as the last argument on the dl command line.  
+(current versions of dl2 should automatically find the tty device in most cases, so you should not need to put any ttyS# on the command line unless you have multiple serial devices and want to specify the right one instead of having to select it from a list interactively)
 
-* The Windows user might need to be in the Administrator group, I haven't done much testing.
+* The Windows user might need to be in the Administrator group, I haven't done much testing of dl2 on Windows.
+
+---
 
 ## Example usage session - initialize a REXCPM
-Initializing a REXCPM excersizes both the bootstrap and normal file access functions.
-In addition to the packages above, install the "unzip" package, or download and unzip the the files from Windows and skip the download & unzip steps shown here.  
-You want to get the latest versions from the REXCPM documentation page anyway instead of the exact versions shown below.
+
+Consult the [REXCPM docs](http://bitchin100.com/wiki/index.php?title=REXCPM) to understand all the commands and actions below.  
+This is just an example to show using dl2 on Windows, not a full explaination of REXCPM installation or usage.
+
+In addition to the packages above where you installed git and gcc etc, also install the "unzip" package, or download and unzip the the files from Windows and skip the download & unzip steps shown here.  
+You want to get the latest versions of any files from the REXCPM docs anyway, not paste the exact versions shown below.
 
 Start with a cold-reset of the Model 100: SHIFT+CTRL+BREAK+RESET  
 (this erases all RAM, including all files)
@@ -107,32 +113,41 @@ bkw@win10pro_bkw /cygdrive/c/Users/bkw/Documents/REX
 $
 ```
 
+'''(Current versions of dl2 should automatically figure out the tty device as long as there is only one, and interactively ask you to select from a list if it detects more than one possible. You can probably skip the parts about the tty device here and just omit the ttyS# from the dl command lines.)'''
 
 * Identify the serial port tty device
 ```
 bkw@win10pro_bkw /cygdrive/c/Users/bkw/Documents/REX
-$ ls /dev/tty*
-/dev/tty  /dev/ttyS6
+$ ls /dev/ttyS*
+/dev/ttyS4
 ```
+In my case, my usb-serial device is ttyS4 at the moment. You may get something else.  
+You may even see multiple matches, even if you only have one usb-serial device connected.  
+One of my laptops has some internal component that shows up as COM4 and ttyS4, and when I connect a usb-serial adapter or arduino programmer etc, it shows up as COM5 or higher -> ttyS5 or higher.
 
-* Run dl, specifying ttyS6 for the tty device  
-The command line is two consecutive commands with different arguments.  
-First ```dl -vb rxcini.DO ttyS6``` uses the bootstrap function to send rxcini.DO to the 100 and run it,  
-As soon as the previous command is done sending rxcini.DO, the next command ```dl -vu ttyS6``` immediately starts providing normal TPDD file access, with uppercase filename conversion.
+* Run dl, specifying the tty device determined above
 
-rxcini.DO while it is running will use the TPDD to load the REXCPM firmware image,  
-and then RXCMGR uses TPDD to load the TS-DOS option rom image,  
-and then you use TS-DOS to copy CPMUPD.CO to the 100,  
-and then CPMUPD.CO uses TPDD to load the CP/M disk image.
+Overview of the sequence of events about to follow:
+
+The initial command below, `dl -vb rxcini.DO ttyS4 && dl -vu ttyS4` is two consecutive commands.  
+First `dl -vb rxcini.DO ttyS4` uses the bootstrap function `-b` to send `rxcini.DO` to the 100 and start executing it,  
+As soon as rxcini is sent, the next command `dl -vu ttyS4` starts providing TPDD file access to the current directory, with uppercase filename conversion `-u`.
+
+rxcini itself and all the later steps all use TPDD to load files from the pc.
+
+While `rxcini.DO` is running it will use TPDD to load the REXCPM firmware image `RXC_12.BR`,  
+and then RXCMGR uses TPDD to load the TS-DOS option rom image `TSD100.BX`,  
+and then you manually use TS-DOS (which uses TPDD) to copy `CPMUPD.CO` to the 100,  
+and then `CPMUPD.CO` uses TPDD to load the CP/M disk image `Cpm210.bk` or `Cpm410.bk`.
 
 ```
 bkw@win10pro_bkw /cygdrive/c/Users/bkw/Documents/REX
-$ dl -vb rxcini.DO ttyS6 && dl -vu ttyS6
+$ dl -vb rxcini.DO ttyS4 && dl -vu ttyS4
 DeskLink+ v2.0.000-16-g9d2a488
 Loading: "rxcini.DO"
-Serial Device: /dev/ttyS6
+Serial Device: /dev/ttyS4
 Working Dir  : /cygdrive/c/Users/bkw/Documents/REX
-Opening "/dev/ttyS6" ... OK
+Opening "/dev/ttyS4" ... OK
 Bootstrap: Installing "rxcini.DO"
 
 Prepare BASIC to receive:
@@ -245,9 +260,9 @@ DONE
 Re-run "dl" (without -b this time) to run the TPDD server.
 
 DeskLink+ v2.0.000-16-g9d2a488
-Serial Device: /dev/ttyS6
+Serial Device: /dev/ttyS4
 Working Dir  : /cygdrive/c/Users/bkw/Documents/REX
-Opening "/dev/ttyS6" ... OK
+Opening "/dev/ttyS4" ... OK
 -------------------------------------------------------------------------------
 "ANLYST.BX"     ANLYST.BX
 "CHECKS.TX"     checksums.txt
@@ -298,7 +313,7 @@ Opening "/dev/ttyS6" ... OK
 -------------------------------------------------------------------------------
 ```
 
-Here I typed ```RXC_12``` at the filename prompt in rxcini
+Here I typed `RXC_12` at the filename prompt in rxcini
 
 ```
 Open for read: "RXC_12.BR"
@@ -328,12 +343,12 @@ Open for read: "RXC_12.BR"
 -------------------------------------------------------------------------------
 ```
 
-After rxcini completed:  
-- Typed ```CALL 63012``` in BASIC to install RXCMGR from the REXCPM  
+After rxcini completed, I:  
+- Typed `CALL 63012` in BASIC to install RXCMGR from the REXCPM  
 - Exited BASIC and launched RXCMGR from the main menu  
 - Pressed TAB to switch to the ROM screen in RXCMGR  
 - Pressed F2 for Load  
-- Entered ```TSD100```
+- Typed `TSD100`
 - Pressed Enter on the new TS-DOS entry to install the TS-DOS option rom (which also launches it)
 
 ```
@@ -389,7 +404,7 @@ Open for read: "TSD100.BX"
 ```
 
 Now TS-DOS option rom is installed.  
-Next, use TS-DOS to copy CPMUPD.CO from "disk" to the 100.
+Next, use TS-DOS to copy `CPMUPD.CO` to the 100.
 
 ```
 Open for read: "CPMUPD.CO"
@@ -445,9 +460,9 @@ Open for read: "CPMUPD.CO"
 ```
 
 - Exited TS-DOS  
-- Entered BASIC and did ```CLEAR0,60000``` to make room for CPMUPD to run  
+- Entered BASIC and typed `CLEAR0,60000` to make room for CPMUPD to run  
 - Launched CPMUPD from the main menu  
-- Entered ```CPM410.BK``` at the filename prompt in CPMUPD because my REXCPM has a 4MB chip.
+- Entered `CPM410.BK` at the filename prompt in CPMUPD because my REXCPM has a 4MB chip.
 
 ```
 Open for read: "Cpm410.bk"
@@ -458,6 +473,6 @@ bkw@win10pro_bkw /cygdrive/c/Users/bkw/Documents/REX
 $
 ```
 
-Press Ctrl+C on the pc to quit dlplus.
+Press Ctrl+C on the pc to quit dl2.
 
 REXCPM is now fully installed.
