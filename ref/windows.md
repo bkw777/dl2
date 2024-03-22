@@ -49,7 +49,8 @@ Then use `ttyS4` (for example) as the last argument on the dl command line.
 ## Example usage session - initialize a REXCPM
 
 Consult the [REXCPM docs](http://bitchin100.com/wiki/index.php?title=REXCPM) to understand all the commands and actions below.  
-This is just an example to show using dl2 on Windows, not a full explaination of REXCPM installation or usage.
+This is just an example to show using dl2 on Windows, not a full explaination of REXCPM installation or usage.  
+See also: https://github.com/bkw777/dl2/blob/master/ref/REXCPM.md
 
 In addition to the packages above where you installed git and gcc etc, also install the "unzip" package, or download and unzip the the files from Windows and skip the download & unzip steps shown here.  
 You want to get the latest versions of any files from the REXCPM docs anyway, not paste the exact versions shown below.
