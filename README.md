@@ -182,6 +182,14 @@ All KC-85 platform machines are supported including TRS-80 Model 100, TANDY 102 
 It's simple and doesn't handle all situations or do anything fancy like relocating, but it handles the common case and serves as a reference and starting point for making a custom loader.  
 See [co2ba](co2ba.md)
 
+Example using co2ba as part of bootstrapping a REX Classic:
+```
+$ wget https://www.bitchin100.com/wiki/images/3/38/R49_M100T102_260_rebuild.zip
+$ unzip R49_M100T102_260_rebuild.zip
+$ co2ba rf149.co call >rf149.do
+$ dl -vb rf149.do && dl -vu
+```
+
 ## OS Compatibility
 Tested on Linux, [Mac](ref/mac.md), [FreeBSD](ref/freebsd.md), and [Windows](ref/windows.md).
 
