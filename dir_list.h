@@ -24,10 +24,7 @@ MA 02111, USA.
 #include <stdint.h>
 #include "constants.h"
 
-#define FEQ DIRENTS // number of FILE_ENTRYs to malloc for at a time
-
-typedef struct
-{
+typedef struct {
 	char     client_fname[TPDD_FILENAME_LEN+1];
 	char     local_fname[LOCAL_FILENAME_MAX+1];
 	uint8_t  attr;
