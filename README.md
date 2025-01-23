@@ -120,7 +120,7 @@ Docs from the past versions of this program. They don't exactly match this versi
 
 ### List all available TPDD client installers, and then bootstrap one of them
 ```
-$ dl -l
+$ dl -b
 $ dl -vb TS-DOS.100
 ```
 
@@ -221,11 +221,10 @@ Tested on Linux, [Mac](ref/mac.md), [FreeBSD](ref/freebsd.md), and [Windows](ref
 * Fake sector 0 based on the files in the current share path so that if a client tries to read the FCB table directly it works.
 * Fake entire disk image in ram based on current share path files. Option to save the image as long as we're there.
 
-## New Feature Testing
-[real attr handling using xattr](ref/xattr.md)
+## Latest Changes
+* [real attr handling using xattr](ref/xattr.md) - enabled by default now
 
-Enable by building with `-DUSE_XATTR`  
-`$ make clean all CXXFLAGS=-DUSE_XATTR && sudo make install`
+* client compatibility profiles
 
 ## History / Credits
 [DeskLink for ms-dos](https://ftp.whtech.com/club100/com/dl-arc.exe.gz) 1987 Travelling Software  
