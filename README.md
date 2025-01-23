@@ -14,28 +14,26 @@ $ sudo make uninstall
 ## Manual
 ```
 $ dl -h
-DeskLink2 v2.1.001-19-g14a2925
+DeskLink2 v2.1.001-30-ge4936fd
 
-Usage: dl [options] [tty_device] [share_path]
+Usage: ./dl [options] [tty_device] [share_path]
 
 Options     Description (default setting)
-   -0       Raw mode - no filename munging, attr = ' '
-   -a c     Attribute - default attr byte used when no xattr (F)
-   -b file  Bootstrap - send loader file to client
-   -d tty   Serial device connected to the client (ttyUSB*)
-   -n       Disable TS-DOS directories (enabled)
-   -g       Getty mode - run as daemon
-   -h       Print this help
-   -i file  Disk image filename for raw sector access
-   -l       List loader files and show bootstrap help
-   -m #     Model - 1 = FB-100/TPDD1, 2 = TPDD2 (1)
-   -p dir   Path - /path/to/dir with files to be served (./)
-   -r       RTS/CTS hardware flow control (false)
-   -s #     Speed - serial port baud rate (19200)
-   -u       Uppercase all filenames (false)
-   -v       Verbosity - more v's = more verbose
-   -w       WP-2 mode - 8.2 filenames for TANDY WP-2
-   -z #     Milliseconds per byte for bootstrap (8)
+ -a attr    Attribute - default attr byte used when no xattr (F)
+ -b file    Bootstrap - send loader file to client - empty for help
+ -c compat  Client compat profile - empty for help (k85)
+ -d tty     Serial device connected to the client (ttyUSB*)
+ -e bool    TS-DOS Subdirectories (true)
+ -g         Getty mode - run as daemon
+ -h         Print this help
+ -i file    Disk image filename for raw sector access - empty for help
+ -m #       Model - 1 = FB-100/TPDD1, 2 = TPDD2 (1)
+ -p dir     Path - /path/to/dir with files to be served (./)
+ -r         RTS/CTS hardware flow control (false)
+ -s #       Speed - serial port baud rate (19200)
+ -u         Uppercase all filenames (false)
+ -v         Verbosity - more v's = more verbose
+ -z #       Milliseconds per byte for bootstrap (8)
 
 The 1st non-option argument is another way to specify the tty device.
 The 2nd non-option argument is another way to specify the share path.
@@ -43,26 +41,27 @@ TPDD2 mode accepts a 2nd share path for bank 1.
 TPDD2 mode does not support TS-DOS dfirectories.
 
 Examples:
-   $ dl
-   $ dl ttyUSB1
-   $ dl -vu -p ~/Downloads/REX
-   $ dl -w /dev/cu.usbserial-AB0MQNN1 ~/Documents/wp2
-   $ dl -m2 -p /tmp/bank0 -p /tmp/bank1
+   $ ./dl
+   $ ./dl ttyUSB1
+   $ ./dl -vu -p ~/Downloads/REX
+   $ ./dl -c wp2 /dev/cu.usbserial-AB0MQNN1 "~/Documents/WP-2 Files"
+   $ ./dl -m2 -p /tmp/bank0 -p /tmp/bank1
 
 $
 ```
 
 ```
-$ dl -l
-DeskLink2 v2.1.001-19-g14a2925
+$ ./dl -b
+DeskLink2 v2.1.001-30-ge4936fd
+"-b" requires a value
 Available support files in /usr/local/lib/dl
 
 Loader files for use with -b:
 -----------------------------
-TRS-80 Model 100/102 : DSKMGR.100 TINY.100 D.100 TEENY.100 TSLOAD.100 TS-DOS.100 PAKDOS.100
+TRS-80 Model 100/102 : PAKDOS.100 TINY.100 D.100 TEENY.100 DSKMGR.100 TSLOAD.100 TS-DOS.100
 TANDY Model 200      : TEENY.200 DSKMGR.200 TSLOAD.200 TS-DOS.200 PAKDOS.200
-NEC PC-8201/PC-8300  : TEENY.NEC TS-DOS.NEC
-Kyotronic KC-85      : DSKMGR.K85 Disk_Power.K85
+NEC PC-8201/PC-8300  : TS-DOS.NEC TEENY.NEC
+Kyotronic KC-85      : Disk_Power.K85 DSKMGR.K85
 Olivetti M-10        : TEENY.M10 DSKMGR.M10
 
 Disk image files for use with -i:
@@ -75,13 +74,35 @@ Filenames given without any path are searched from /usr/local/lib/dl
 as well as the current directory.
 Examples:
 
-   dl -b TS-DOS.100
-   dl -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
-   dl -vb rxcini.DO && dl -vu
-   dl -vu -i Sardine_American_English.pdd1
+   ./dl -b TS-DOS.100
+   ./dl -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
+   ./dl -vb rxcini.DO && ./dl -vu
+   ./dl -vu -i Sardine_American_English.pdd1
 
 $ 
 ```
+
+```
+$ ./dl -c
+DeskLink2 v2.1.001-30-ge4936fd
+"-c" requires a value
+
+Client Compatibility Profiles
+
+PROFILE	BASE	EXT	PAD	ATTR	TS-DOS	MAGIC	UP
+NAME	LEN	LEN	FNAMES	BYTE	DIRS	FILES	CASE
+-------------------------------------------------------------
+raw	0	0	false	' '	false	false	false
+k85	6	2	true	'F'	true	true	
+wp2	8	2	true	'F'	false	false	
+cpm	8	3	false	'F'	false	false	
+rexcpm	6	2	true	'F'	false	false	true
+z88	12	3	false	'F'	false	false	
+st	6	2	true	'F'	false	false	
+
+$ 
+```
+
 
 Several of the above settings can alternatively be supplied via environment variables, as well as a few other [hacky extra options](ref/advanced_options.txt)
 
