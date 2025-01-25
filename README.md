@@ -14,7 +14,7 @@ $ sudo make uninstall
 ## Manual
 ```
 $ dl -h
-DeskLink2 v2.1.001-33-g1f5ccb2
+DeskLink2 v2.2.001-0-g7b928ff
 
 Usage: ./dl [options] [tty_device] [share_path]
 
@@ -49,21 +49,22 @@ Examples:
    $ ./dl -c wp2 /dev/cu.usbserial-AB0MQNN1 "~/Documents/WP-2 Files"
    $ ./dl -m2 -p /tmp/bank0 -p /tmp/bank1
 
+
 $
 ```
 
 ```
 $ ./dl -b
-DeskLink2 v2.1.001-30-ge4936fd
+DeskLink2 v2.2.001-0-g7b928ff
 "-b" requires a value
 Available support files in /usr/local/lib/dl
 
 Loader files for use with -b:
 -----------------------------
-TRS-80 Model 100/102 : PAKDOS.100 TINY.100 D.100 TEENY.100 DSKMGR.100 TSLOAD.100 TS-DOS.100
-TANDY Model 200      : TEENY.200 DSKMGR.200 TSLOAD.200 TS-DOS.200 PAKDOS.200
-NEC PC-8201/PC-8300  : TS-DOS.NEC TEENY.NEC
-Kyotronic KC-85      : Disk_Power.K85 DSKMGR.K85
+TRS-80 Model 100/102 : DSKMGR.100 TSLOAD.100 TS-DOS.100 TINY.100 D.100 TEENY.100 PAKDOS.100
+TANDY Model 200      : DSKMGR.200 TSLOAD.200 TS-DOS.200 PAKDOS.200 TEENY.200
+NEC PC-8201/PC-8300  : TEENY.NEC TS-DOS.NEC
+Kyotronic KC-85      : DSKMGR.K85 Disk_Power.K85
 Olivetti M-10        : TEENY.M10 DSKMGR.M10
 
 Disk image files for use with -i:
@@ -86,7 +87,7 @@ $
 
 ```
 $ ./dl -c
-DeskLink2 v2.1.001-33-g1f5ccb2
+DeskLink2 v2.2.001-0-g7b928ff
 "-c" requires a value
 
 Client Compatibility Profiles
