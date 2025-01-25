@@ -100,16 +100,8 @@ MA 02111, USA.
 #define DEFAULT_RTSCTS false
 #endif
 
-#ifndef DEFAULT_COMPAT
-#define DEFAULT_COMPAT "k85"
-#endif
-
-#ifndef DEFAULT_BASELEN
-#define DEFAULT_BASELEN 6
-#endif
-
-#ifndef DEFAULT_EXTLEN
-#define DEFAULT_EXTLEN 2
+#ifndef DEFAULT_PROFILE
+#define DEFAULT_PROFILE "k85"
 #endif
 
 #ifndef DEFAULT_OPERATION_MODE
@@ -170,15 +162,15 @@ const char * magic_files[] = {
 };
 
 // client compatibility profiles
-//    id, base, ext, pad, attr, dme, magic, upcase
+//     id,   base, ext, pad,    attr,    dme,  magic, upcase
 #define CLIENT_PROFILES { \
-	{ "raw", 0,  0, false, ATTR_RAW, false, false, false }, \
-	{ "k85", 6,  2, true,  ATTR_DEF, true,  true,  -1 }, \
-	{ "wp2", 8,  2, true,  ATTR_DEF, false, false, -1 }, \
-	{ "cpm", 8,  3, false, ATTR_DEF, false, false, -1 }, \
-	{ "rexcpm", 6,  2, true, ATTR_DEF, false, false, true }, \
-	{ "z88", 12, 3, false, ATTR_DEF, false, false, -1 }, \
-	{ "st",  6,  2, true,  ATTR_DEF, false, false, -1 } \
+	{ "raw",    0,  0, false, ATTR_RAW, false, false, false }, \
+	{ "k85",    6,  2, true,  ATTR_DEF, true,  true,  -1    }, \
+	{ "wp2",    8,  2, true,  ATTR_DEF, false, false, false }, \
+	{ "cpm",    8,  3, false, ATTR_DEF, false, false, false }, \
+	{ "rexcpm", 6,  2, true,  ATTR_DEF, false, false, true  }, \
+	{ "z88",    12, 3, false, ATTR_DEF, false, false, false }, \
+	{ "st",     6,  2, true,  ATTR_DEF, false, false, -1    }  \
 }
 
 // terminal emulation
@@ -269,15 +261,14 @@ typedef struct {
 	int8_t  upcase;
 } CLIENT_PROFILE;
 const CLIENT_PROFILE profiles [] = CLIENT_PROFILES ;
-const CLIENT_PROFILE * cdefs = &profiles[0];
-const char* compat = profiles[0].id;
-uint8_t base_len = DEFAULT_BASELEN;
-uint8_t ext_len = DEFAULT_EXTLEN;
-char default_attr = ATTR_DEF;
-bool enable_magic_files = true;
+const char* profile = profiles[0].id;
+uint8_t base_len = 0;
+uint8_t ext_len = 0;
+char default_attr = ATTR_RAW;
+bool enable_magic_files = false;
 bool pad_fn = false;
 bool enable_dme = false;
-bool raw = false;
+bool raw = true;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -364,7 +355,7 @@ int baud_to_stat_code (int r) {
 		0;
 }
 
-void list_profiles () {
+void show_profiles_help () {
 	const int n = sizeof(profiles)/sizeof(profiles[0]);
 
 	dbg(0,"\n");
@@ -388,37 +379,76 @@ void list_profiles () {
 		);
 	}
 	dbg(0,"\n");
+	dbg(0,"Example: \"-c cpm\" sets filenames to 8.3 without padding or upcase.\n");
+	dbg(0,"\n");
+	dbg(0,"May also use \"-c ##.##\" to set an arbitrary filename pattern\n");
+	dbg(0,"with other parameters set same as \"raw\". Example: -c 16.0 \n");
+	dbg(0,"\n");
+	dbg(0,"Filenames are limited to 24 bytes total, the hardware limit in a real drive.\n");
+	dbg(0,"\n");
 }
 
 // client compatibility profile
-void set_compat (const char* s) {
+void load_profile (const char* s) {
 
 	const int n = sizeof(profiles)/sizeof(profiles[0]);
 	const int l = sizeof(profiles[0].id);
+	int i, p;
+	char t[4]={0};
 
-	if (!strncasecmp(s,"list",l)
+	// display help
+	if (!s[0]
+		|| !strncasecmp(s,"list",l)
 		|| !strncasecmp(s,"help",l)
 		|| !strncasecmp(s,"?",l)
-	) { list_profiles(); return; }
+	) { show_profiles_help(); return; }
 
-	for (int i=0; i<n; i++) {
-		if (!strncasecmp(s,profiles[i].id,l)) { cdefs = &profiles[i]; break; }
+	// detect "##.##"
+	p = strchr(s,'.')-s;
+	if (p>0 && p<3) {
+		load_profile("raw");
+
+		memcpy(t,s,p);
+		i = atoi(t);
+		if (i>0 && i<TPDD_FILENAME_LEN) base_len = i;
+
+		memset(t,0,4);
+		i = sizeof(s)-p-1;
+		if (i>4) i = 4;
+		memcpy(t,s+p+1,i);
+		i = atoi(t);
+		if (i>-1 && i<TPDD_FILENAME_LEN-base_len) ext_len = i;
+
+		return;
 	}
 
-	compat = cdefs->id;
-	base_len = cdefs->base;
-	ext_len = cdefs->ext;
-	pad_fn = cdefs->pad;
-	default_attr = cdefs->attr;
-	enable_dme = cdefs->dme;
-	enable_magic_files = cdefs->magic;
+	// search for matching profile by name
+	p = false;
+	for (i=0; i<n; i++) {
+		if (!strncasecmp(s,profiles[i].id,l)) { p = true ;break; }
+	}
+	if (!p) {
+		dbg(0,"No profile named \"%s\" found.\n",s);
+		show_profiles_help();
+		return;
+	}
 
-	switch (cdefs->upcase) {
+	profile = profiles[i].id;
+	base_len = profiles[i].base;
+	ext_len = profiles[i].ext;
+	pad_fn = profiles[i].pad;
+	default_attr = profiles[i].attr;
+	enable_dme = profiles[i].dme;
+	enable_magic_files = profiles[i].magic;
+
+	// upcase has a 3rd state -1 which means no-op / don't-change
+	switch (profiles[i].upcase) {
 		case true:  upcase=true;  break;
 		case false: upcase=false; break;
 	}
 
-	raw = !strncmp(compat,"raw",3);
+	// a couple places we want a quicker way to check for raw
+	raw = !strncmp(profile,"raw",3);
 
 }
 
@@ -1191,6 +1221,8 @@ FILE_ENTRY* make_file_entry(char* namep, uint8_t attr, uint16_t len, char flags)
 		if (strchr(namep,'.')) {
 			ibl = strchr(namep,'.')-namep;  // first dot -> initial base len
 			ies = strrchr(namep,'.')-namep; // last dot -> initial ext start
+			printf("%s: last dot: %d\n",namep,ies);
+			printf(":: \"%s\"\n",namep+ies+1);
 			iel = strlen(namep+ies+1);      // initial ext len
 		}
 
@@ -2368,17 +2400,18 @@ int bootstrap(char* f) {
 //
 
 void show_config () {
-#if !defined(_WIN)
-	dbg(0,"getty_mode      : %s\n",getty_mode?"true":"false");
+	dbg(0,"model           : %d\n",model);
+	dbg(0,"operation_mode  : %d\n",operation_mode);
+	dbg(0,"profile         : %s\n",profile);
+	dbg(0,"base_len        : %d\n",base_len);
+	dbg(0,"ext_len         : %d\n",ext_len);
+	dbg(0,"attr            : '%c' (0x%1$02X)\n",default_attr);
+#if defined(USE_XATTR)
+	dbg(0,"xattr_name      : \"%s\"\n",xattr_name);
 #endif
 	dbg(0,"upcase          : %s\n",upcase?"true":"false");
 	dbg(0,"rtscts          : %s\n",rtscts?"true":"false");
 	dbg(0,"verbosity       : %d\n",debug);
-	dbg(0,"model           : %d\n",model);
-	dbg(0,"compat          : %s\n",compat);
-	dbg(0,"base_len        : %d\n",base_len);
-	dbg(0,"ext_len         : %d\n",ext_len);
-	dbg(2,"attr            : '%c' (0x%1$02X)\n",default_attr);
 	dbg(0,"enable_dme      : %s\n",enable_dme?"true":"false");
 	dbg(0,"magic_files     : %s\n",enable_magic_files?"true":"false");
 	dbg(0,"BASIC_byte_ms   : %d\n",BASIC_byte_us/1000);
@@ -2386,51 +2419,52 @@ void show_config () {
 	dbg(0,"app_lib_dir     : \"%s\"\n",app_lib_dir);
 	dbg(0,"client_tty_name : \"%s\"\n",client_tty_name);
 	dbg(0,"disk_img_fname  : \"%s\"\n",disk_img_fname);
-	dbg(0,"iwd             : \"%s\"\n",iwd);
-	dbg(0,"cwd             : \"%s\"\n",cwd);
+	dbg(2,"iwd             : \"%s\"\n",iwd);
+	dbg(2,"cwd             : \"%s\"\n",cwd);
 	dbg(0,"share_path[0]   : \"%s\"\n",share_path[0]);
 	dbg(0,"share_path[1]   : \"%s\"\n",share_path[1]);
-	dbg(2,"operation_mode  : %d\n",operation_mode);
-	dbg(2,"baud            : %d\n",baud);
-	dbg(2,"dme_root_label  : \"%-*.*s\"\n",6,6,dme_root_label);
-	dbg(2,"dme_parent_label: \"%-*.*s\"\n",6,6,dme_parent_label);
-	dbg(2,"dme_dir_label   : \"%-2.2s\"\n",dme_dir_label);
+	dbg(0,"baud            : %d\n",baud);
+	dbg(0,"dme_root_label  : \"%-*.*s\"\n",6,6,dme_root_label);
+	dbg(0,"dme_parent_label: \"%-*.*s\"\n",6,6,dme_parent_label);
+	dbg(0,"dme_dir_label   : \"%-2.2s\"\n",dme_dir_label);
 	dbg(0,"tildes          : %s\n",tildes?"true":"false");
-#if defined(USE_XATTR)
-	dbg(0,"xattr_name      : \"%s\"\n",xattr_name);
+#if !defined(_WIN)
+	dbg(0,"getty_mode      : %s\n",getty_mode?"true":"false");
 #endif
 }
 
 void show_main_help() {
-	set_compat(DEFAULT_COMPAT);
+	load_profile(DEFAULT_PROFILE);
 	dbg(0,"\nUsage: %1$s [options] [tty_device] [share_path]\n"
 		"\n"
-		"Options     Description (default setting)\n"
-//		" -0       Raw mode - no filename munging, attr = ' '\n"
+		"Options      Description... (default setting)\n"
+//		" -0          Raw mode - no filename munging, attr = ' '\n"
 #if defined(USE_XATTR)
-		" -a attr    Attribute - default attr byte used when no xattr (%2$c)\n"
+		" -a attr     Attribute - default attr byte used when no xattr (%2$c)\n"
 #else
-		" -a attr    Attribute - attribute byte used for all files (%2$c)\n"
+		" -a attr     Attribute - attribute byte used for all files (%2$c)\n"
 #endif
-		" -b file    Bootstrap - send loader file to client - empty for help\n"
-		" -c compat  Client compat profile - empty for help (%9$s)\n"
-		" -d tty     Serial device connected to the client (%4$s*)\n"
-		" -e bool    TS-DOS Subdirectories (%10$s)\n"
+		" -b file     Bootstrap - send loader file to client - empty for help\n"
+		" -c profile  Client compatibility profile - empty for help (%9$s)\n"
+		" -d tty      Serial device connected to the client (%4$s*)\n"
+		" -e bool     TS-DOS Subdirectories (%10$s)\n"
 //		" -n          Disable TS-DOS directories\n"
 #if !defined(_WIN)
-		" -g         Getty mode - run as daemon\n"
+		" -g          Getty mode - run as daemon\n"
 #endif
-		" -h         Print this help\n"
-		" -i file    Disk image filename for raw sector access - empty for help\n"
-//		" -l         List loader files and show bootstrap help\n"
-		" -m #       Model - 1 = FB-100/TPDD1, 2 = TPDD2 (%5$u)\n"
-		" -p dir     Path - /path/to/dir with files to be served (./)\n"
-		" -r         RTS/CTS hardware flow control (%7$s)\n"
-		" -s #       Speed - serial port baud rate (%6$d)\n"
-		" -u         Uppercase all filenames (%8$s)\n"
-		" -v         Verbosity - more v's = more verbose\n"
-//		" -w         WP-2 mode - 8.2 filenames for TANDY WP-2\n"
-		" -z #       Milliseconds per byte for bootstrap (%3$d)\n"
+		" -h          Print this help\n"
+		" -i file     Disk image filename for raw sector access - empty for help\n"
+//		" -l          List loader files and show bootstrap help\n"
+		" -m #        Model - 1 = FB-100/TPDD1, 2 = TPDD2 (%5$u)\n"
+		" -p dir      Path - /path/to/dir with files to be served (./)\n"
+		" -r          RTS/CTS hardware flow control (%7$s)\n"
+		" -s #        Speed - serial port baud rate (%6$d)\n"
+		" -u          Uppercase all filenames (%8$s)\n"
+		" -~ bool     Truncated filenames end in '~' (%11$s)\n"
+		" -v          Verbosity - more v's = more verbose\n"
+//		" -w          WP-2 mode - 8.2 filenames for TANDY WP-2\n"
+		" -z #        Milliseconds per byte for bootstrap (%3$d)\n"
+		" -^ #        Dump config and exit\n"
 		"\n"
 		"The 1st non-option argument is another way to specify the tty device.\n"
 		"The 2nd non-option argument is another way to specify the share path.\n"
@@ -2452,8 +2486,9 @@ void show_main_help() {
 		,DEFAULT_BAUD
 		,DEFAULT_RTSCTS?"true":"false"
 		,DEFAULT_UPCASE?"true":"false"
-		,DEFAULT_COMPAT
+		,DEFAULT_PROFILE
 		,enable_dme?"true":"false"
+		,tildes?"true":"false"
 	);
 
 }
@@ -2465,13 +2500,12 @@ int main(int argc, char** argv) {
 	bool x = false;
 	args = argv;
 	(void)!getcwd(iwd,PATH_MAX); // remember initial working directory
-	set_compat(DEFAULT_COMPAT);
+	load_profile(DEFAULT_PROFILE);
 
 	// environment
 	if (getenv("OPERATION_MODE")) operation_mode = atoi(getenv("OPERATION_MODE"));
-	if (getenv("COMPAT")) set_compat(getenv("COMPAT"));
-	if (getenv("BASE_LEN")) base_len = atoi(getenv("BASE_LEN"));
-	if (getenv("EXT_LEN")) ext_len = atoi(getenv("EXT_LEN"));
+	if (getenv("PROFILE")) load_profile(getenv("PROFILE"));
+	if (getenv("FNAMES")) load_profile(getenv("FNAMES"));
 	if (getenv("ATTR")) default_attr = *getenv("ATTR");
 	if (getenv("ENABLE_DME")) enable_dme = stobool(getenv("ENABLE_DME"));
 	if (getenv("ENABLE_MAGIC_FILES")) enable_magic_files = stobool(getenv("ENABLE_MAGIC_FILES"));
@@ -2492,10 +2526,10 @@ int main(int argc, char** argv) {
 	while ((i = getopt (argc, argv, ":0a:b:c:d:e:ghi:lm:p:rs:uvwz:~:^")) >=0)
 #endif
 		switch (i) {
-			case '0': set_compat("raw");                          break; // back compat = -c raw
+			case '0': load_profile("raw");                        break; // back compat = -c raw
 			case 'a': default_attr=*strndup(optarg,1);            break;
 			case 'b': strcpy(bootstrap_fname,optarg);             break;
-			case 'c': set_compat(optarg);                         break;
+			case 'c': load_profile(optarg);                       break;
 			case 'd': strcpy(client_tty_name,optarg);             break;
 			case 'e': enable_dme = stobool(optarg);               break;
 			case 'n': enable_dme = false;                         break;  // back compat = -e false
@@ -2512,12 +2546,12 @@ int main(int argc, char** argv) {
 			case 'u': upcase = true;                              break;
 			case '~': tildes = stobool(optarg);                   break;
 			case 'v': debug++;                                    break;
-			case 'w': set_compat("wp2"); upcase=false;            break; // back compat = -c wp2
+			case 'w': load_profile("wp2");                        break; // back compat = -c wp2
 			case 'z': BASIC_byte_us=atoi(optarg)*1000;            break;
 			case '^': x = true;                                   break;
 			case ':': dbg(0,"\"-%c\" requires a value\n",optopt);
 				if (optopt=='b'||optopt=='i') { show_bootstrap_help(); exit(0); }
-				if (optopt=='c') { list_profiles(); exit(0); }
+				if (optopt=='c') { show_profiles_help(); exit(0); }
 				break;
 			case '?':
 				if (isprint(optopt)) dbg(0,"Unknown option \"-%c\"\n",optopt);
@@ -2544,6 +2578,8 @@ int main(int argc, char** argv) {
 	resolve_client_tty_name();
 	find_lib_file(bootstrap_fname);
 
+	// delay loading the default profile until after options are parsed
+	//if (!profile) load_profile(DEFAULT_PROFILE);
 	if (x) { show_config(); return 0; }
 
 	dbg(0,    "Serial Device: %s\n",client_tty_name);
@@ -2564,7 +2600,7 @@ int main(int argc, char** argv) {
 
 	dbg(2,"Emulating %s\n",(model==2)?"TANDY 26-3814 (TPDD2)":"Brother FB-100 (TPDD1)");
 	dbg(2,"TPDD2 banks %s\n",(model==2)?"enabled":"disabled");
-	if (strcmp(compat,DEFAULT_COMPAT)) dbg(2,"Client Compatibility Profile: \"%s\"\n",compat);
+	if (strcmp(profile,DEFAULT_PROFILE)) dbg(2,"Client Compatibility Profile: \"%s\"\n",profile);
 	dbg(2,"TS-DOS directories %s\n",(enable_dme)?"enabled":"disabled");
 	dbg(2,"Magic files for UR-II/TSLOAD %s\n",(enable_magic_files)?"enabled":"disabled");
 	if (model==2) dbg(0,"Bank 0 Dir: %s\nBank 1 Dir: %s\n",share_path[0],share_path[1]);

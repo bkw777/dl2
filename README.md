@@ -21,7 +21,7 @@ Usage: ./dl [options] [tty_device] [share_path]
 Options     Description (default setting)
  -a attr    Attribute - default attr byte used when no xattr (F)
  -b file    Bootstrap - send loader file to client - empty for help
- -c compat  Client compat profile - empty for help (k85)
+ -c profile Client compatibility profile - empty for help (k85)
  -d tty     Serial device connected to the client (ttyUSB*)
  -e bool    TS-DOS Subdirectories (true)
  -g         Getty mode - run as daemon

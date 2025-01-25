@@ -13,17 +13,14 @@ APP_VERSION := $(shell git describe --long 2>&-)
 
 # optional configurables
 #FB100_ROM := Brother_FB-100.rom # exists but not used
-TPDD2_ROM := TANDY_26-3814.rom
+#TPDD2_ROM := TANDY_26-3814.rom  # exists and is used
 #DEFAULT_BASIC_BYTE_MS := 8  # ms per byte in bootstrap
 #DEFAULT_MODEL := 1          # 1=tpdd1  2=tpdd2  (TS-DOS directory support requires tpdd1)
 #DEFAULT_OPERATION_MODE := 1 # 0=FDC-mode 1=Operation-mode
 #DEFAULT_BAUD := 19200
 #DEFAULT_RTSCTS := false
 #DEFAULT_UPCASE := false
-#DEFAULT_PROFILE := "k85" # k85 = Floppy/TS-DOS/etc - 6.2, dme, magic files
-#DEFAULT_BASELEN := 6    # default 6.2 filenames compatible with Floppy/TS-DOS/etc.
-#DEFAULT_EXTLEN := 2
-#DEFAULT_ATTR := 0x46   # default attribute 'F' compatible with Floppy/TS-DOS/etc.
+#DEFAULT_PROFILE := "k85" # k85 = Floppy/TS-DOS/etc - 6.2, padded, F, dme, magic files
 #RAW_ATTR := 0x20       # attr for "raw" mode, drive firmware fills unused fields with 0x20
 #DEFAULT_TILDES := true
 #XATTR_NAME := pdd.attr
@@ -101,11 +98,16 @@ DEFS = \
 	-DAPP_VERSION=\"$(APP_VERSION)\" \
 	-DAPP_LIB_DIR=\"$(APP_LIB_DIR)\" \
 	-DTTY_PREFIX=\"$(TTY_PREFIX)\" \
-	-DTPDD2_ROM=\"$(TPDD2_ROM)\" \
 	-DUSE_XATTR \
 #	-DPRINT_8BIT \
 #	-DNADSBOX_EXTENSIONS \
 
+#ifdef TPDD1_ROM
+#	DEFS += -DTPDD1_ROM=\"$(TPDD1_ROM)\"
+#endif
+ifdef TPDD2_ROM
+	DEFS += -DTPDD2_ROM=\"$(TPDD2_ROM)\"
+endif
 ifdef TSDOS_ROOT_LABEL
 	DEFS += -DTSDOS_ROOT_LABEL=\"$(TSDOS_ROOT_LABEL)\"
 endif
@@ -127,17 +129,11 @@ endif
 ifdef DEFAULT_RTSCTS
 	DEFS += -DDEFAULT_RTSCTS=$(DEFAULT_RTSCTS)
 endif
-ifdef DEFAULT_UPCASE
-	DEFS += -DDEFAULT_UPCASE=$(DEFAULT_UPCASE)
-endif
 ifdef DEFAULT_PROFILE
 	DEFS += -DDEFAULT_PROFILE=$(DEFAULT_PROFILE)
 endif
-ifdef DEFAULT_BASELEN
-	DEFS += -DDEFAULT_BASELEN=$(DEFAULT_BASELEN)
-endif
-ifdef DEFAULT_EXTLEN
-	DEFS += -DDEFAULT_EXTLEN=$(DEFAULT_EXTLEN)
+ifdef DEFAULT_UPCASE
+	DEFS += -DDEFAULT_UPCASE=$(DEFAULT_UPCASE)
 endif
 ifdef DEFAULT_ATTR
 	DEFS += -DDEFAULT_ATTR=$(DEFAULT_ATTR)
