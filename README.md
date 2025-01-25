@@ -14,26 +14,28 @@ $ sudo make uninstall
 ## Manual
 ```
 $ dl -h
-DeskLink2 v2.1.001-30-ge4936fd
+DeskLink2 v2.1.001-33-g1f5ccb2
 
 Usage: ./dl [options] [tty_device] [share_path]
 
-Options     Description (default setting)
- -a attr    Attribute - default attr byte used when no xattr (F)
- -b file    Bootstrap - send loader file to client - empty for help
- -c profile Client compatibility profile - empty for help (k85)
- -d tty     Serial device connected to the client (ttyUSB*)
- -e bool    TS-DOS Subdirectories (true)
- -g         Getty mode - run as daemon
- -h         Print this help
- -i file    Disk image filename for raw sector access - empty for help
- -m #       Model - 1 = FB-100/TPDD1, 2 = TPDD2 (1)
- -p dir     Path - /path/to/dir with files to be served (./)
- -r         RTS/CTS hardware flow control (false)
- -s #       Speed - serial port baud rate (19200)
- -u         Uppercase all filenames (false)
- -v         Verbosity - more v's = more verbose
- -z #       Milliseconds per byte for bootstrap (8)
+Options      Description... (default setting)
+ -a attr     Attribute - default attr byte used when no xattr (F)
+ -b file     Bootstrap - send loader file to client - empty for help
+ -c profile  Client compatibility profile - empty for help (k85)
+ -d tty      Serial device connected to the client (ttyUSB*)
+ -e bool     TS-DOS Subdirectories (true)
+ -g          Getty mode - run as daemon
+ -h          Print this help
+ -i file     Disk image filename for raw sector access - empty for help
+ -m #        Model - 1 = FB-100/TPDD1, 2 = TPDD2 (1)
+ -p dir      Path - /path/to/dir with files to be served (./)
+ -r          RTS/CTS hardware flow control (false)
+ -s #        Speed - serial port baud rate (19200)
+ -u          Uppercase all filenames (false)
+ -~ bool     Truncated filenames end in '~' (true)
+ -v          Verbosity - more v's = more verbose
+ -z #        Milliseconds per byte for bootstrap (8)
+ -^ #        Dump config and exit
 
 The 1st non-option argument is another way to specify the tty device.
 The 2nd non-option argument is another way to specify the share path.
@@ -84,7 +86,7 @@ $
 
 ```
 $ ./dl -c
-DeskLink2 v2.1.001-30-ge4936fd
+DeskLink2 v2.1.001-33-g1f5ccb2
 "-c" requires a value
 
 Client Compatibility Profiles
@@ -94,11 +96,18 @@ NAME	LEN	LEN	FNAMES	BYTE	DIRS	FILES	CASE
 -------------------------------------------------------------
 raw	0	0	false	' '	false	false	false
 k85	6	2	true	'F'	true	true	
-wp2	8	2	true	'F'	false	false	
-cpm	8	3	false	'F'	false	false	
+wp2	8	2	true	'F'	false	false	false
+cpm	8	3	false	'F'	false	false	false
 rexcpm	6	2	true	'F'	false	false	true
-z88	12	3	false	'F'	false	false	
+z88	12	3	false	'F'	false	false	false
 st	6	2	true	'F'	false	false	
+
+Example: "-c cpm" sets filenames to 8.3 without padding or upcase.
+
+May also use "-c ##.##" to set an arbitrary filename pattern
+with other parameters set same as "raw". Example: -c 16.0 
+
+Filenames are limited to 24 bytes total, the hardware limit in a real drive.
 
 $ 
 ```
