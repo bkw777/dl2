@@ -162,15 +162,20 @@ const char * magic_files[] = {
 };
 
 // client compatibility profiles
+// REXCPM native is cpm, but import & export forces 6.2 upcase
+// Cambridge Z88 native is 12.3, not sure what DISCMNGR or DISC_RBL actually does
+// Atari ST native is cpm, but PDDOS limits to 6.2
+// No xenix client exists probably, but it would be 14.0
+//	{ "xenix",  14, 0, false, ATTR_RAW, false, false, false }
 //     id,   base, ext, pad,    attr,    dme,  magic, upcase
 #define CLIENT_PROFILES { \
 	{ "raw",    0,  0, false, ATTR_RAW, false, false, false }, \
-	{ "k85",    6,  2, true,  ATTR_DEF, true,  true,  -1    }, \
+	{ "k85",    6,  2, true,  ATTR_DEF, true,  true,  false }, \
 	{ "wp2",    8,  2, true,  ATTR_DEF, false, false, false }, \
 	{ "cpm",    8,  3, false, ATTR_DEF, false, false, false }, \
 	{ "rexcpm", 6,  2, true,  ATTR_DEF, false, false, true  }, \
 	{ "z88",    12, 3, false, ATTR_DEF, false, false, false }, \
-	{ "st",     6,  2, true,  ATTR_DEF, false, false, -1    }  \
+	{ "st",     6,  2, true,  ATTR_DEF, false, false, false }  \
 }
 
 // terminal emulation
@@ -205,7 +210,7 @@ bool upcase = DEFAULT_UPCASE;
 bool rtscts = DEFAULT_RTSCTS;
 bool tildes = DEFAULT_TILDES;
 uint8_t model = DEFAULT_MODEL;
-int baud = DEFAULT_BAUD;
+uint16_t baud = DEFAULT_BAUD;
 int BASIC_byte_us = DEFAULT_BASIC_BYTE_MS*1000;
 
 char client_tty_name[PATH_MAX+1] = {0x00};
@@ -250,25 +255,26 @@ uint8_t ram[RAM_LEN] = {0x00};       // 2k ram (pdd2 disk image record buffer)
 uint8_t rom[ROM_LEN] = {0x00};       // 4k cpu internal mask rom
 
 // client compatibility settings
+#define PROFILE_ID_LEN 8
 typedef struct {
-	char    id[33];
+	char    id[PROFILE_ID_LEN+1];
 	uint8_t base;
 	uint8_t ext;
 	bool    pad;
 	uint8_t attr;
 	bool    dme;
 	bool    magic;
-	int8_t  upcase;
+	bool    upcase;
 } CLIENT_PROFILE;
 const CLIENT_PROFILE profiles [] = CLIENT_PROFILES ;
-const char* profile = profiles[0].id;
+//const char* profile = profiles[0].id;
+char profile[PROFILE_ID_LEN+1] = {0};
 uint8_t base_len = 0;
 uint8_t ext_len = 0;
 char default_attr = ATTR_RAW;
 bool enable_magic_files = false;
 bool pad_fn = false;
-bool enable_dme = false;
-bool raw = true;
+bool dme_en = false;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -307,43 +313,102 @@ void dbg_p(const int v, unsigned char* b) {
 	dbg_b(v,b+2,b[1]);
 }
 
-// string-to-bool
-bool stobool (const char* s) {
-	return (
-		atoi(s)>0
-		|| !strcasecmp(s,"true")
-		|| !strcasecmp(s,"on")
-		|| !strcasecmp(s,"yes")
-		|| !strcmp(s,":")
-	) ? true : false;
+// ascii-to-bool
+// true = case-insensitive: 1 y yes t true on enable
+bool atobool (const char* s) {
+	// min 2 chars to tell "on" from "off"
+	char t[5] = {0};
+	t[0]=',';
+	t[1]=s[0]?tolower(s[0]):' '; // replace the nuls to avoid
+	t[2]=s[1]?tolower(s[1]):' '; // s="o" -> t=",o" -> matches ",on,"
+	t[3]=',';
+	return strstr(",on,1 ,t ,y ,tr,ye,en,",t);
 }
 
 // int-to-rate - given int 9600 return macro B9600
-int itor (int i) {
+speed_t itobaud (uint32_t i) {
 	return
-		i==75?B75:         // kc85 supports, drive does not
-		i==110?B110:       // kc85 supports, drive does not
-		i==150?B150:       // drive supports, kc85 does not
+		i==0?B0:
+		i==50?B50:
+		i==75?B75:
+		i==110?B110:
+		i==134?B134:
+		i==150?B150:
+		i==200?B200:
 		i==300?B300:
 		i==600?B600:
 		i==1200?B1200:
+		i==1800?B1800:
 		i==2400?B2400:
 		i==4800?B4800:
-		i==9600?B9600:     // default Brother FB-100, KnitKing FDD19, Purple Computing D103
-		i==19200?B19200:   // default TANDY 26-3808, TANDY 26-3814
+		i==9600?B9600:
+		i==19200?B19200:
 		i==38400?B38400:
-#if defined(B76800) //#if defined(__sparc__) // ref/baud_linux.c
-		i==76800?B76800:   // drive supports, local platform may
+#ifdef B57600
+		i==57600?B57600:
+#endif
+#ifdef B76800
+		i==76800?B76800:
+#endif
+#ifdef B115200
+		i==115200?B115200:
+#endif
+#ifdef B153600
+		i==153600?B153600:
+#endif
+#ifdef B230400
+		i==230400?B230400:
+#endif
+#ifdef B307200
+		i==307200?B307200:
+#endif
+#ifdef B460800
+		i==460800?B460800:
+#endif
+#ifdef B500000
+		i==500000?B500000:
+#endif
+#ifdef B576000
+		i==576000?B576000:
+#endif
+#ifdef B614400
+		i==614400?B614400:
+#endif
+#ifdef B921600
+		i==921600?B921600:
+#endif
+#ifdef B1000000
+		i==1000000?B1000000:
+#endif
+#ifdef B1152000
+		i==1152000?B1152000:
+#endif
+#ifdef B1500000
+		i==1500000?B1500000:
+#endif
+#ifdef B2000000
+		i==2000000?B2000000:
+#endif
+#ifdef B2500000
+		i==2500000?B2500000:
+#endif
+#ifdef B3000000
+		i==3000000?B3000000:
+#endif
+#ifdef B3500000
+		i==3500000?B3500000:
+#endif
+#ifdef B4000000
+		i==4000000?B4000000:
 #endif
 		0;
 }
 
-// given 19200 return 9 (the # in "COM:#8N1ENN")
-int baud_to_stat_code (int r) {
+// given int 19200 return 9 (the # in "COM:#8N1ENN")
+uint8_t baud_to_stat_code (uint16_t r) {
 	return
-		r==75?1:     // kc85 supports, drive does not
-		r==110?2:    // kc85 supports, drive does not
-//		r==150?0:    // drive supports, kc85 does not
+		r==75?1:
+		r==110?2:
 		r==300?3:
 		r==600?4:
 		r==1200?5:
@@ -351,19 +416,78 @@ int baud_to_stat_code (int r) {
 		r==4800?7:
 		r==9600?8:
 		r==19200?9:
-//		b==76800?0:  // drive supports, kc85 does not
 		0;
 }
 
-void show_profiles_help () {
+void show_profiles_help (int e) {
 	const int n = sizeof(profiles)/sizeof(profiles[0]);
 
-	dbg(0,"\n");
-	dbg(0,"Client Compatibility Profiles\n");
-	dbg(0,"\n");
-	dbg(0,"PROFILE\tBASE\tEXT\tPAD\tATTR\tTS-DOS\tMAGIC\tUP\n");
-	dbg(0,"NAME\tLEN\tLEN\tFNAMES\tBYTE\tDIRS\tFILES\tCASE\n");
-	dbg(0,"-------------------------------------------------------------\n");
+	dbg(0,
+		"\n"
+		"help for Client Compatibility Profiles\n"
+		"\n"
+		"usage:\n"
+		" -c name    use profile <name> - (default: \"%s\")\n"
+		" -c #.#     \"raw\" with filenames truncated to #.# & attr='%c'\n"
+		" -c #.#p    \"#.#\" fixed-length space-padded\n"
+		" -v -c      more help\n"
+		,DEFAULT_PROFILE,ATTR_DEF
+	);
+
+	dbg(1,
+		"\n"
+		"Profiles taylor the translation between local filenames and TPDD filenames.\n"
+		"\n"
+		"A real TPDD doesn't care what's in the filename, and emulating a TPDD\n"
+		"doesn't require any translation other than truncating to 24 bytes.\n"
+		"\n"
+		"But most TPDD clients write filenames to TPDD drives in specific formats,\n"
+		"and we need to translate filenames between the local and client formats.\n"
+		"\n"
+		"Strictly speaking, \"raw\" always works for any and all clients,\n"
+		"from the clients point of view. It still emulates a real drive exactly.\n"
+		"\n"
+		"The only reason for any compatibility profile is for more convenient\n"
+		"local filenames. When TS-DOS saves a file like \"A.BA\", it actually\n"
+		"writes \"A     .BA\" to a real drive. In \"raw\" mode this would create a\n"
+		"local file named verbatim: \"A     .BA\", which is legal but inconvenient.\n"
+		"And TS-DOS does not recognize any disk files that don't conform\n"
+		"to the \"k85\" profile below. (fixed-length, space-padded, 6.2)\n"
+		"\n"
+		"\"raw\" still \"works\" because TS-DOS can both create any files it\n"
+		"wants, and access any files it created, identical to a real drive.\n"
+		"\n"
+		"Profiles just make it so that a local file named \"my_long_file_name.text\"\n"
+		"appears to TS-DOS as \"my_lo~.t~\", which may be ugly but TS-DOS can use it.\n"
+		"And when TS-DOS tries to read or write a file named \"FOO   .CO\",\n"
+		"we use \"FOO.CO\" for the local filename.\n"
+		"\n"
+		"Most of the parameters in a profile also have individual commandline flags.\n"
+		"Example: \"-c k85\" is short for \"-c 6.2p -a F -e on\"\n"
+		"(except k85 is the default so you don't need to use any of those)\n"
+		"\n"
+		"The default \"k85\" matches all KC-85-clone platform clients. Examples:\n"
+		"Floppy, TS-DOS, DSKMGR, TEENY, etc, on TRS-80 Model 100, NEC PC-8201a, etc.\n"
+		"\n"
+		"NAME    profile name\n"
+		"BASE    basename length\n"
+		"EXT     extension length\n"
+		"PAD     fixed-length space-padded\n"
+		"ATTR    default attribute byte if no xattr\n"
+		"DME     enable TS-DOS directory mode extension\n"
+		"TSLOAD  enable \"magic files\" (ex: DOS100.CO) for TSLOAD / Ultimate ROM II\n"
+		"UPCASE  translate filenames to all uppercase\n"
+		"\n"
+		"Available profiles:\n"
+	);
+
+	dbg(0,
+		"\n"
+//		"PROFILE\tBASE\tEXT\tPAD\tATTR\tTS-DOS\tMAGIC\tUP\n"
+//		"NAME\tLEN\tLEN\tFNAMES\tBYTE\tDIRS\tFILES\tCASE\n"
+		"NAME\tBASE\tEXT\tPAD\tATTR\tDME\tTSLOAD\tUPCASE\n"
+		"-------------------------------------------------------------\n"
+	);
 
 	for (int i=0; i<n; i++) {
 		dbg(0,
@@ -371,84 +495,96 @@ void show_profiles_help () {
 			profiles[i].id,
 			profiles[i].base,
 			profiles[i].ext,
-			profiles[i].pad?"true":"false",
+			profiles[i].pad?"on":"off",
 			profiles[i].attr,
-			profiles[i].dme?"true":"false",
-			profiles[i].magic?"true":"false",
-			profiles[i].upcase<0?"":profiles[i].upcase?"true":"false"
+			profiles[i].dme?"on":"off",
+			profiles[i].magic?"on":"off",
+			profiles[i].upcase?"on":"off"
 		);
 	}
+
 	dbg(0,"\n");
-	dbg(0,"Example: \"-c cpm\" sets filenames to 8.3 without padding or upcase.\n");
-	dbg(0,"\n");
-	dbg(0,"May also use \"-c ##.##\" to set an arbitrary filename pattern\n");
-	dbg(0,"with other parameters set same as \"raw\". Example: -c 16.0 \n");
-	dbg(0,"\n");
-	dbg(0,"Filenames are limited to 24 bytes total, the hardware limit in a real drive.\n");
-	dbg(0,"\n");
+
+	exit(e);
+}
+
+bool ckhelp (const char* s) {
+	return (
+		!s[0] ||
+		!strncasecmp(s,"list",PROFILE_ID_LEN) ||
+		!strncasecmp(s,"help",PROFILE_ID_LEN) ||
+		!strncasecmp(s,"?",PROFILE_ID_LEN)
+	);
+}
+
+// set base_len, ext_len, pad_fn from ##.##p
+void set_fnames (const char* s) {
+
+	if (ckhelp(s)) show_profiles_help(0);
+
+	int i, p;
+	char t[4] = {0};
+
+	p = strchr(s,'.')-s;
+	if (p<1 || p>2) show_profiles_help(1);
+
+	for (i=sizeof(s);i>p;i--) {
+		if (s[i]=='p'||s[i]=='P') pad_fn = true;
+		if (s[i]>='0' && s[i]<='9') break;
+	}
+
+	memcpy(t,s,p);
+	i = atoi(t);
+	if (i>0 && i<TPDD_FILENAME_LEN) base_len = i;
+
+	memset(t,0,4);
+	i = sizeof(s)-p-1;
+	if (i>4) i = 4;
+	memcpy(t,s+p+1,i);
+	i = atoi(t);
+	if (i>-1 && i<TPDD_FILENAME_LEN-base_len) ext_len = i;
+
+	snprintf(profile,PROFILE_ID_LEN+1,"%s",s);
+	pad_fn = false;
+	default_attr = ATTR_DEF;
+	dme_en = false;
+	enable_magic_files = false;
+	upcase = false;
+
+	return;
 }
 
 // client compatibility profile
 void load_profile (const char* s) {
 
 	const int n = sizeof(profiles)/sizeof(profiles[0]);
-	const int l = sizeof(profiles[0].id);
 	int i, p;
-	char t[4]={0};
 
-	// display help
-	if (!s[0]
-		|| !strncasecmp(s,"list",l)
-		|| !strncasecmp(s,"help",l)
-		|| !strncasecmp(s,"?",l)
-	) { show_profiles_help(); return; }
-
-	// detect "##.##"
-	p = strchr(s,'.')-s;
-	if (p>0 && p<3) {
-		load_profile("raw");
-
-		memcpy(t,s,p);
-		i = atoi(t);
-		if (i>0 && i<TPDD_FILENAME_LEN) base_len = i;
-
-		memset(t,0,4);
-		i = sizeof(s)-p-1;
-		if (i>4) i = 4;
-		memcpy(t,s+p+1,i);
-		i = atoi(t);
-		if (i>-1 && i<TPDD_FILENAME_LEN-base_len) ext_len = i;
-
-		return;
-	}
+	if (ckhelp(s)) show_profiles_help(0);
 
 	// search for matching profile by name
 	p = false;
 	for (i=0; i<n; i++) {
-		if (!strncasecmp(s,profiles[i].id,l)) { p = true ;break; }
-	}
-	if (!p) {
-		dbg(0,"No profile named \"%s\" found.\n",s);
-		show_profiles_help();
-		return;
+		if (!strncasecmp(s,profiles[i].id,PROFILE_ID_LEN)) { p = true ;break; }
 	}
 
-	profile = profiles[i].id;
+	// If no profile by name, try #.#[p]
+	// do it after searching by name so that a profile name can have "." in it
+	if (strchr(s,'.')) { set_fnames(s); return; }
+
+	if (!p) {
+		dbg(0,"No profile named \"%s\" found.\n",s);
+		show_profiles_help(1);
+	}
+
+	strncpy(profile,profiles[i].id,PROFILE_ID_LEN);
 	base_len = profiles[i].base;
 	ext_len = profiles[i].ext;
 	pad_fn = profiles[i].pad;
 	default_attr = profiles[i].attr;
-	enable_dme = profiles[i].dme;
+	dme_en = profiles[i].dme;
 	enable_magic_files = profiles[i].magic;
-
-	// upcase has a 3rd state -1 which means no-op / don't-change
-	switch (profiles[i].upcase) {
-		case true:  upcase=true;  break;
-		case false: upcase=false; break;
-	}
-
-	// a couple places we want a quicker way to check for raw
-	raw = !strncmp(profile,"raw",3);
+	upcase = profiles[i].upcase;
 
 }
 
@@ -691,7 +827,7 @@ int open_client_tty () {
 	if (rtscts) client_termios.c_cflag |= CRTSCTS;
 	else client_termios.c_cflag &= ~CRTSCTS;
 
-	if (cfsetspeed(&client_termios,itor(baud))==-1) return 22;
+	if (cfsetspeed(&client_termios,itobaud(baud))==-1) return 22;
 
 	if (tcsetattr(client_tty_fd,TCSANOW,&client_termios)==-1) return 23;
 
@@ -794,8 +930,9 @@ int check_magic_file(char* b) {
 	return 1;
 }
 
-// This is kind of silly but why not. Load a rom image file into rom[],
-// then tpdd2 mem_read() in the ROM address range returns data from rom[].
+
+// This is kind of silly but why not? Load a rom image file into rom[],
+// then tpdd2 mem_read() in the ROM address range returns data from rom[],
 void load_rom(char* f) {
 	dbg(3,"%s(%s)\n",__func__,f);
 	char t[PATH_MAX+1] = {0x00};
@@ -1193,70 +1330,100 @@ void get_fdc_cmd() {
 //  OPERATION MODE
 //
 
+/*
+#define MIN(a,b)    (((a)<(b))?(a):(b))
+#define MAX(a,b)    (((a)>(b))?(a):(b))
+#define MAX3(a,b,c) (((a)>(b))?(((a)>(c))?(a):(c)):(((b)>(c))?(b):(c)))
+#define MIN3(a,b,c) (((a)<(b))?(((a)<(c))?(a):(c)):(((b)<(c))?(b):(c)))
+
+static inline int min(const int a, const int b) {
+    return a < b ? a : b;
+}
+static inline int max(const int a, const int b) {
+    return a > b ? a : b;
+}
+static inline long minl(const long a, const long b) {
+    return a < b ? a : b;
+}
+static inline long maxl(const long a, const long b) {
+    return a > b ? a : b;
+}
+static inline long long minll(const long long a, const long long b) {
+    return a < b ? a : b;
+}
+static inline long long maxll(const long long a, const long long b) {
+    return a > b ? a : b;
+}
+*/
+
 FILE_ENTRY* make_file_entry(char* namep, uint8_t attr, uint16_t len, char flags) {
 	dbg(3,"%s(\"%s\")\n",__func__,namep);
 	static FILE_ENTRY f;
-	int t=strlen(namep);
-
-	strncpy(f.local_fname, namep, sizeof(f.local_fname)-1);
-	memset(f.client_fname, 0x00, sizeof(f.client_fname));
+	strncpy(f.local_fname, namep, LOCAL_FILENAME_MAX);
+	memset(f.client_fname, 0x00, TPDD_FILENAME_LEN+1);
 	f.attr = attr;
 	f.len = len;
 	f.flags = flags;
 
-	if (raw) {
+	// input length
+	uint8_t il = strlen(namep);
 
-		// raw mode
-		snprintf(f.client_fname,TPDD_FILENAME_LEN+1,"%-*.*s",TPDD_FILENAME_LEN,TPDD_FILENAME_LEN,namep);
-		if (tildes && t>TPDD_FILENAME_LEN) f.client_fname[TPDD_FILENAME_LEN-1]='~';
+	// find the last dot but not if it's a directory
+	uint8_t dp = 0;
+	if (!f.flags&FE_FLAGS_DIR && strrchr(namep,'.')) dp = strrchr(namep,'.')-namep;
+
+	// output length
+	uint8_t ol = base_len?(base_len+(ext_len?(1+ext_len):0)):TPDD_FILENAME_LEN;
+
+	if (!ext_len) {
+		// ignore dots
+
+		snprintf(f.client_fname,TPDD_FILENAME_LEN+1,"%-*.*s",ol,ol,namep);
+		if (tildes && il>ol) f.client_fname[ol-1]='~';
 
 	} else {
-
-		// Floppy/TS-DOS or WP-2 or other non-raw compat mode
-		char bn[TPDD_FILENAME_LEN] = {0};
-		char en[TPDD_FILENAME_LEN] = {0};
-		int ies=t, ibl=t, iel=0, bl=0;
-
-		// find the positions of the first and last dots in the full local filename
-		if (strchr(namep,'.')) {
-			ibl = strchr(namep,'.')-namep;  // first dot -> initial base len
-			ies = strrchr(namep,'.')-namep; // last dot -> initial ext start
-			printf("%s: last dot: %d\n",namep,ies);
-			printf(":: \"%s\"\n",namep+ies+1);
-			iel = strlen(namep+ies+1);      // initial ext len
-		}
+		// handle dots
 
 		// base
-		bl = (ibl<base_len) ? ibl : base_len; // truncated base len
-		strncpy(bn,namep,bl);                 // truncated base name
-		if (pad_fn) snprintf(f.client_fname,base_len+1,"%-*.*s",base_len,base_len,bn); // padded basename portion of client_fname
-		else snprintf(f.client_fname,base_len+1,"%s",bn);                              // unpadded basename portion of client_fname
-		if (tildes && base_len && ibl>base_len) f.client_fname[base_len-1]='~';        // overwrite last byte of basename with ~
+		char bn[TPDD_FILENAME_LEN+1] = {0};
+		// might be shorter than base_len
+		uint8_t bl = (dp&&dp<base_len)?dp:base_len;
+		// copy the basename portion of namep
+		if (bl) strncpy(bn,namep,bl);
+		// replace any . with _
+		for (int i=0;i<bl;i++) if (bn[i]=='.') bn[i]='_';
+		// tilde
+		if ( tildes &&
+				dp?dp>bl:il>ol ||
+				(f.flags&FE_FLAGS_DIR && il > ol-ext_len-1)
+			) bn[bl-1]='~';
 
 		// ext
-		if (enable_dme && flags&FE_FLAGS_DIR) {
-			// TS-DOS directories
-			if (!strcmp(f.local_fname,"..")) memcpy (f.client_fname, dme_parent_label, base_len); // special case for DME
-			en[0] = dme_dir_label[0];                                                             //
-			en[1] = dme_dir_label[1];                                                             //
-			f.len = 0;                                                                            //
-		} else {
-			// normal files
-			if (pad_fn) snprintf(en,ext_len+1,"%-*.*s",ext_len,ext_len,namep+ies+1); // padded ext name
-			else snprintf(en,ext_len+1,"%s",namep+ies+1);                            // unpadded ext name
-			if (tildes && ext_len && iel>ext_len) en[ext_len-1]='~';                 // overwrite last byte of ext name with ~
+		char en[TPDD_FILENAME_LEN+1] = {0};
+		uint8_t x = il-dp-1;
+		uint8_t el = dp? x<ext_len?x:ext_len :0;
+		if (el) strncpy(en,namep+dp+1,el);
+		if (tildes && x>el) en[el-1]='~';
+
+		// TS-DOS directories
+		if (dme_en && flags&FE_FLAGS_DIR) {
+			if (!strcmp(f.local_fname,"..")) memcpy(bn,dme_parent_label,base_len);
+			memcpy(en,dme_dir_label,ext_len+1);
+			el = ext_len;
+			f.len = 0;
 		}
 
-		if ( pad_fn || strlen(en) ) strcat(f.client_fname,".");                    // append "." to client_fname
+		// output
+		// base
+		if (pad_fn) snprintf(f.client_fname,cfnl,"%-*.*s",base_len,base_len,bn);
+		else        snprintf(f.client_fname,cfnl,"%s",bn);
+		// dot
+		if (dp||pad_fn) strncat(f.client_fname,".",1);
+		// ext
+		strncat(f.client_fname,en,el);
 
-		strcat(f.client_fname,en);                                                 // append ext name to client_fname
-		// Remove trailing spaces, blah...
-		// goofed up something since this wasn't needed before
-		char* p;
-		for (p = strrchr(f.client_fname,' ');p >= f.client_fname && *p == ' ';p--) *p = 0x00;
-
-		if (upcase) for(int i=0;i<TPDD_FILENAME_LEN;i++) f.client_fname[i]=toupper(f.client_fname[i]);  // 
-
+		// upcase
+		if (upcase) for(int i=0;i<TPDD_FILENAME_LEN;i++) f.client_fname[i]=toupper(f.client_fname[i]);
 	}
 
 	/* match format with header in update_file_list() */
@@ -1496,7 +1663,7 @@ int req_dirent() {
 // contents from the display
 void update_dme_cwd() {
 	dbg(2,"%s()\n",__func__);
-	if (!enable_dme) return;
+	if (!dme_en) return;
 
 	int i;
 	update_cwd();
@@ -1516,7 +1683,7 @@ void update_dme_cwd() {
 // Construct a DME packet around dme_cwd and send it to the client
 void ret_dme_cwd() {
 	dbg(2,"%s(\"%s\")\n",__func__,dme_cwd);
-	if (!enable_dme) return;
+	if (!dme_en) return;
 	gb[0] = RET_STD[0];
 	gb[1] = 0x0B;   // not RET_STD[1] because TS-DOS DME violates the spec
 	gb[2] = 0x00;   // don't know why this byte is 0
@@ -1565,7 +1732,7 @@ void req_fdc() {
 	// byte of a real FDC command, and respond to the 2nd and any other FDC
 	// requests with DME response instead of switching to FDC mode, as long as in_dme>1.
 	// in_dme is only set here, and only unset in dirent_get_first()
-	if (in_dme<2 && enable_dme) {
+	if (in_dme<2 && dme_en) {
 		// Try to read one more byte, and store it in ch[0] where get_fdc_req()
 		// can pick it up in case it was NOT the trailing 0x0D of a DME request
 		// but instead was the first byte of an actual FDC command.
@@ -2273,9 +2440,9 @@ void get_opr_cmd() {
 //
 
 void show_bootstrap_help() {
-	dbg(0,"Available support files in %s\n\n",app_lib_dir);
+	dbg(0,"\nAvailable support files in %s\n\n",app_lib_dir);
 
-	dbg(0,"Loader files for use with -b:\n"
+	dbg(0,"Bootstrap/Loader files for use with -b :\n"
 	      "-----------------------------\n");
 	dbg(0,  "TRS-80 Model 100/102 :"); lsx(app_lib_dir,"100"," %s");
 	dbg(0,"\nTANDY Model 200      :"); lsx(app_lib_dir,"200"," %s");
@@ -2283,7 +2450,7 @@ void show_bootstrap_help() {
 	dbg(0,"\nKyotronic KC-85      :"); lsx(app_lib_dir,"K85"," %s");
 	dbg(0,"\nOlivetti M-10        :"); lsx(app_lib_dir,"M10"," %s");
 
-	dbg(0,"\n\nDisk image files for use with -i:\n"
+	dbg(0,"\n\nDisk image files for use with -i :\n"
 	          "---------------------------------\n");
 	lsx(app_lib_dir,"pdd1","%s\n");
 	dbg(0,"\n");
@@ -2291,8 +2458,9 @@ void show_bootstrap_help() {
 
 	dbg(0,
 		"\n"
-		"Filenames given without any path are searched from %2$s\n"
-		"as well as the current directory.\n"
+		"Filenames are searched in the current directory first,\n"
+		"and then in %2$s\n"
+		"\n"
 		"Examples:\n\n"
 		"   %1$s -b TS-DOS.100\n"
 		"   %1$s -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100\n"
@@ -2360,7 +2528,7 @@ int bootstrap(char* f) {
 	}
 
 	char t[PATH_MAX+1]={0x00};
-	int sc = baud_to_stat_code(baud);
+	uint8_t sc = baud_to_stat_code(baud);
 	if (!sc) {
 		dbg(0,"Prepare the client to receive data."
 		"\n"
@@ -2405,6 +2573,7 @@ void show_config () {
 	dbg(0,"profile         : %s\n",profile);
 	dbg(0,"base_len        : %d\n",base_len);
 	dbg(0,"ext_len         : %d\n",ext_len);
+	dbg(0,"pad_fn          : %s\n",pad_fn?"true":"false");
 	dbg(0,"attr            : '%c' (0x%1$02X)\n",default_attr);
 #if defined(USE_XATTR)
 	dbg(0,"xattr_name      : \"%s\"\n",xattr_name);
@@ -2412,7 +2581,7 @@ void show_config () {
 	dbg(0,"upcase          : %s\n",upcase?"true":"false");
 	dbg(0,"rtscts          : %s\n",rtscts?"true":"false");
 	dbg(0,"verbosity       : %d\n",debug);
-	dbg(0,"enable_dme      : %s\n",enable_dme?"true":"false");
+	dbg(0,"dme_en          : %s\n",dme_en?"true":"false");
 	dbg(0,"magic_files     : %s\n",enable_magic_files?"true":"false");
 	dbg(0,"BASIC_byte_ms   : %d\n",BASIC_byte_us/1000);
 	dbg(0,"bootstrap_fname : \"%s\"\n",bootstrap_fname);
@@ -2445,31 +2614,34 @@ void show_main_help() {
 		" -a attr     Attribute - attribute byte used for all files (%2$c)\n"
 #endif
 		" -b file     Bootstrap - send loader file to client - empty for help\n"
-		" -c profile  Client compatibility profile - empty for help (%9$s)\n"
+		" -c profile  Client compatibility profile (%9$s) - empty for help\n"
 		" -d tty      Serial device connected to the client (%4$s*)\n"
-		" -e bool     TS-DOS Subdirectories (%10$s)\n"
-//		" -n          Disable TS-DOS directories\n"
+		" -e bool     TS-DOS Subdirectories (%10$s) - TPDD1-only\n"
+		" -f          Start in FDC mode - TPDD1-only\n"
 #if !defined(_WIN)
 		" -g          Getty mode - run as daemon\n"
 #endif
 		" -h          Print this help\n"
 		" -i file     Disk image filename for raw sector access - empty for help\n"
 //		" -l          List loader files and show bootstrap help\n"
-		" -m #        Model - 1 = FB-100/TPDD1, 2 = TPDD2 (%5$u)\n"
+		" -m 1|2      Model - 1 = FB-100/TPDD1, 2 = TPDD2 (%5$u)\n"
+//		" -n          Disable TS-DOS directories\n"
+//		" -n #.#[p]   Names - Translate filenames to #.# format, optionally [p]added\n"
 		" -p dir      Path - /path/to/dir with files to be served (./)\n"
-		" -r          RTS/CTS hardware flow control (%7$s)\n"
+		" -r bool     RTS/CTS hardware flow control (%7$s)\n"
 		" -s #        Speed - serial port baud rate (%6$d)\n"
 		" -u          Uppercase all filenames (%8$s)\n"
 		" -~ bool     Truncated filenames end in '~' (%11$s)\n"
-		" -v          Verbosity - more v's = more verbose\n"
+		" -v          Verbosity - more v's = more verbose, both activity & help\n"
 //		" -w          WP-2 mode - 8.2 filenames for TANDY WP-2\n"
-		" -z #        Milliseconds per byte for bootstrap (%3$d)\n"
-		" -^ #        Dump config and exit\n"
+		" -z #        Sleep # ms per byte in bootstrap (%3$d)\n"
+		" -^          Dump config and exit\n"
 		"\n"
 		"The 1st non-option argument is another way to specify the tty device.\n"
 		"The 2nd non-option argument is another way to specify the share path.\n"
 		"TPDD2 mode accepts a 2nd share path for bank 1.\n"
-		"TPDD2 mode does not support TS-DOS dfirectories.\n"
+		//"TS-DOS directory support is only possible in TPDD1 mode.\n"
+		"\"bool\" accepts case-insensitive: on off 0 1 y n t f yes no true false\n"
 		"\n"
 		"Examples:\n"
 		"   $ %1$s\n"
@@ -2484,11 +2656,11 @@ void show_main_help() {
 		,TTY_PREFIX
 		,DEFAULT_MODEL
 		,DEFAULT_BAUD
-		,DEFAULT_RTSCTS?"true":"false"
-		,DEFAULT_UPCASE?"true":"false"
+		,DEFAULT_RTSCTS?"on":"off"
+		,DEFAULT_UPCASE?"on":"off"
 		,DEFAULT_PROFILE
-		,enable_dme?"true":"false"
-		,tildes?"true":"false"
+		,dme_en?"on":"off"
+		,tildes?"on":"off"
 	);
 
 }
@@ -2503,15 +2675,15 @@ int main(int argc, char** argv) {
 	load_profile(DEFAULT_PROFILE);
 
 	// environment
-	if (getenv("OPERATION_MODE")) operation_mode = atoi(getenv("OPERATION_MODE"));
+	if (getenv("FDC_MODE")) operation_mode = !atobool(getenv("FDC_MODE"));
 	if (getenv("PROFILE")) load_profile(getenv("PROFILE"));
-	if (getenv("FNAMES")) load_profile(getenv("FNAMES"));
 	if (getenv("ATTR")) default_attr = *getenv("ATTR");
-	if (getenv("ENABLE_DME")) enable_dme = stobool(getenv("ENABLE_DME"));
-	if (getenv("ENABLE_MAGIC_FILES")) enable_magic_files = stobool(getenv("ENABLE_MAGIC_FILES"));
-	if (getenv("TILDES")) tildes = stobool(getenv("TILDES"));
+	if (getenv("DME")) dme_en = atobool(getenv("DME"));
+	if (getenv("TSLOAD")) enable_magic_files = atobool(getenv("TSLOAD"));
+	if (getenv("TILDES")) tildes = atobool(getenv("TILDES"));
 	if (getenv("CLIENT_TTY")) strcpy(client_tty_name,getenv("CLIENT_TTY"));
 	if (getenv("BAUD")) baud = atoi(getenv("BAUD"));
+	if (getenv("RTSCTS")) baud = atoi(getenv("BAUD"));
 	if (getenv("ROOT_LABEL")) snprintf(dme_root_label,6+1,"%-*.*s",6,6,getenv("ROOT_LABEL"));
 	if (getenv("PARENT_LABEL")) snprintf(dme_parent_label,6+1,"%-*.*s",6,6,getenv("PARENT_LABEL"));
 	if (getenv("DIR_LABEL")) snprintf(dme_dir_label,3,"%-2.2s",getenv("DIR_LABEL"));
@@ -2520,42 +2692,46 @@ int main(int argc, char** argv) {
 #endif
 
 	// commandline
-#if defined(_WIN)
-	while ((i = getopt (argc, argv, ":0a:b:c:d:e:hi:lm:p:rs:uvwz:~:^")) >=0)
-#else
-	while ((i = getopt (argc, argv, ":0a:b:c:d:e:ghi:lm:p:rs:uvwz:~:^")) >=0)
+	while ((i = getopt (argc, argv, ":0a:b:c:d:e:fhi:lm:np:r:s:uvwz:~:^"
+#if !defined(_WIN)
+		"g"
 #endif
+	)) >=0)
 		switch (i) {
-			case '0': load_profile("raw");                        break; // back compat = -c raw
+			case '0': load_profile("raw");                        break; // back compat, short for -c raw
 			case 'a': default_attr=*strndup(optarg,1);            break;
 			case 'b': strcpy(bootstrap_fname,optarg);             break;
 			case 'c': load_profile(optarg);                       break;
 			case 'd': strcpy(client_tty_name,optarg);             break;
-			case 'e': enable_dme = stobool(optarg);               break;
-			case 'n': enable_dme = false;                         break;  // back compat = -e false
+			case 'e': dme_en = atobool(optarg);                   break;
+			//case 'f': set_fnames(optarg);                         break;
+			case 'f': operation_mode = MODE_FDC;                  break;
 #if !defined(_WIN)
 			case 'g': getty_mode = true; debug = 0;               break;
 #endif
 			case 'h': show_main_help(); exit(0);                  break;
 			case 'i': strcpy(disk_img_fname,optarg);              break;
-			case 'l': show_bootstrap_help(); exit(0);             break;
+			case 'l': show_bootstrap_help(); exit(0);             break; // back compat, short for -b "" / -b help
 			case 'm': model = atoi(optarg);                       break;
+			case 'n': dme_en = false;                             break; // back compat, short for -e false
+			//case 'n': set_fnames(optarg);                         break;
+			//case 'o': operation_mode = atobool(optarg);           break;
 			case 'p': add_share_path(optarg);                     break;
-			case 'r': rtscts = true;                              break;
+			case 'r': rtscts = atobool(optarg);                   break;
 			case 's': baud = atoi(optarg);                        break;
 			case 'u': upcase = true;                              break;
-			case '~': tildes = stobool(optarg);                   break;
 			case 'v': debug++;                                    break;
-			case 'w': load_profile("wp2");                        break; // back compat = -c wp2
+			case 'w': load_profile("wp2");                        break; // back compat, short for -c wp2
 			case 'z': BASIC_byte_us=atoi(optarg)*1000;            break;
+			case '~': tildes = atobool(optarg);                   break;
 			case '^': x = true;                                   break;
 			case ':': dbg(0,"\"-%c\" requires a value\n",optopt);
 				if (optopt=='b'||optopt=='i') { show_bootstrap_help(); exit(0); }
-				if (optopt=='c') { show_profiles_help(); exit(0); }
-				break;
+				if (optopt=='c') show_profiles_help(0);
+				show_main_help();                                 return 1;
 			case '?':
 				if (isprint(optopt)) dbg(0,"Unknown option \"-%c\"\n",optopt);
-				else dbg(0,"Unknown option character \"0x%02X\"\n",optopt);
+				else dbg(0,"Unknown option \"0x%02X\"\n",optopt);
 			default: show_main_help();                            return 1;
 		}
 
@@ -2591,8 +2767,8 @@ int main(int argc, char** argv) {
 
 	// further setup that's only needed for tpdd
 	if (check_disk_image()) return 1; // this may set model=1 or 2 based on disk image size or name
-	if (model==2) { load_rom(TPDD2_ROM); enable_dme=false; }
-	if (enable_dme) memcpy(dme_cwd,dme_root_label,base_len);
+	if (model==2) { load_rom(TPDD2_ROM); dme_en=false; }
+	if (dme_en && base_len && base_len<=6) memcpy(dme_cwd,dme_root_label,base_len);
 	cfnl = base_len + 1 + ext_len; // client filename length
 	if (base_len<1||cfnl>TPDD_FILENAME_LEN) cfnl = TPDD_FILENAME_LEN;
 
@@ -2601,7 +2777,7 @@ int main(int argc, char** argv) {
 	dbg(2,"Emulating %s\n",(model==2)?"TANDY 26-3814 (TPDD2)":"Brother FB-100 (TPDD1)");
 	dbg(2,"TPDD2 banks %s\n",(model==2)?"enabled":"disabled");
 	if (strcmp(profile,DEFAULT_PROFILE)) dbg(2,"Client Compatibility Profile: \"%s\"\n",profile);
-	dbg(2,"TS-DOS directories %s\n",(enable_dme)?"enabled":"disabled");
+	dbg(2,"TS-DOS directories %s\n",(dme_en)?"enabled":"disabled");
 	dbg(2,"Magic files for UR-II/TSLOAD %s\n",(enable_magic_files)?"enabled":"disabled");
 	if (model==2) dbg(0,"Bank 0 Dir: %s\nBank 1 Dir: %s\n",share_path[0],share_path[1]);
 	if (tildes) dbg(2,"Truncated filenames end in \"~\"\n");

@@ -14,33 +14,34 @@ $ sudo make uninstall
 ## Manual
 ```
 $ dl -h
-DeskLink2 v2.2.001-0-g7b928ff
+DeskLink2 v2.2.001-1-gce946d5
 
 Usage: ./dl [options] [tty_device] [share_path]
 
 Options      Description... (default setting)
  -a attr     Attribute - default attr byte used when no xattr (F)
  -b file     Bootstrap - send loader file to client - empty for help
- -c profile  Client compatibility profile - empty for help (k85)
+ -c profile  Client compatibility profile (k85) - empty for help
  -d tty      Serial device connected to the client (ttyUSB*)
- -e bool     TS-DOS Subdirectories (true)
+ -e bool     TS-DOS Subdirectories (on) - TPDD1-only
+ -f          Start in FDC mode - TPDD1-only
  -g          Getty mode - run as daemon
  -h          Print this help
  -i file     Disk image filename for raw sector access - empty for help
- -m #        Model - 1 = FB-100/TPDD1, 2 = TPDD2 (1)
+ -m 1|2      Model - 1 = FB-100/TPDD1, 2 = TPDD2 (1)
  -p dir      Path - /path/to/dir with files to be served (./)
- -r          RTS/CTS hardware flow control (false)
+ -r bool     RTS/CTS hardware flow control (off)
  -s #        Speed - serial port baud rate (19200)
- -u          Uppercase all filenames (false)
- -~ bool     Truncated filenames end in '~' (true)
- -v          Verbosity - more v's = more verbose
- -z #        Milliseconds per byte for bootstrap (8)
- -^ #        Dump config and exit
+ -u          Uppercase all filenames (off)
+ -~ bool     Truncated filenames end in '~' (on)
+ -v          Verbosity - more v's = more verbose, both activity & help
+ -z #        Sleep # ms per byte in bootstrap (8)
+ -^          Dump config and exit
 
 The 1st non-option argument is another way to specify the tty device.
 The 2nd non-option argument is another way to specify the share path.
 TPDD2 mode accepts a 2nd share path for bank 1.
-TPDD2 mode does not support TS-DOS dfirectories.
+"bool" accepts case-insensitive: on off 0 1 y n t f yes no true false
 
 Examples:
    $ ./dl
@@ -49,17 +50,17 @@ Examples:
    $ ./dl -c wp2 /dev/cu.usbserial-AB0MQNN1 "~/Documents/WP-2 Files"
    $ ./dl -m2 -p /tmp/bank0 -p /tmp/bank1
 
-
 $
 ```
 
 ```
 $ ./dl -b
-DeskLink2 v2.2.001-0-g7b928ff
+DeskLink2 v2.2.001-1-gce946d5
 "-b" requires a value
+
 Available support files in /usr/local/lib/dl
 
-Loader files for use with -b:
+Bootstrap/Loader files for use with -b :
 -----------------------------
 TRS-80 Model 100/102 : DSKMGR.100 TSLOAD.100 TS-DOS.100 TINY.100 D.100 TEENY.100 PAKDOS.100
 TANDY Model 200      : DSKMGR.200 TSLOAD.200 TS-DOS.200 PAKDOS.200 TEENY.200
@@ -67,14 +68,15 @@ NEC PC-8201/PC-8300  : TEENY.NEC TS-DOS.NEC
 Kyotronic KC-85      : DSKMGR.K85 Disk_Power.K85
 Olivetti M-10        : TEENY.M10 DSKMGR.M10
 
-Disk image files for use with -i:
+Disk image files for use with -i :
 ---------------------------------
 Sardine_American_English.pdd1
 Disk_Power.K85.pdd1
 
 
-Filenames given without any path are searched from /usr/local/lib/dl
-as well as the current directory.
+Filenames are searched in the current directory first,
+and then in /usr/local/lib/dl
+
 Examples:
 
    ./dl -b TS-DOS.100
@@ -87,28 +89,26 @@ $
 
 ```
 $ ./dl -c
-DeskLink2 v2.2.001-0-g7b928ff
+DeskLink2 v2.2.001-1-gce946d5
 "-c" requires a value
 
-Client Compatibility Profiles
+help for Client Compatibility Profiles
 
-PROFILE	BASE	EXT	PAD	ATTR	TS-DOS	MAGIC	UP
-NAME	LEN	LEN	FNAMES	BYTE	DIRS	FILES	CASE
+usage:
+ -c name    use profile <name> - (default: "k85")
+ -c #.#     "raw" with filenames truncated to #.# & attr='F'
+ -c #.#p    "#.#" fixed-length space-padded
+ -v -c      more help
+
+NAME	BASE	EXT	PAD	ATTR	DME	TSLOAD	UPCASE
 -------------------------------------------------------------
-raw	0	0	false	' '	false	false	false
-k85	6	2	true	'F'	true	true	
-wp2	8	2	true	'F'	false	false	false
-cpm	8	3	false	'F'	false	false	false
-rexcpm	6	2	true	'F'	false	false	true
-z88	12	3	false	'F'	false	false	false
-st	6	2	true	'F'	false	false	
-
-Example: "-c cpm" sets filenames to 8.3 without padding or upcase.
-
-May also use "-c ##.##" to set an arbitrary filename pattern
-with other parameters set same as "raw". Example: -c 16.0 
-
-Filenames are limited to 24 bytes total, the hardware limit in a real drive.
+raw	0	0	off	' '	off	off	off
+k85	6	2	on	'F'	on	on	off
+wp2	8	2	on	'F'	off	off	off
+cpm	8	3	off	'F'	off	off	off
+rexcpm	6	2	on	'F'	off	off	on
+z88	12	3	off	'F'	off	off	off
+st	6	2	on	'F'	off	off	off
 
 $ 
 ```
@@ -230,6 +230,7 @@ Tested on Linux, [Mac](ref/mac.md), [FreeBSD](ref/freebsd.md), and [Windows](ref
 * Figure out and emulate more of the special memory addresses accessible in tpdd2 mode. We already do some.
 * Fake sector 0 based on the files in the current share path so that if a client tries to read the FCB table directly it works.
 * Fake entire disk image in ram based on current share path files. Option to save the image as long as we're there.
+* -j 1111 to emulate the jumper settings
 
 ## Latest Changes
 * [real attr handling using xattr](ref/xattr.md) - enabled by default now
