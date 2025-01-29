@@ -16,7 +16,7 @@ $ sudo make uninstall
 $ dl -h
 DeskLink2 v2.2.001-1-gce946d5
 
-Usage: ./dl [options] [tty_device] [share_path]
+Usage: dl [options] [tty_device] [share_path]
 
 Options      Description... (default setting)
  -a attr     Attribute - default attr byte used when no xattr (F)
@@ -44,17 +44,17 @@ TPDD2 mode accepts a 2nd share path for bank 1.
 "bool" accepts case-insensitive: on off 0 1 y n t f yes no true false
 
 Examples:
-   $ ./dl
-   $ ./dl ttyUSB1
-   $ ./dl -v -p ~/Downloads/REX
-   $ ./dl -c wp2 /dev/cu.usbserial-AB0MQNN1 "~/Documents/WP-2 Files"
-   $ ./dl -m2 -p /tmp/bank0 -p /tmp/bank1
+   $ dl
+   $ dl ttyUSB1
+   $ dl -v -p ~/Downloads/REX
+   $ dl -c wp2 /dev/cu.usbserial-AB0MQNN1 "~/Documents/WP-2 Files"
+   $ dl -m2 -p /tmp/bank0 -p /tmp/bank1
 
 $
 ```
 
 ```
-$ ./dl -b
+$ dl -b
 DeskLink2 v2.2.001-1-gce946d5
 "-b" requires a value
 
@@ -79,16 +79,16 @@ and then in /usr/local/lib/dl
 
 Examples:
 
-   ./dl -b TS-DOS.100
-   ./dl -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
-   ./dl -vb rxcini.DO && ./dl -v
-   ./dl -v -i Sardine_American_English.pdd1
+   dl -b TS-DOS.100
+   dl -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
+   dl -vb rxcini.DO && ./dl -v
+   dl -v -i Sardine_American_English.pdd1
 
 $ 
 ```
 
 ```
-$ ./dl -c
+$ dl -c
 DeskLink2 v2.2.001-1-gce946d5
 "-c" requires a value
 
