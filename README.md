@@ -46,7 +46,7 @@ TPDD2 mode accepts a 2nd share path for bank 1.
 Examples:
    $ ./dl
    $ ./dl ttyUSB1
-   $ ./dl -vu -p ~/Downloads/REX
+   $ ./dl -v -p ~/Downloads/REX
    $ ./dl -c wp2 /dev/cu.usbserial-AB0MQNN1 "~/Documents/WP-2 Files"
    $ ./dl -m2 -p /tmp/bank0 -p /tmp/bank1
 
@@ -81,8 +81,8 @@ Examples:
 
    ./dl -b TS-DOS.100
    ./dl -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
-   ./dl -vb rxcini.DO && ./dl -vu
-   ./dl -vu -i Sardine_American_English.pdd1
+   ./dl -vb rxcini.DO && ./dl -v
+   ./dl -v -i Sardine_American_English.pdd1
 
 $ 
 ```
@@ -125,8 +125,8 @@ Docs from the past versions of this program. They don't exactly match this versi
 
 ## Examples:
 
-### Run the TPDD server, verbose, upcase, serving files from the current directory
-`$ dl -vu`
+### Run the TPDD server, verbose, serving files from the current directory
+`$ dl -v`
 
 ### List all available TPDD client installers, and then bootstrap one of them
 ```
@@ -139,7 +139,7 @@ $ dl -vb TS-DOS.100
 ([Full directions for REXCPM](ref/REXCPM.md))
 
 ### Update a [REX#](http://bitchin100.com/wiki/index.php?title=REXsharp)
-`$ dl -vb 'rx#u1.do' && dl -vu`
+`$ dl -vb 'rx#u1.do' && dl -v`
 
 ## "Magic Files" / Ultimate ROM II / TSLOAD
 There is a short list of filenames that are specially recognized:  
@@ -218,7 +218,7 @@ Example using co2ba as part of bootstrapping a REX Classic:
 $ wget https://www.bitchin100.com/wiki/images/3/38/R49_M100T102_260_rebuild.zip
 $ unzip R49_M100T102_260_rebuild.zip
 $ co2ba rf149.co call >rf149.do
-$ dl -vb rf149.do && dl -vu
+$ dl -vb rf149.do && dl -v
 ```
 
 ## OS Compatibility

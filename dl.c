@@ -162,15 +162,17 @@ const char * magic_files[] = {
 };
 
 // client compatibility profiles
-// REXCPM native is cpm, but import & export forces 6.2 upcase
-// Cambridge Z88 native is 12.3, not sure what DISCMNGR or DISC_RBL actually does
-// Atari ST native is cpm, but PDDOS limits to 6.2
-// No xenix client exists probably, but it would be 14.0
+// kc-85 platform can use lowercase filenames just fine, but at least both both
+// TS-DOS and TEENY convert to uppercase in places, so upcase to avoid the battle.
+// REXCPM native is cpm, but import & export forces 6.2 upcase.
+// Cambridge Z88 native is 12.3, not sure what DISCMNGR or DISC_RBL actually does.
+// Atari ST native is cpm, but PDDOS limits to 6.2 .
+// No xenix client exists probably, but it would be 14.0 .
 //	{ "xenix",  14, 0, false, ATTR_RAW, false, false, false }
 //     id,   base, ext, pad,    attr,    dme,  magic, upcase
 #define CLIENT_PROFILES { \
 	{ "raw",    0,  0, false, ATTR_RAW, false, false, false }, \
-	{ "k85",    6,  2, true,  ATTR_DEF, true,  true,  false }, \
+	{ "k85",    6,  2, true,  ATTR_DEF, true,  true,  true  }, \
 	{ "wp2",    8,  2, true,  ATTR_DEF, false, false, false }, \
 	{ "cpm",    8,  3, false, ATTR_DEF, false, false, false }, \
 	{ "rexcpm", 6,  2, true,  ATTR_DEF, false, false, true  }, \
@@ -2464,8 +2466,8 @@ void show_bootstrap_help() {
 		"Examples:\n\n"
 		"   %1$s -b TS-DOS.100\n"
 		"   %1$s -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100\n"
-		"   %1$s -vb rxcini.DO && %1$s -vu\n"
-		"   %1$s -vu -i Sardine_American_English.pdd1\n\n"
+		"   %1$s -vb rxcini.DO && %1$s -v\n"
+		"   %1$s -v -i Sardine_American_English.pdd1\n\n"
 	,args[0],app_lib_dir);
 }
 
@@ -2646,7 +2648,7 @@ void show_main_help() {
 		"Examples:\n"
 		"   $ %1$s\n"
 		"   $ %1$s ttyUSB1\n"
-		"   $ %1$s -vu -p ~/Downloads/REX\n"
+		"   $ %1$s -v -p ~/Downloads/REX\n"
 		"   $ %1$s -c wp2 /dev/cu.usbserial-AB0MQNN1 \"~/Documents/WP-2 Files\"\n"
 		"   $ %1$s -m2 -p /tmp/bank0 -p /tmp/bank1\n"
 		"\n"
