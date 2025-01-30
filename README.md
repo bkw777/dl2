@@ -14,74 +14,105 @@ $ sudo make uninstall
 ## Manual
 ```
 $ dl -h
-DeskLink2 v2.1.001-19-g14a2925
+DeskLink2 v2.2.001-1-gce946d5
 
 Usage: dl [options] [tty_device] [share_path]
 
-Options     Description (default setting)
-   -0       Raw mode - no filename munging, attr = ' '
-   -a c     Attribute - default attr byte used when no xattr (F)
-   -b file  Bootstrap - send loader file to client
-   -d tty   Serial device connected to the client (ttyUSB*)
-   -n       Disable TS-DOS directories (enabled)
-   -g       Getty mode - run as daemon
-   -h       Print this help
-   -i file  Disk image filename for raw sector access
-   -l       List loader files and show bootstrap help
-   -m #     Model - 1 = FB-100/TPDD1, 2 = TPDD2 (1)
-   -p dir   Path - /path/to/dir with files to be served (./)
-   -r       RTS/CTS hardware flow control (false)
-   -s #     Speed - serial port baud rate (19200)
-   -u       Uppercase all filenames (false)
-   -v       Verbosity - more v's = more verbose
-   -w       WP-2 mode - 8.2 filenames for TANDY WP-2
-   -z #     Milliseconds per byte for bootstrap (8)
+Options      Description... (default setting)
+ -a attr     Attribute - default attr byte used when no xattr (F)
+ -b file     Bootstrap - send loader file to client - empty for help
+ -c profile  Client compatibility profile (k85) - empty for help
+ -d tty      Serial device connected to the client (ttyUSB*)
+ -e bool     TS-DOS Subdirectories (on) - TPDD1-only
+ -f          Start in FDC mode - TPDD1-only
+ -g          Getty mode - run as daemon
+ -h          Print this help
+ -i file     Disk image filename for raw sector access - empty for help
+ -m 1|2      Model - 1 = FB-100/TPDD1, 2 = TPDD2 (1)
+ -p dir      Path - /path/to/dir with files to be served (./)
+ -r bool     RTS/CTS hardware flow control (off)
+ -s #        Speed - serial port baud rate (19200)
+ -u          Uppercase all filenames (off)
+ -~ bool     Truncated filenames end in '~' (on)
+ -v          Verbosity - more v's = more verbose, both activity & help
+ -z #        Sleep # ms per byte in bootstrap (8)
+ -^          Dump config and exit
 
 The 1st non-option argument is another way to specify the tty device.
 The 2nd non-option argument is another way to specify the share path.
 TPDD2 mode accepts a 2nd share path for bank 1.
-TPDD2 mode does not support TS-DOS dfirectories.
+"bool" accepts case-insensitive: on off 0 1 y n t f yes no true false
 
 Examples:
    $ dl
    $ dl ttyUSB1
-   $ dl -vu -p ~/Downloads/REX
-   $ dl -w /dev/cu.usbserial-AB0MQNN1 ~/Documents/wp2
+   $ dl -v -p ~/Downloads/REX
+   $ dl -c wp2 /dev/cu.usbserial-AB0MQNN1 "~/Documents/WP-2 Files"
    $ dl -m2 -p /tmp/bank0 -p /tmp/bank1
 
 $
 ```
 
 ```
-$ dl -l
-DeskLink2 v2.1.001-19-g14a2925
+$ dl -b
+DeskLink2 v2.2.001-1-gce946d5
+"-b" requires a value
+
 Available support files in /usr/local/lib/dl
 
-Loader files for use with -b:
+Bootstrap/Loader files for use with -b :
 -----------------------------
-TRS-80 Model 100/102 : DSKMGR.100 TINY.100 D.100 TEENY.100 TSLOAD.100 TS-DOS.100 PAKDOS.100
-TANDY Model 200      : TEENY.200 DSKMGR.200 TSLOAD.200 TS-DOS.200 PAKDOS.200
+TRS-80 Model 100/102 : DSKMGR.100 TSLOAD.100 TS-DOS.100 TINY.100 D.100 TEENY.100 PAKDOS.100
+TANDY Model 200      : DSKMGR.200 TSLOAD.200 TS-DOS.200 PAKDOS.200 TEENY.200
 NEC PC-8201/PC-8300  : TEENY.NEC TS-DOS.NEC
 Kyotronic KC-85      : DSKMGR.K85 Disk_Power.K85
 Olivetti M-10        : TEENY.M10 DSKMGR.M10
 
-Disk image files for use with -i:
+Disk image files for use with -i :
 ---------------------------------
 Sardine_American_English.pdd1
 Disk_Power.K85.pdd1
 
 
-Filenames given without any path are searched from /usr/local/lib/dl
-as well as the current directory.
+Filenames are searched in the current directory first,
+and then in /usr/local/lib/dl
+
 Examples:
 
    dl -b TS-DOS.100
    dl -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
-   dl -vb rxcini.DO && dl -vu
-   dl -vu -i Sardine_American_English.pdd1
+   dl -vb rxcini.DO && ./dl -v
+   dl -v -i Sardine_American_English.pdd1
 
 $ 
 ```
+
+```
+$ dl -c
+DeskLink2 v2.2.001-1-gce946d5
+"-c" requires a value
+
+help for Client Compatibility Profiles
+
+usage:
+ -c name    use profile <name> - (default: "k85")
+ -c #.#     "raw" with filenames truncated to #.# & attr='F'
+ -c #.#p    "#.#" fixed-length space-padded
+ -v -c      more help
+
+NAME	BASE	EXT	PAD	ATTR	DME	TSLOAD	UPCASE
+-------------------------------------------------------------
+raw	0	0	off	' '	off	off	off
+k85	6	2	on	'F'	on	on	off
+wp2	8	2	on	'F'	off	off	off
+cpm	8	3	off	'F'	off	off	off
+rexcpm	6	2	on	'F'	off	off	on
+z88	12	3	off	'F'	off	off	off
+st	6	2	on	'F'	off	off	off
+
+$ 
+```
+
 
 Several of the above settings can alternatively be supplied via environment variables, as well as a few other [hacky extra options](ref/advanced_options.txt)
 
@@ -94,12 +125,12 @@ Docs from the past versions of this program. They don't exactly match this versi
 
 ## Examples:
 
-### Run the TPDD server, verbose, upcase, serving files from the current directory
-`$ dl -vu`
+### Run the TPDD server, verbose, serving files from the current directory
+`$ dl -v`
 
 ### List all available TPDD client installers, and then bootstrap one of them
 ```
-$ dl -l
+$ dl -b
 $ dl -vb TS-DOS.100
 ```
 
@@ -108,7 +139,7 @@ $ dl -vb TS-DOS.100
 ([Full directions for REXCPM](ref/REXCPM.md))
 
 ### Update a [REX#](http://bitchin100.com/wiki/index.php?title=REXsharp)
-`$ dl -vb 'rx#u1.do' && dl -vu`
+`$ dl -vb 'rx#u1.do' && dl -v`
 
 ## "Magic Files" / Ultimate ROM II / TSLOAD
 There is a short list of filenames that are specially recognized:  
@@ -187,7 +218,7 @@ Example using co2ba as part of bootstrapping a REX Classic:
 $ wget https://www.bitchin100.com/wiki/images/3/38/R49_M100T102_260_rebuild.zip
 $ unzip R49_M100T102_260_rebuild.zip
 $ co2ba rf149.co call >rf149.do
-$ dl -vb rf149.do && dl -vu
+$ dl -vb rf149.do && dl -v
 ```
 
 ## OS Compatibility
@@ -199,12 +230,12 @@ Tested on Linux, [Mac](ref/mac.md), [FreeBSD](ref/freebsd.md), and [Windows](ref
 * Figure out and emulate more of the special memory addresses accessible in tpdd2 mode. We already do some.
 * Fake sector 0 based on the files in the current share path so that if a client tries to read the FCB table directly it works.
 * Fake entire disk image in ram based on current share path files. Option to save the image as long as we're there.
+* -j 1111 to emulate the jumper settings
 
-## New Feature Testing
-[real attr handling using xattr](ref/xattr.md)
+## Latest Changes
+* [real attr handling using xattr](ref/xattr.md) - enabled by default now
 
-Enable by building with `-DUSE_XATTR`  
-`$ make clean all CXXFLAGS=-DUSE_XATTR && sudo make install`
+* client compatibility profiles
 
 ## History / Credits
 [DeskLink for ms-dos](https://ftp.whtech.com/club100/com/dl-arc.exe.gz) 1987 Travelling Software  

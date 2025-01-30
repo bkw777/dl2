@@ -247,10 +247,20 @@ static const uint16_t FDC_LOGICAL_SECTOR_SIZE[7] = {64,80,128,256,512,1024,1280}
 #define OPR_CMD_SYNC 0x5A
 #define FDC_CMD_EOL  0x0D
 
-// compatibility modes
-#define DOT_FLOPPY  6
-#define DOT_WP2     8
+// drive operating modes
 #define MODE_OPR    1
 #define MODE_FDC    0
+
+#ifdef RAW_ATTR
+#define ATTR_RAW RAW_ATTR
+#else
+#define ATTR_RAW 0x20 // space - drive firmware fills unused with 0x20
+#endif
+
+#ifdef DEFAULT_ATTR
+#define ATTR_DEF DEFAULT_ATTR
+#else
+#define ATTR_DEF 0x46 // F - almost all clients on all platforms hardcode F
+#endif
 
 #endif // PDD_CONSTANTS_H

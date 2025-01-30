@@ -10,22 +10,22 @@ APP_NAME := DeskLink2
 APP_LIB_DIR := $(PREFIX)/lib/$(NAME)
 APP_DOC_DIR := $(PREFIX)/share/doc/$(NAME)
 APP_VERSION := $(shell git describe --long 2>&-)
-#FB100_ROM := Brother_FB-100.rom # no use yet
-TPDD2_ROM := TANDY_26-3814.rom
 
-DEFAULT_BASIC_BYTE_MS := 8  # ms per byte in bootstrap
-DEFAULT_MODEL := 1          # 1=tpdd1  2=tpdd2  (TS-DOS directory support requires tpdd1)
-DEFAULT_OPERATION_MODE := 1 # 0=FDC-mode 1=Operation-mode
-DEFAULT_BAUD := 19200
-DEFAULT_RTSCTS := false
-DEFAULT_UPCASE := false
-DEFAULT_DOTPOS := 6    # default 6.2 filenames compatible with Floppy/TS-DOS/etc.
-DEFAULT_TILDES := true
-DEFAULT_ATTR := 0x46   # default attribute 'F' compatible with Floppy/TS-DOS/etc.
-RAW_ATTR := 0x20       # attr for "raw" mode, 0x00, 0x20, 0x46 are all plausible.
-XATTR_NAME := pdd.attr
-DEFAULT_DME_ROOT_LABEL := "0:    "
-DEFAULT_DME_PARENT_LABEL := "^     "
+# optional configurables
+#FB100_ROM := Brother_FB-100.rom # exists but not used
+#TPDD2_ROM := TANDY_26-3814.rom  # exists and is used
+#DEFAULT_BASIC_BYTE_MS := 8  # ms per byte in bootstrap
+#DEFAULT_MODEL := 1          # 1=tpdd1  2=tpdd2  (TS-DOS directory support requires tpdd1)
+#DEFAULT_OPERATION_MODE := 1 # 0=FDC-mode 1=Operation-mode
+#DEFAULT_BAUD := 19200
+#DEFAULT_RTSCTS := false
+#DEFAULT_UPCASE := false
+#DEFAULT_PROFILE := "k85" # k85 = Floppy/TS-DOS/etc - 6.2, padded, F, dme, magic files
+#RAW_ATTR := 0x20       # attr for "raw" mode, drive firmware fills unused fields with 0x20
+#DEFAULT_TILDES := true
+#XATTR_NAME := pdd.attr
+#TSDOS_ROOT_LABEL := "0:    "
+#TSDOS_PARENT_LABEL := "^     "
 
 CLIENT_LOADERS := \
 	clients/teeny/TINY.100 \
@@ -71,8 +71,8 @@ CLIENT_DOCS := \
 #	clients/power-dos/powr-d.txt
 
 DOCS := dl.do README.txt README.md LICENSE $(CLIENT_DOCS)
-SOURCES := dl.c dir_list.c
-HEADERS := dir_list.h constants.h
+SOURCES := dl.c dir_list.c xattr.c
+HEADERS := constants.h dir_list.h xattr.h
 
 ifeq ($(OS),Darwin)
  TTY_PREFIX := cu.usbserial
@@ -93,28 +93,62 @@ ifeq ($(OS),Windows_NT)
  CFLAGS += -D_WIN
 endif
 
-DEFINES := \
+DEFS = \
 	-DAPP_NAME=\"$(APP_NAME)\" \
 	-DAPP_VERSION=\"$(APP_VERSION)\" \
 	-DAPP_LIB_DIR=\"$(APP_LIB_DIR)\" \
 	-DTTY_PREFIX=\"$(TTY_PREFIX)\" \
-	-DDEFAULT_DME_ROOT_LABEL=\"$(DEFAULT_DME_ROOT_LABEL)\" \
-	-DDEFAULT_DME_PARENT_LABEL=\"$(DEFAULT_DME_PARENT_LABEL)\" \
-	-DTPDD2_ROM=\"$(TPDD2_ROM)\" \
-	-DDEFAULT_BASIC_BYTE_MS=$(DEFAULT_BASIC_BYTE_MS) \
-	-DDEFAULT_MODEL=$(DEFAULT_MODEL) \
-	-DDEFAULT_OPERATION_MODE=$(DEFAULT_OPERATION_MODE) \
-	-DDEFAULT_BAUD=$(DEFAULT_BAUD) \
-	-DDEFAULT_RTSCTS=$(DEFAULT_RTSCTS) \
-	-DDEFAULT_UPCASE=$(DEFAULT_UPCASE) \
-	-DDEFAULT_DOTPOS=$(DEFAULT_DOTPOS) \
-	-DDEFAULT_TILDES=$(DEFAULT_TILDES) \
-	-DDEFAULT_ATTR=$(DEFAULT_ATTR) \
-	-DRAW_ATTR=$(RAW_ATTR) \
-	-DXATTR_NAME=\"$(XATTR_NAME)\" \
-#	-DUSE_XATTR \
+	-DUSE_XATTR \
 #	-DPRINT_8BIT \
 #	-DNADSBOX_EXTENSIONS \
+
+#ifdef TPDD1_ROM
+#	DEFS += -DTPDD1_ROM=\"$(TPDD1_ROM)\"
+#endif
+ifdef TPDD2_ROM
+	DEFS += -DTPDD2_ROM=\"$(TPDD2_ROM)\"
+endif
+ifdef TSDOS_ROOT_LABEL
+	DEFS += -DTSDOS_ROOT_LABEL=\"$(TSDOS_ROOT_LABEL)\"
+endif
+ifdef TSDOS_PARENT_LABEL
+	DEFS += -DTSDOS_PARENT_LABEL=\"$(TSDOS_PARENT_LABEL)\"
+endif
+ifdef DEFAULT_BASIC_BYTE_MS
+	DEFS += -DDEFAULT_BASIC_BYTE_MS=$(DEFAULT_BASIC_BYTE_MS)
+endif
+ifdef DEFAULT_MODEL
+	DEFS += -DDEFAULT_MODEL=$(DEFAULT_MODEL)
+endif
+ifdef DEFAULT_OPERATION_MODE
+	DEFS += -DDEFAULT_OPERATION_MODE=$(DEFAULT_OPERATION_MODE)
+endif
+ifdef DEFAULT_BAUD
+	DEFS += -DDEFAULT_BAUD=$(DEFAULT_BAUD)
+endif
+ifdef DEFAULT_RTSCTS
+	DEFS += -DDEFAULT_RTSCTS=$(DEFAULT_RTSCTS)
+endif
+ifdef DEFAULT_PROFILE
+	DEFS += -DDEFAULT_PROFILE=$(DEFAULT_PROFILE)
+endif
+ifdef DEFAULT_UPCASE
+	DEFS += -DDEFAULT_UPCASE=$(DEFAULT_UPCASE)
+endif
+ifdef DEFAULT_ATTR
+	DEFS += -DDEFAULT_ATTR=$(DEFAULT_ATTR)
+endif
+ifdef RAW_ATTR
+	DEFS += -DRAW_ATTR=$(RAW_ATTR)
+endif
+ifdef DEFAULT_TILDES
+	DEFS += -DDEFAULT_TILDES=$(DEFAULT_TILDES)
+endif
+ifdef XATTR_NAME
+	DEFS += -DXATTR_NAME=\"$(XATTR_NAME)\"
+endif
+
+DEFINES := $(DEFS)
 
 ifdef DEBUG
  CFLAGS += -g
@@ -123,7 +157,7 @@ endif
 .PHONY: all
 all: $(NAME)
 
-$(NAME): $(SOURCES) $(HEADERS)
+$(NAME): Makefile $(SOURCES) $(HEADERS)
 	$(CC) $(CFLAGS) $(CXXFLAGS) $(DEFINES) $(SOURCES) $(LDLIBS) -o $(@)
 
 install: $(NAME) $(CLIENT_LOADERS) $(LIB_OTHER) $(DOCS)

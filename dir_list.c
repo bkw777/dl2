@@ -23,6 +23,7 @@ MA 02111, USA.
 #include <strings.h>
 #include <string.h>
 #include <ctype.h>
+
 #include "dir_list.h"
 
 static uint16_t allocated;
@@ -33,9 +34,9 @@ static FILE_ENTRY* tblp = 0;
 static FILE_ENTRY* current_record(void);
 
 int file_list_init() {
-	tblp = malloc(sizeof(FILE_ENTRY)*FEQ);
+	tblp = malloc(sizeof(FILE_ENTRY)*DIRENTS);
 	if (!tblp) return -1;
-	allocated = FEQ;
+	allocated = DIRENTS;
 	ndx = 0;
 	cur = 0;
 	return 0;
@@ -53,14 +54,14 @@ int file_list_cleanup() {
 void file_list_clear_all() {
 	cur = ndx = 0;
 }
-   
+
 int add_file(FILE_ENTRY* fe) {
-	/* allocate FEQ more records if out of space */
+	/* allocate DIRENTS more records if out of space */
 	if (ndx >= allocated) {
 		/* resize the array */
-		tblp = realloc(tblp, (allocated+FEQ)*sizeof(FILE_ENTRY));
+		tblp = realloc(tblp, (allocated+DIRENTS)*sizeof(FILE_ENTRY));
 		if (!tblp) return -1;
-		allocated += FEQ;
+		allocated += DIRENTS;
 	}
 
 	/* reference the entry */
