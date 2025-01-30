@@ -84,7 +84,7 @@ $
 
 ```
 $ dl -c
-DeskLink2 v2.2.001-7-g1cd1b38
+DeskLink2 v2.2.001-9-g8b17554
 "-c" requires a value
 
 Help for Client Compatibility Profiles
@@ -102,10 +102,10 @@ NAME	BASE	EXT	PAD	ATTR	DME	TSLOAD	UPCASE
 raw	0	0	off	' '	off	off	off
 k85	6	2	on	'F'	on	on	on
 wp2	8	2	on	'F'	off	off	off
-cpm	8	3	off	'F'	off	off	off
+cpm	8	3	off	'F'	off	off	on
 rexcpm	6	2	on	'F'	off	off	on
 z88	12	3	off	'F'	off	off	off
-st	6	2	on	'F'	off	off	off
+st	6	2	on	'F'	off	off	on
 
 $ 
 ```

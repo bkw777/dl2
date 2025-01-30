@@ -162,22 +162,45 @@ const char * magic_files[] = {
 };
 
 // client compatibility profiles
-// kc-85 platform can use lowercase filenames just fine, but at least both both
+//
+// KC-85
+// The platform can use lowercase filenames just fine, but at least both
 // TS-DOS and TEENY convert to uppercase in places, so upcase to avoid the battle.
-// REXCPM native is cpm, but import & export forces 6.2 upcase.
+//
+// CP/M
+// https://www.shaels.net/index.php/cpm80-22-documents/using-cpm/3-file-names
+// "The CPM CPP module converts commands into upper case before they are executed
+//  which leads many to believe that the CPM file system is not case sensitive,
+//  when in fact the CPM file system is case sensitive. If you use a CPM program
+//  such as Microsoft Basic you can create file names which contain lower case
+//  characters. The problem is files which contain lower case characters can not
+//  be specified as parameters at the CPP command prompt, as the characters will
+//  be converted to upper case by the CPP before the command is executed."
+// So upcase to avoid the battle...
+//
+// REXCPM native is CP/M, but import & export are limited further to 6.2 upcase.
+//
 // Cambridge Z88 native is 12.3, not sure what DISCMNGR or DISC_RBL actually does.
-// Atari ST native is cpm, but PDDOS limits to 6.2 .
-// No xenix client exists probably, but it would be 14.0 .
+//
+// Atari ST native is CP/M, later MS-DOS, but PDDOS limits to 6.2
+//
+// MS-DOS (Atari Portfolio) by rights would be this:
+//	{ "msdos",  8,  3, false, ATTR_RAW, false, false, false },
+// except most of the pdd software was only made to work with Floppy/TS-DOS,
+// disks so even with an ms-dos client you usually want to use k85 or cpm
+//
+// Probably no xenix client exists until I port one, but it would be this:
 //	{ "xenix",  14, 0, false, ATTR_RAW, false, false, false }
+//
 //     id,   base, ext, pad,    attr,    dme,  magic, upcase
 #define CLIENT_PROFILES { \
 	{ "raw",    0,  0, false, ATTR_RAW, false, false, false }, \
 	{ "k85",    6,  2, true,  ATTR_DEF, true,  true,  true  }, \
 	{ "wp2",    8,  2, true,  ATTR_DEF, false, false, false }, \
-	{ "cpm",    8,  3, false, ATTR_DEF, false, false, false }, \
+	{ "cpm",    8,  3, false, ATTR_DEF, false, false, true  }, \
 	{ "rexcpm", 6,  2, true,  ATTR_DEF, false, false, true  }, \
 	{ "z88",    12, 3, false, ATTR_DEF, false, false, false }, \
-	{ "st",     6,  2, true,  ATTR_DEF, false, false, false }  \
+	{ "st",     6,  2, true,  ATTR_DEF, false, false, true  }  \
 }
 
 // terminal emulation
