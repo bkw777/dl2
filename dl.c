@@ -1332,32 +1332,6 @@ void get_fdc_cmd() {
 //  OPERATION MODE
 //
 
-/*
-#define MIN(a,b)    (((a)<(b))?(a):(b))
-#define MAX(a,b)    (((a)>(b))?(a):(b))
-#define MAX3(a,b,c) (((a)>(b))?(((a)>(c))?(a):(c)):(((b)>(c))?(b):(c)))
-#define MIN3(a,b,c) (((a)<(b))?(((a)<(c))?(a):(c)):(((b)<(c))?(b):(c)))
-
-static inline int min(const int a, const int b) {
-    return a < b ? a : b;
-}
-static inline int max(const int a, const int b) {
-    return a > b ? a : b;
-}
-static inline long minl(const long a, const long b) {
-    return a < b ? a : b;
-}
-static inline long maxl(const long a, const long b) {
-    return a > b ? a : b;
-}
-static inline long long minll(const long long a, const long long b) {
-    return a < b ? a : b;
-}
-static inline long long maxll(const long long a, const long long b) {
-    return a > b ? a : b;
-}
-*/
-
 FILE_ENTRY* make_file_entry(char* namep, uint8_t attr, uint16_t len, char flags) {
 	dbg(3,"%s(\"%s\")\n",__func__,namep);
 	static FILE_ENTRY f;
@@ -1476,9 +1450,11 @@ int read_next_dirent(DIR* dir,int m) {
 			if (strlen(dire->d_name)>LOCAL_FILENAME_MAX) continue; // skip long filenames
 		}
 
+		// TODO - make this configurable
 		// If filesize is too large for the tpdd 16 bit size field, then say
-		// size=0 but allow the file to be accessed, because cpmupd.CO for
-		// REXCPM violates the tpdd protocol to load a large CP/M disk image.
+		// size=0 but allow the file to be accessed.
+		// A real drive does NOT do this, but REXCPM cpmupd.CO
+		// violates the tpdd protocol to load a large CP/M disk image.
 		if (st.st_size>UINT16_MAX) st.st_size=0;
 
 		uint8_t attr = default_attr;
@@ -2796,7 +2772,7 @@ int main(int argc, char** argv) {
 	// show the directory listing locally even before any directory list
 	// commands, so that a user with no client-side display like TEENY, REX
 	// rom image loading, REXCPM rxcini setup, etc can see what filenames are
-	// available to load and their exact spelling from the tpdd client side.
+	// available to load, and their exact spelling from the tpdd client side.
 	if (debug) update_file_list(NO_RET);
 
 	// process commands forever
