@@ -14,7 +14,7 @@ $ sudo make uninstall
 ## Manual
 ```
 $ dl -h
-DeskLink2 v2.2.001-1-gce946d5
+DeskLink2 v2.2.001-7-g1cd1b38
 
 Usage: dl [options] [tty_device] [share_path]
 
@@ -48,41 +48,36 @@ Examples:
    $ dl ttyUSB1
    $ dl -v -p ~/Downloads/REX
    $ dl -c wp2 /dev/cu.usbserial-AB0MQNN1 "~/Documents/WP-2 Files"
-   $ dl -m2 -p /tmp/bank0 -p /tmp/bank1
 
 $
 ```
 
 ```
 $ dl -b
-DeskLink2 v2.2.001-1-gce946d5
+DeskLink2 v2.2.001-7-g1cd1b38
 "-b" requires a value
 
-Available support files in /usr/local/lib/dl
+Help for Bootstrap
 
-Bootstrap/Loader files for use with -b :
------------------------------
-TRS-80 Model 100/102 : DSKMGR.100 TSLOAD.100 TS-DOS.100 TINY.100 D.100 TEENY.100 PAKDOS.100
+Usage:
+ -b filename     send file out over the serial port, slowly
+ -v -b           more help about bootstrap
+
+If filename is not found, then /usr/local/lib/dl is searched.
+
+Available built-in bootstrap/loader files (in /usr/local/lib/dl):
+
+TRS-80 Model 100/102 : DSKMGR.100 D.100 TSLOAD.100 TS-DOS.100 PAKDOS.100 TEENY.100 TINY.100
 TANDY Model 200      : DSKMGR.200 TSLOAD.200 TS-DOS.200 PAKDOS.200 TEENY.200
 NEC PC-8201/PC-8300  : TEENY.NEC TS-DOS.NEC
-Kyotronic KC-85      : DSKMGR.K85 Disk_Power.K85
+Kyotronic KC-85      : Disk_Power.K85 DSKMGR.K85
 Olivetti M-10        : TEENY.M10 DSKMGR.M10
-
-Disk image files for use with -i :
----------------------------------
-Sardine_American_English.pdd1
-Disk_Power.K85.pdd1
-
-
-Filenames are searched in the current directory first,
-and then in /usr/local/lib/dl
 
 Examples:
 
    dl -b TS-DOS.100
    dl -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
-   dl -vb rxcini.DO && ./dl -v
-   dl -v -i Sardine_American_English.pdd1
+   dl -vb rxcini.DO && dl -v
 
 $ 
 ```
@@ -115,8 +110,34 @@ st	6	2	on	'F'	off	off	off
 $ 
 ```
 
+```
+$ dl -i
+DeskLink2 v2.2.001-7-g1cd1b38
+"-i" requires a value
 
-Several of the above settings can alternatively be supplied via environment variables, as well as a few other [hacky extra options](ref/advanced_options.txt)
+Help for Disk Images
+
+Usage:
+ -i filename    use disk image file <filename>
+ -v -i          more help about disk images
+
+Available built-in (bundled) disk image files (in /usr/local/lib/dl):
+
+TPDD1:
+	TPDD1_26-3808_Utility_Disk.pdd1
+	Sardine_American_English.pdd1
+	Disk_Power.K85.pdd1
+TPDD2:
+	TPDD2_26-3814_Utility_Disk.pdd2
+
+Examples:
+	dl -v -i Sardine_American_English.pdd1
+	dl -v -i ./my_new_disk.pdd2
+
+$ 
+```
+
+There are also several [environment variables](ref/advanced_options.txt)
 
 Docs from the past versions of this program. They don't exactly match this version any more.   
 [README.txt](README.txt) from [dlplus](http://bitchin100.com/files/linux/dlplus.zip) by John R. Hogerhuis  
