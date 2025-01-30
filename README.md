@@ -89,21 +89,23 @@ $
 
 ```
 $ dl -c
-DeskLink2 v2.2.001-1-gce946d5
+DeskLink2 v2.2.001-7-g1cd1b38
 "-c" requires a value
 
-help for Client Compatibility Profiles
+Help for Client Compatibility Profiles
 
-usage:
+Usage:
  -c name    use profile <name> - (default: "k85")
- -c #.#     "raw" with filenames truncated to #.# & attr='F'
- -c #.#p    "#.#" fixed-length space-padded
- -v -c      more help
+ -c #.#     "raw", truncated but not padded to #.#, attr='F'
+ -c #.#p    "raw", truncated and padded to #.#, attr='F'
+ -v -c      more help about profiles
+
+Available profiles:
 
 NAME	BASE	EXT	PAD	ATTR	DME	TSLOAD	UPCASE
 -------------------------------------------------------------
 raw	0	0	off	' '	off	off	off
-k85	6	2	on	'F'	on	on	off
+k85	6	2	on	'F'	on	on	on
 wp2	8	2	on	'F'	off	off	off
 cpm	8	3	off	'F'	off	off	off
 rexcpm	6	2	on	'F'	off	off	on

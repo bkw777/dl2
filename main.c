@@ -421,18 +421,30 @@ uint8_t baud_to_stat_code (uint16_t r) {
 		0;
 }
 
+void lsx (char* path,char* match,char* fmt) {
+	struct dirent *files;
+	DIR *dir = opendir(path);
+	if (!dir){dbg(0,"Cannot open \"%s\"",path); return;}
+	int i;
+	while ((files = readdir(dir))) {
+		for (i=strlen(files->d_name);files->d_name[i]!='.';i--);
+		if (!strcmp(files->d_name+i+1,match)) dbg(0,fmt,files->d_name);
+	}
+	closedir(dir);
+}
+
 void show_profiles_help (int e) {
 	const int n = sizeof(profiles)/sizeof(profiles[0]);
 
 	dbg(0,
 		"\n"
-		"help for Client Compatibility Profiles\n"
+		"Help for Client Compatibility Profiles\n"
 		"\n"
-		"usage:\n"
-		" -c name    use profile <name> - (default: \"%s\")\n"
-		" -c #.#     \"raw\" with filenames truncated to #.# & attr='%c'\n"
-		" -c #.#p    \"#.#\" fixed-length space-padded\n"
-		" -v -c      more help\n"
+		"Usage:\n"
+		" -c name    use profile <name> - (default: \"%1$s\")\n"
+		" -c #.#     \"raw\", truncated but not padded to #.#, attr='%2$c'\n"
+		" -c #.#p    \"raw\", truncated and padded to #.#, attr='%2$c'\n"
+		" -v -c      more help about profiles\n"
 		,DEFAULT_PROFILE,ATTR_DEF
 	);
 
@@ -464,8 +476,10 @@ void show_profiles_help (int e) {
 		"And when TS-DOS tries to read or write a file named \"FOO   .CO\",\n"
 		"we use \"FOO.CO\" for the local filename.\n"
 		"\n"
-		"Most of the parameters in a profile also have individual commandline flags.\n"
-		"Example: \"-c k85\" is short for \"-c 6.2p -a F -e on\"\n"
+		"Most of the parameters in a profile also have individual commandline flags,\n"
+		"and all parameters have individual environment variables.\n"
+		"Example: \"dl -c k85\" is short for \"dl -c 6.2p -a F -e on\"\n"
+		"or: \"PROFILE=6.2p ATTR=F DME=on TSLOAD=on UPCASE=on dl\"\n"
 		"(except k85 is the default so you don't need to use any of those)\n"
 		"\n"
 		"The default \"k85\" matches all KC-85-clone platform clients. Examples:\n"
@@ -479,11 +493,11 @@ void show_profiles_help (int e) {
 		"DME     enable TS-DOS directory mode extension\n"
 		"TSLOAD  enable \"magic files\" (ex: DOS100.CO) for TSLOAD / Ultimate ROM II\n"
 		"UPCASE  translate filenames to all uppercase\n"
-		"\n"
-		"Available profiles:\n"
 	);
 
 	dbg(0,
+		"\n"
+		"Available profiles:\n"
 		"\n"
 //		"PROFILE\tBASE\tEXT\tPAD\tATTR\tTS-DOS\tMAGIC\tUP\n"
 //		"NAME\tLEN\tLEN\tFNAMES\tBYTE\tDIRS\tFILES\tCASE\n"
@@ -506,6 +520,59 @@ void show_profiles_help (int e) {
 	}
 
 	dbg(0,"\n");
+
+	exit(e);
+}
+
+void show_diskimage_help(int e) {
+
+	dbg(0,
+		"\n"
+		"Help for Disk Images\n"
+		"\n"
+		"Usage:\n"
+		" -i filename    use disk image file <filename>\n"
+		" -v -i          more help about disk images\n"
+		"\n"
+	);
+	dbg(1,
+		"If filename is not found, then %1$s is searched.\n"
+		"\n"
+		"If the filename ends in \".pdd1\", or the file is the correct exact\n"
+		"size of a TPDD1 disk image, then dl2 will automatically operate in\n"
+		"TPDD1 emulation mode, and the same for \".pdd2\" and TPDD2.\n"
+		"\n"
+		"If the drive model cannot be determined by either name or size\n"
+		"(such as a new empty file with an arbitrary name that you want created),\n"
+		"then use \"-m 1\" or \"-m 2\" to specify tpdd1 or tpdd2.\n"
+		"\n"
+		"If filename does not exist, or exists but is zero bytes, then the file\n"
+		"will be created and filled with a new blank formatted disk image,\n"
+		"if and when the client issues a format command.\n"
+		"\n"
+		"Disk images may be dumped from / restored to physical disks using\n"
+		"the appropriate model real drive and https://github.com/bkw777/pdd.sh\n"
+		"\n"
+		,app_lib_dir
+	);
+	dbg(0,
+		"Available built-in (bundled) disk image files (in %1$s):\n"
+		"\n"
+		,app_lib_dir
+	);
+
+	dbg(0,"TPDD1:\n");
+	lsx(app_lib_dir,"pdd1","	%s\n");
+	dbg(0,"TPDD2:\n");
+	lsx(app_lib_dir,"pdd2","	%s\n");
+
+	dbg(0,
+		"\n"
+		"Examples:\n"
+		"	%1$s -v -i Sardine_American_English.pdd1\n"
+		"	%1$s -v -i ./my_new_disk.pdd2\n"
+		"\n"
+	,args[0]);
 
 	exit(e);
 }
@@ -649,8 +716,9 @@ void find_lib_file (char* f) {
 }
 
 int check_disk_image () {
-	// if they didn't ask for any disk image, then bail without error
-	if (!disk_img_fname[0]) return 0;
+
+//	if (!disk_img_fname[0]) return 0;
+	if (ckhelp(disk_img_fname)) show_diskimage_help(0);
 
 	dbg(3,"looking for disk image \"%s\"\n",disk_img_fname);
 
@@ -912,18 +980,6 @@ char* collapse_padded_fname(char* fname) {
 	return fname;
 }
 
-void lsx (char* path,char* match,char* fmt) {
-	struct dirent *files;
-	DIR *dir = opendir(path);
-	if (!dir){dbg(0,"Cannot open \"%s\"",path); return;}
-	int i;
-	while ((files = readdir(dir))) {
-		for (i=strlen(files->d_name);files->d_name[i]!='.';i--);
-		if (!strcmp(files->d_name+i+1,match)) dbg(0,fmt,files->d_name);
-	}
-	closedir(dir);
-}
-
 int check_magic_file(char* b) {
 	dbg(3,"%s(\"%s\")\n",__func__,b);
 	if (!enable_magic_files) return 1;
@@ -931,7 +987,6 @@ int check_magic_file(char* b) {
 	for (int i=0;i<l;++i) if (!strcmp(magic_files[i],b)) return 0;
 	return 1;
 }
-
 
 // This is kind of silly but why not? Load a rom image file into rom[],
 // then tpdd2 mem_read() in the ROM address range returns data from rom[],
@@ -2417,36 +2472,6 @@ void get_opr_cmd() {
 //  BOOTSTRAP
 //
 
-void show_bootstrap_help() {
-	dbg(0,"\nAvailable support files in %s\n\n",app_lib_dir);
-
-	dbg(0,"Bootstrap/Loader files for use with -b :\n"
-	      "-----------------------------\n");
-	dbg(0,  "TRS-80 Model 100/102 :"); lsx(app_lib_dir,"100"," %s");
-	dbg(0,"\nTANDY Model 200      :"); lsx(app_lib_dir,"200"," %s");
-	dbg(0,"\nNEC PC-8201/PC-8300  :"); lsx(app_lib_dir,"NEC"," %s");
-	dbg(0,"\nKyotronic KC-85      :"); lsx(app_lib_dir,"K85"," %s");
-	dbg(0,"\nOlivetti M-10        :"); lsx(app_lib_dir,"M10"," %s");
-
-	dbg(0,"\n\nDisk image files for use with -i :\n"
-	          "---------------------------------\n");
-	lsx(app_lib_dir,"pdd1","%s\n");
-	dbg(0,"\n");
-	lsx(app_lib_dir,"pdd2","%s\n");
-
-	dbg(0,
-		"\n"
-		"Filenames are searched in the current directory first,\n"
-		"and then in %2$s\n"
-		"\n"
-		"Examples:\n\n"
-		"   %1$s -b TS-DOS.100\n"
-		"   %1$s -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100\n"
-		"   %1$s -vb rxcini.DO && %1$s -v\n"
-		"   %1$s -v -i Sardine_American_English.pdd1\n\n"
-	,args[0],app_lib_dir);
-}
-
 void slowbyte(uint8_t b) {
 	write_client_tty(&b,1);
 	tcdrain(client_tty_fd);
@@ -2643,6 +2668,93 @@ void show_main_help() {
 
 }
 
+void show_bootstrap_help(int e) {
+
+	dbg(0,
+		"\n"
+		"Help for Bootstrap\n"
+		"\n"
+		"Usage:\n"
+		" -b filename     send file out over the serial port, slowly\n"
+		" -v -b           more help about bootstrap\n"
+		"\n"
+		"If filename is not found, then %1$s is searched.\n"
+		"\n"
+		,app_lib_dir
+	);
+	dbg(1,
+		"The bootstrap function is a convenient way to load software onto\n"
+		"KC-85 clone machines like TRS-80 Model 100 via the serial port,\n"
+		"when there is no proper file-transfer software installed yet.\n"
+		"\n"
+		"It just does the same thing you could do manually with TELCOM and any\n"
+		"kind of serial terminal program on the pc, but automates the process\n"
+		"to the fewest possible manual steps, and the few necessary manual steps\n"
+		"have on-screen prompts so you never have to remember the key details.\n"
+		"\n"
+		"<filename> should be a valid BASIC program file in ascii format,\n"
+		"meaning a plain text *.DO file not a tokenized *.BA file.\n"
+		"\n"
+		"Line-endings may be either CRLF or CR-only, but not LF-only.\n"
+		"Lines may be up to 255 bytes long, although the interactive editor\n"
+		"in the BASIC interpreter can not handle lines longer than 127 bytes.\n"
+		"\n"
+		"The file should have a CR or CRLF at the end of the last line,\n"
+		"and a ^Z (0x1A) after that as the last byte in the file.\n"
+		"If the final ^Z is missing then one will be sent after the data.\n"
+		"\n"
+		"Follow the on-screen prompts. First, dl2 will display a prompt showing\n"
+		"the RUN \"COM:...\" command to run on the receiving machine, and waits\n"
+		"for you to press Enter before proceeding.\n"
+		"\n"
+		"Open BASIC on the portable and type-in the displayed RUN command\n"
+		"and hit Enter there. BASIC will now look hung because there will be no\n"
+		"cursor or propmt or any other visible activity on the portable.\n"
+		"\n"
+		"Then press Enter here on the pc. The file will then start streaming\n"
+		"over to the portable, and will immediately start executing as soon as\n"
+		"the BASIC reads the ending ^Z."
+		"\n"
+		"Some installers have further instructions for that particular installer,\n"
+		"displayed either here on the pc or on the portable.\n"
+		"\n"
+		"If you want to keep the transferred BASIC instead of immediately\n"
+		"execute-and-discard, then where the prompt says RUN \"COM:98N1ENN\",\n"
+		"you can just type LOAD \"COM:98N1ENN\" instead, then SAVE \"NAME\" .\n"
+		"\n"
+		"This process is also handy for random ad-hoc transfers of any text or\n"
+		"basic files, not just program installers, simply because it removes all\n"
+		"of the variables of getting two comm programs configured correctly on\n"
+		"both ends of the serial link.\n"
+		"\n"
+	);
+	dbg(0,
+		"Available built-in bootstrap/loader files (in %s):\n"
+		"\n"
+		,app_lib_dir
+	);
+
+	dbg(0,  "TRS-80 Model 100/102 :"); lsx(app_lib_dir,"100"," %s");
+	dbg(0,"\nTANDY Model 200      :"); lsx(app_lib_dir,"200"," %s");
+	dbg(0,"\nNEC PC-8201/PC-8300  :"); lsx(app_lib_dir,"NEC"," %s");
+	dbg(0,"\nKyotronic KC-85      :"); lsx(app_lib_dir,"K85"," %s");
+	dbg(0,"\nOlivetti M-10        :"); lsx(app_lib_dir,"M10"," %s");
+
+	dbg(0,
+		"\n"
+		"\n"
+		"Examples:\n"
+		"\n"
+		"   %1$s -b TS-DOS.100\n"
+		"   %1$s -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100\n"
+		"   %1$s -vb rxcini.DO && %1$s -v\n"
+		"\n"
+		,args[0]
+	);
+
+	exit(e);
+}
+
 int main(int argc, char** argv) {
 	dbg(0,APP_NAME " " APP_VERSION "\n");
 
@@ -2689,7 +2801,7 @@ int main(int argc, char** argv) {
 #endif
 			case 'h': show_main_help(); exit(0);                  break;
 			case 'i': strcpy(disk_img_fname,optarg);              break;
-			case 'l': show_bootstrap_help(); exit(0);             break; // back compat, short for -b "" / -b help
+			case 'l': show_bootstrap_help(0);                     break; // back compat, short for -b help / -i help
 			case 'm': model = atoi(optarg);                       break;
 			case 'n': dme_en = false;                             break; // back compat, short for -e false
 			//case 'n': set_fnames(optarg);                         break;
@@ -2704,7 +2816,8 @@ int main(int argc, char** argv) {
 			case '~': tildes = atobool(optarg);                   break;
 			case '^': x = true;                                   break;
 			case ':': dbg(0,"\"-%c\" requires a value\n",optopt);
-				if (optopt=='b'||optopt=='i') { show_bootstrap_help(); exit(0); }
+				if (optopt=='b') show_bootstrap_help(0);
+				if (optopt=='i') show_diskimage_help(0);
 				if (optopt=='c') show_profiles_help(0);
 				show_main_help();                                 return 1;
 			case '?':

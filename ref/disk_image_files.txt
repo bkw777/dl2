@@ -50,23 +50,21 @@ filesystem, but the installer uses fdc-mode sector access to read sectret data
 from some sectors that aren't marked as in-use in the FCB ot SMT tables.
 
 Generally, you also need to use some extra commandline options to disable
-TS-DOS directory extensions support (-n), and to force stricter TPDD1-only
+TS-DOS directory extensions support (-e off), and to force stricter TPDD1-only
 or TPDD2-only emulation (-m 1) or (-m 2). Example:
 
-$ dl -vun -m 1 -i Sardine_American_English.pdd1
+$ dl -v -e off -m 1 -i Sardine_American_English.pdd1
 
-That isn't required to use disk images in general, it's just that in both
-of these real examples, the client software does things that trigger unexpected
-responses from the server that a real drive wouldn't do, so the extra options
-make the server act more like a real drive, as the client software expects.
-Some other client software may or may not do wierd things and may or may not
-need the stricter emulation.
+That isn't required to use disk images in general, it's just that in both of
+these real examples, the software involved happens to do things that trigger
+responses from an emulator that a real drive wouldn't do, so the extra options
+just turn off features and make the server act more strictly like a real drive.
 
 Disk image files can be created with https://github.co/bkw777/pdd.sh
 
 dl2 can also create new disk images from client-issued format and sector
-access commands. Example: run "$ dl -vvn -m 1 -i ./newdisk.pdd1"
-and then use a client to "format" the "disk".
+access commands. Example: run "$ dl -vv -e off -m 1 -i ./newdisk.pdd1"
+and then use a client (like TS-DOS) to "format" the "disk".
 
 For TPDD1, both the FDC-mode the Operation-mode format commands do what a real
 drive does. The FDC-mode format just generates all nulls and the one logical

@@ -57,6 +57,8 @@ LIB_OTHER := \
 	clients/ts-dos/SAR200.CO \
 	clients/ts-dos/Sardine_American_English.pdd1 \
 	clients/disk_power/Disk_Power.K85.pdd1 \
+	TPDD1_26-3808_Utility_Disk.pdd1 \
+	TPDD2_26-3814_Utility_Disk.pdd2
 
 CLIENT_DOCS := \
 	clients/teeny/teenydoc.txt \
