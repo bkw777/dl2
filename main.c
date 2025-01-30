@@ -2661,7 +2661,7 @@ int main(int argc, char** argv) {
 	if (getenv("TILDES")) tildes = atobool(getenv("TILDES"));
 	if (getenv("CLIENT_TTY")) strcpy(client_tty_name,getenv("CLIENT_TTY"));
 	if (getenv("BAUD")) baud = atoi(getenv("BAUD"));
-	if (getenv("RTSCTS")) baud = atoi(getenv("BAUD"));
+	if (getenv("RTSCTS")) rtscts = atobool(getenv("RTSCTS"));
 	if (getenv("ROOT_LABEL")) snprintf(dme_root_label,6+1,"%-*.*s",6,6,getenv("ROOT_LABEL"));
 	if (getenv("PARENT_LABEL")) snprintf(dme_parent_label,6+1,"%-*.*s",6,6,getenv("PARENT_LABEL"));
 	if (getenv("DIR_LABEL")) snprintf(dme_dir_label,3,"%-2.2s",getenv("DIR_LABEL"));

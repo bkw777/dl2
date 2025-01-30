@@ -5,6 +5,8 @@
 
 #ifdef USE_XATTR
 
+// default xattr_name is #defined in xattr.c
+// and overridable at run-time from main.c
 extern const char* xattr_name;
 
 void dl_getxattr (const char* path, uint8_t* value);

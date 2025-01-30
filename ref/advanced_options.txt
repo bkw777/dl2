@@ -1,28 +1,63 @@
 Some special features & controls, and experiments.
 
-Aside from the options displayed by the help options -h and -l,
+Aside from the options displayed by the help options -h, -c, -b, & -i,
 there are also some debugging and special options and some environment
 variables.
+
+Command-line stwitches override env variables,
+and later switches override earlier switches.
+
+PROFILE is processed before other variables, so that the other
+variables can override individual settings within a profile.
 
 Commandline switches:
 
  -^  Config dump. This just displays several config options and exits.
-     If used in cencert with -vv or more, then it shows even more
-     info, including the results of all environment variables.
+     If used with -vv, then it shows even more info,
+     including the internal results of all environment variables.
 
-     This is a way to verify that config options are actually in effect.
+     This is a way to verify what config options are actually in effect.
+
+     Build a command line with both variables and switches, and put -^
+     as the very last argument, and the dump will show the final result
+     of all the combined settings which may override each other, etc.
 
 Environment variables:
 
+variable      data      equivalent  (default        description if no
+name          type      cli switch   value)         equivalent in -h help
+
+FDC_MODE      bool      true = -f   (false)
+PROFILE       str       -c str      (k85)
+ATTR          chr       -a chr      (F)
+DME           bool      -e bool     (true for k85)
+TSLOAD        bool                  (true for k85)  enable magic files
+TILDES        bool      -~ bool     (true)
+CLIENT_TTY    str       -d str      (/dev/ttyUSB* for linux)
+BAUD          #         -s #        (19200)
+RTSCTS        bool      -r bool     (false)
+ROOT_LABEL    str                   ("0:    ")
+PARENT_LABEL  str                   ("^     ")
+DIR_LABEL     str                   ("<>")
+XATTR_NAME    str                   ("pdd.attr" w/ platform-specific prefix/suffix) 
+
+str = a string
+chr = a single character
+# = an integer
+bool = case-insensitive on/off true/false yes/no 0/1 t/f y/n
+
 To use these, just put them in the environment. The simplest is just type
 them on the same command line before the executable name.
+
+ROOT & PARENT are padded or truncated as needed to exactly 6 bytes,
+so you can give a short value without quotes
 
 Example:
 
 	$ ROOT_LABEL=/ PARENT_LABEL=^ dl
 
 
- ROOT_LABEL="0:"
+ROOT_LABEL="0:"
 	examples:
 		'ROOT'
 		'/'
@@ -45,7 +80,7 @@ Example:
 	If you want a shorter string to be centered,
 	use quotes and include the spaces.
 
- PARENT_LABEL="^"
+PARENT_LABEL="^"
 	examples:
 		'PARENT'
 		'^'
@@ -79,7 +114,7 @@ Example:
 	to work, it has to be left-justified like a real filename would be.
 	It takes some trial & error to figure out what works.
 
- ATTR="F"
+ATTR="F"
 	examples: 'F', ' ', any single byte
 
 	A real TPDD drive has a one-byte field along with every filename.
@@ -117,28 +152,106 @@ Example:
 	pdd.sh exposes the field and let's you see it and write whatever
 	you want in it and search whatever you want in it.
 
- DOT_OFFSET=6
-	valid values: 0 to 24, but really only 0, 6, or 8 are useful.
+ PROFILE=k85
+ PROFILE=8.3
+ PROFILE=8.2p
+	Same as command line switch "-c"
 
-	Just another way to do the same thing as the -w or -0 options, except
-	you can specify any value from 0-24.
+	PROFILE=name
+	-c name    use profile <name> - (default: "k85")
 
-	Default behavior is DOT_OFFSET=6, aka "Floppy/TS-DOS mode".
-	This makes 6.2 space-padded filenames.
+	PROFILE=#.#
+	-c #.#     "raw", truncated but not padded to #.#, attr=F
 
-	The -w option is DOT_OFFSET=8, aka "WP-2 mode".
-	This makes 8.2 space-padded filenames.
+	profile=#.#p
+	-c #.#p    "raw", truncated and padded to #.#, attr=F
 
-	The -0 option does DOT_OFFSET=0, aka "raw mode".
-	This makes filenames truncated to 24 bytes but otherwise not modified.
-	There is no special meaning or handling of dots or any other characters.
+	Profiles taylor the translation between local filenames and TPDD filenames.
 
-	It's possibly useful as just as an alternative way to set 0 or 8 as
-	default instead of having to include the -0 or -w commandline options
-	every time.
+	A real TPDD doesn't care what's in the filename, and emulating a TPDD
+	doesn't require any translation other than truncating to 24 bytes.
 
- OPERATION_MODE=1
-	valid values: 0 or 1
+	But most TPDD clients write filenames to TPDD drives in specific formats,
+	and we need to translate filenames between the local and client formats.
+
+	Strictly speaking, "raw" always works for any and all clients,
+	from the clients point of view. It still emulates a real drive exactly.
+
+	The only reason for any compatibility profile is for more convenient
+	local filenames. When TS-DOS saves a file like "A.BA", it actually
+	writes "A     .BA" to a real drive. In "raw" mode this would create a
+	local file named verbatim: "A     .BA", which is legal but inconvenient.
+	And TS-DOS does not recognize any disk files that don't conform
+	to the "k85" profile below. (fixed-length, space-padded, 6.2)
+
+	"raw" still "works" because TS-DOS can both create any files it
+	wants, and access any files it created, identical to a real drive.
+
+	Profiles just make it so that a local file named "my_long_file_name.text"
+	appears to TS-DOS as "my_lo~.t~", which may be ugly but TS-DOS can use it.
+	And when TS-DOS tries to read or write a file named "FOO   .CO",
+	we use "FOO.CO" for the local filename.
+
+	Most of the parameters in a profile also have individual commandline flags.
+	Example: "-c k85" is short for "-c 6.2p -a F -e on"
+	(except k85 is the default so you don't need to use any of those)
+
+	The #.# syntax is a way to specify any other filename pattern you might need
+	that isn't covered by one of the built-in profiles below.
+
+	If the number after the dot is >0 then the translated filename will have only
+	one dot. The last dot in the original name will be taken as "the" dot.
+	Everything before the last dot will be truncated down to the basename length,
+	and any dots substituted with "_". Everything after the last dot will be
+	truncated down to the ext length.
+
+	To specify a simple max length without limiting or modifying dots, use #.0
+
+	Examples:
+	-c cpm      "abc.txt" -> "abc.txt"
+	-c 8.3      "my.long.file.name.shtml" -> "my_long~.sh~"
+	-c 8.2p     "abc.txt" -> "abc     .t~"
+	-c 14.0     "my.long.file.name.shtml" -> "my.long.file.~"
+	-c 6.2p -u  "abc.co" -> "ABC   .CO"
+
+    or equivalent:
+	PROFILE=cpm    "abc.txt" -> "abc.txt"
+	PROFILE=8.3    "my.long.file.name.shtml" -> "my_long~.sh~"
+	PROFILE=8.2p   "abc.txt" -> "abc     .t~"
+	PROFILE=14.0   "my.long.file.name.shtml" -> "my.long.file.~"
+	PROFILE=6.2p UPCASE=on  "abc.co" -> "ABC   .CO"
+	PROFILE=k85    "abc.co" -> "ABC   .CO"
+
+	The default is the same as: PROFILE=k85
+	which is also the same as: PROFILE=6.2p UPCASE=on ATTR=F DME=on TSLOAD=on TILDES=on
+
+	The default "k85" matches all KC-85-clone platform clients. Examples:
+	Floppy, TS-DOS, DSKMGR, TEENY, etc, on TRS-80 Model 100, NEC PC-8201a, etc.
+
+	NAME    profile name
+	BASE    basename length
+	EXT     extension length
+	PAD     fixed-length space-padded
+	ATTR    default attribute byte if no xattr
+	DME     enable TS-DOS directory mode extension
+	TSLOAD  enable "magic files" (ex: DOS100.CO) for TSLOAD / Ultimate ROM II
+	UPCASE  translate filenames to all uppercase
+
+	Available profiles:
+
+	NAME  BASE EXT  PAD	 ATTR  DME  TSLOAD  UPCASE
+	-------------------------------------------------------------
+	raw     0   0   off  ' '   off    off   off
+	k85     6   2   on   'F'   on     on    on
+	wp2     8   2   on   'F'   off    off   off
+	cpm     8   3   off  'F'   off    off   off
+	rexcpm  6   2   on   'F'   off    off   on
+	z88     12  3   off  'F'   off    off   off
+	st      6   2   on   'F'   off    off   off
+
+FDC_MODE=false
+	default false
+	commandline switch -f (takes no argument) is the same as FDC_MODE=true
 
 	A TPDD1 / FB-100 drive has two main modes of operation called
 	Operation-mode and FDC-mode.
@@ -152,18 +265,17 @@ Example:
 	This setting lets you emulate the dip switch settings for starting up
 	in FDC-mode instead of Operation-mode.
 
-	Default is OPERATION_MODE=1, meaning dl2 starts up in Operation-mode.
-	This matches the TPDD1 default dip switch settings, the TPDD2 (tpdd2 has
-	no other mode), and the hard-wired solder-blob settings on FB-100 and
-	Purple-Computing drives.
+	Default is FDC_MODE=false, meaning dl2 starts up in Operation-mode.
+	This matches the TPDD1 default dip switch settings, and the hard-wired
+	solder-blob settings on Brother FB-100, KnitKing FDD19, Purple Computing D103, 
+	and matches the TPDD2's only mode (tpdd2 has no FDC mode).
 
 	Regardless which mode is the default at start-up, the drive (and dl2) still
-	responds to the commands to switch between modes, and clients like
-	TS-DOS always send a little set/reset sequence to ensure the drive gets
-	put into Operation-mode before it tries to use Operation-mode commands.
-	So mostly it almost doesn't matter which mode is the power-on default.
+	responds to the commands to switch between modes, and at least some clients
+	like TS-DOS always send a little set/reset sequence to ensure the drive gets put
+	into Operation-mode before it tries to use any other Operation-mode commands.
 
- BAUD=19200
+BAUD=19200
 	valid values:
 		75       model-t supports, drive does not
 		110      model-t supports, drive does not
@@ -202,7 +314,7 @@ Example:
 	rate. So the option is there in dl2 but isn't available unless you compiled
 	on a system that supports it.
 
- CLIENT_TTY=ttyUSB0
+CLIENT_TTY=ttyUSB0
 	examples: ttyUSB0, ttyS2, cu.usbserial-AL03RAXP
 
 	The device name of the tty that the client is connected to,
@@ -213,12 +325,11 @@ Example:
 	"/dev/tty.*" interface to the same device. The cu.* interface
 	provides exclusive access to the port and avoids data corruption.
 
- DISABLE_DME=false
-	valid values: 0, false, off, no, 1, true, on, yes
-	case-insensitive, 0 = all values <1 = false, 1 = all values >0 = true
-
+DME=true
 	Enable/Disable TS-DOS directory support.
-	Default is enabled, use this to disable.
+	Default depends on the PROFILE.
+	Default profile is k85 which has DME enabled.
+	Use this to override whatever the profile has set.
 
 	TS-DOS/Desk-Link directory mode extensions technically violate the tpdd spec,
 	which could theoretically break some legitimate tpdd client software that
@@ -230,50 +341,27 @@ Example:
 	use FDC-mode at all are Sardine and the installer for Disk-Power, and both
 	of those are working on dl2 without needing this option.
 
- MAGIC_FILES=true
-	valid values: 0, false, off, no, 1, true, on, yes
-	case-insensitive, 0 = all values <1 = false, 1 = all values >0 = true
+TSLOAD=true
+	Enable/Disable the "magic files" feature.
+	Default depends on PROFILE
+	Default profile is k85, which has TSLOAD enabled
+	Use this to override whatever the profile has set.
 
-	Enable/Disable the "magic files" feature. (default enabled)
 	In case you specifically do not want the special filenames like "DOS100.CO"
 	to be recognized and work by magic even if there is no file by that name.
 
- TILDES=true
-	valid values: 0, false, off, no, 1, true, on, yes
-	case-insensitive, 0 = all values <1 = false, 1 = all values >0 = true
+TILDES=true
+	Enable/Disable indicating truncated filenames with a trailing "~"
+	Default is true
 
-	When long local filenames are truncated down to the tpdd limits,
-	distinguish truncated filenames from naturally short filenames
-	by ending the truncated names with '~'.
-
-	The basename and extension parts of the filenames are evaluated
-	individually.
-	areallylongname.ba -> "areal~.ba"
-	a.bas -> "a     .b~"
-	areallylongname.basic -> "areal~.b~"
-
-	Basename and ext also end at the first and last dots if there are
-	multiple dots, and in that case, if the part before the first dot is
-	short enough to fit, but there was more filename removed after a dot,
-	then a tilde is added to indicate that even though the name looks short
-	the original name was actually longer.
-	a.ba -> "a     .ba"
-	a.long.name.ba -> "a~    .ba"
-
-	By default the basename.ext limits are 6.2, compatible with Floppy,
-	TS-DOS, and all other KC-85 platform tpdd client software.
-
-	The "-w" option limits are 8.2, compatible with the TANDY WP-2 firmware.
-
-	The "-0" option is "raw mode" and allows using the entire 24 bytes
-	in the filename field like a real drive, with no special meaning to dots
-	or any other character. There is no "extension". The local filename is
-	simply copied verbatim up to it's first 24 bytes (or 23 if a ~ is needed).
-	a.twenty-four.bytes.name -> "a.twenty-four.bytes.name"
-	this.name.is.over.24.bytes.long -> "this.name.is.over.24.by~"
-
-XATTR_NAME=user.pdd.attr
+XATTR_NAME=pdd.attr
 
 	If compiled with -DUSE_XATTR, then this environment variable can be used
-	to specify a different xattr name than the default "user.pdd.attr" for
+	to specify a different xattr name than the default "pdd.attr" for
 	storing and retrieving the ATTR byte for each file.
+
+	Default depends on the platform.
+	Default is "pdd.attr", with platform-specific prefixes or suffixes added.
+	linux:   "user.pdd.attr"
+	mac:     "pdd.attr#S"
+	freebsd: "pdd.attr" in EXTATTR_NAMESPACE_USER

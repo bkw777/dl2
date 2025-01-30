@@ -71,7 +71,7 @@ CLIENT_DOCS := \
 #	clients/power-dos/powr-d.txt
 
 DOCS := dl.do README.txt README.md LICENSE $(CLIENT_DOCS)
-SOURCES := dl.c dir_list.c xattr.c
+SOURCES := main.c dir_list.c xattr.c
 HEADERS := constants.h dir_list.h xattr.h
 
 ifeq ($(OS),Darwin)
