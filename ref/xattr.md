@@ -88,7 +88,7 @@ As with a real drive, both the filename and attr must match in order to access a
 filename "foo" with attr "a"  
 and  
 filename "foo" with attr "b"  
-are two different files.
+are two different files, basically the same as if one were named "fooa" and one were named "foob"
 
 For instance to load or delete one of these files that has a non-default attr, you have to specify both the filename and the attr :  
 `PDD(opr:6.2,F)> rm T3.DO d`
@@ -96,6 +96,21 @@ For instance to load or delete one of these files that has a non-default attr, y
 This is working on Linux, Macos, & FreeBSD.
 
 For any platform that isn't supported, or on any filesystem that doesn't have extended attributes, or any new local files that weren't created by a tpdd client, it will just transparently work the old way. Attr will be 'F' or whatever the "-a" commandline flag or the ATTR environment variable says.
+
+## notes
+
+To see xattrs on files:
+`getfattr -d -- NAME.BA`  
+`getfattr -d -- *`
+
+cp, tar, rsync, etc don't preserve xattrs with files by default.  
+
+They all have options for it, so you can preserve the xattrs in copies, it's just not the default behavior.
+
+Even text editors may need extra config so they don't unlink & create a new file on each save.
+
+In reality, you will never notice or care because everything that you ever want to use with a TPDD emulator, they all happen to always hard-code attr=F at all times, and that is the same thing dl2 will do any time a file has no xattr.  
+This is the same as all tpdd emulators which have all been hard-coding 'F' all along anyway since the beginning in 1984.
 
 ## misc references
 Wrapper to provide a single interface to the different platforms xattr interfaces.  
