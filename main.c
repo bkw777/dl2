@@ -738,21 +738,23 @@ void find_lib_file (char* f) {
 
 }
 
-int check_disk_image () {
+int set_disk_image (char* f) {
 
-//	if (!disk_img_fname[0]) return 0;
-	if (ckhelp(disk_img_fname)) show_diskimage_help(0);
+	if (ckhelp(f)) show_diskimage_help(0);
 
-	dbg(3,"looking for disk image \"%s\"\n",disk_img_fname);
+	dbg(3,"looking for disk image \"%s\"\n",f);
 
-	find_lib_file(disk_img_fname);
+	char t[PATH_MAX+1]={0x00};
+	strcpy(t,f);
 
-	// disk_img_fname has now been re-written if and as necessary,
-	// and still may or may not exist
+	find_lib_file(t);
+
+	// f has now possibly been re-written with the path to a bundled file,
+	// or not, and still may or may not exist
 	struct stat info;
-	if (!stat(disk_img_fname, &info) && info.st_size>0) {
+	if (!stat(t, &info) && info.st_size>0) {
 		// if file exists and >0 bytes
-		dbg(1,"Loading disk image file \"%s\"\n",disk_img_fname);
+		dbg(1,"Loading disk image file \"%s\"\n",t);
 
 		// use file size to automatically set model 1 vs 2 or reject file
 		if (info.st_size==PDD1_IMG_LEN) model = 1;
@@ -767,23 +769,24 @@ int check_disk_image () {
 		}
 	} else {
 		// if file doesn't exist or is 0 bytes
-		dbg(1,"Disk image file \"%s\" is empty or does not exist.\nIt will be created if the client issues a format command.\n",disk_img_fname);
+		dbg(1,"Disk image file \"%s\" is empty or does not exist.\nIt will be created if the client issues a format command.\n",t);
 
 		// use file name to automatically set model 1 vs 2
 		char ext[6] = {0};
-		strncpy(ext,disk_img_fname+strlen(disk_img_fname)-5,5);
+		strncpy(ext,t+strlen(f)-5,5);
 		if (!strcasecmp(ext,DEFAULT_TPDD1_IMG_SUFFIX)) model = 1;
 		else if (!strcasecmp(ext,DEFAULT_TPDD2_IMG_SUFFIX)) model = 2;
 	}
 
+	memset(disk_img_fname,0,PATH_MAX+1);
+
 	// rewrite with leading path if not already
 	// because we we may cd all over the place
-	if (disk_img_fname[0]=='/') return 0;
-	char t[PATH_MAX+1] = {0};
-	strcpy(t,iwd);
-	strcat(t,"/");
-	strcat(t,disk_img_fname);
-	memcpy(disk_img_fname,t,PATH_MAX+1);
+	if (t[0]!='/') {
+		strcpy(disk_img_fname,iwd);
+		strcat(disk_img_fname,"/");
+	}
+	strcat(disk_img_fname,t);
 
 	return 0;
 }
@@ -2823,7 +2826,7 @@ int main(int argc, char** argv) {
 			case 'g': getty_mode = true; debug = 0;               break;
 #endif
 			case 'h': show_main_help(); exit(0);                  break;
-			case 'i': strcpy(disk_img_fname,optarg);              break;
+			case 'i': set_disk_image(optarg);                     break;
 			case 'l': show_bootstrap_help(0);                     break; // back compat, short for -b help / -i help
 			case 'm': model = atoi(optarg);                       break;
 			case 'n': dme_en = false;                             break; // back compat, short for -e false
@@ -2868,8 +2871,6 @@ int main(int argc, char** argv) {
 	resolve_client_tty_name();
 	find_lib_file(bootstrap_fname);
 
-	// delay loading the default profile until after options are parsed
-	//if (!profile) load_profile(DEFAULT_PROFILE);
 	if (x) { show_config(); return 0; }
 
 	dbg(0,    "Serial Device: %s\n",client_tty_name);
@@ -2880,7 +2881,6 @@ int main(int argc, char** argv) {
 	if (bootstrap_fname[0]) return (bootstrap(bootstrap_fname));
 
 	// further setup that's only needed for tpdd
-	if (check_disk_image()) return 1; // this may set model=1 or 2 based on disk image size or name
 	if (model==2) { load_rom(TPDD2_ROM); dme_en=false; }
 	if (dme_en && base_len && base_len<=6) memcpy(dme_cwd,dme_root_label,base_len);
 	cfnl = base_len + 1 + ext_len; // client filename length
