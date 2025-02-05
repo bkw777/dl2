@@ -1,0 +1,13 @@
+Package: dl2
+Version: 2.2.003-1.1
+Architecture: amd64
+Maintainer: bkw
+Installed-Size: 1347
+Depends: libc6 (>= 2.34)
+Section: contrib/otherosfs
+Priority: optional
+Homepage: https://github.com/bkw777/dl2
+Description: DeskLink2 is a Tandy Portable Disk Drive emulator
+ dl2 emulates the TPDD1 (Brother FB100) and TPDD2 floppy
+ disk drives. A wide variety of quality of life features are
+ included for bootstrapping and operation.

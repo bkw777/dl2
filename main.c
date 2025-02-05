@@ -705,16 +705,17 @@ void cd_share_path () {
 	update_cwd();
 }
 
-// maybe rewrite f[] with /path/to/f
+// find file f either directly or in app_lib_dir
+// maybe rewrite f with /path/to/f
 void find_lib_file (char* f) {
-	if (f[0]==0x00) return;
+	if (f[0]==0) return;
 
-	char t[PATH_MAX+1]={0x00};
+	char t[PATH_MAX+1]={0};
 
 	// rewrite ~/foo to $HOME/foo
 	if (f[0]=='~' && f[1]=='/') {
 		strcpy(t,f);
-		memset(f,0x00,PATH_MAX);
+		memset(f,0,PATH_MAX);
 		strcpy(f,getenv("HOME"));
 		strcat(f,t+1);
 	}
@@ -725,31 +726,36 @@ void find_lib_file (char* f) {
 	if (!access(f,F_OK)) return; // if pathless filename exists & accessible, use it as-is
 
 	// none of above matched, look in app_lib_dir
-	memset(t,0x00,PATH_MAX);
+	memset(t,0,PATH_MAX);
 	strcpy(t,app_lib_dir);
 	strcat(t,"/");
 	strcat(t,f);
 	// if found in app_lib_dir then rewrite with that path
 	if (!access(t,F_OK)) {
-		memset(f,0x00,PATH_MAX);
+		memset(f,0,PATH_MAX);
 		strcpy(f,t);
 	}
-	// else leave f[] as it was, some consumers create the file if not exist
+
+	// else leave f[] as it was
+	//no error as some consumers create the file if not exist
 
 }
 
+// find file f either directly or in app_lib_dir
+// examine for tpdd1 vs tpdd2
+// set disk_img_fname
 int set_disk_img_fname (char* f) {
 
 	if (ckhelp(f)) show_diskimage_help(0);
 
 	dbg(3,"looking for disk image \"%s\"\n",f);
 
-	char t[PATH_MAX+1]={0x00};
-	strcpy(t,f);
+	char t[PATH_MAX+1]={0};
+	strncpy(t,f,PATH_MAX);
 
 	find_lib_file(t);
 
-	// f has now possibly been re-written with the path to a bundled file,
+	// t has now possibly been re-written with the path to a bundled file,
 	// or not, and still may or may not exist
 	struct stat info;
 	if (!stat(t, &info) && info.st_size>0) {
@@ -759,6 +765,8 @@ int set_disk_img_fname (char* f) {
 		// use file size to automatically set model 1 vs 2 or reject file
 		if (info.st_size==PDD1_IMG_LEN) model = 1;
 		if (info.st_size==PDD2_IMG_LEN) model = 2;
+
+		// user may have explicitly used -m 1 or -m 2
 		if (model==1 && info.st_size != PDD1_IMG_LEN) {
 			dbg(0,"%d bytes, expected %u bytes for TPDD1\n",info.st_size,PDD1_IMG_LEN);
 			return 1;
@@ -767,13 +775,17 @@ int set_disk_img_fname (char* f) {
 			dbg(0,"%d bytes, expected %u bytes for TPDD2\n",info.st_size,PDD2_IMG_LEN);
 			return 1;
 		}
+
 	} else {
-		// if file doesn't exist or is 0 bytes
+		// if file doesn't exist or is 0 bytes, create it
+
 		dbg(1,"Disk image file \"%s\" is empty or does not exist.\nIt will be created if the client issues a format command.\n",t);
 
 		// use file name to automatically set model 1 vs 2
+		// overrides -m if -i came after -m
+		// ext = dot pddN null
 		char ext[6] = {0};
-		strncpy(ext,t+strlen(f)-5,5);
+		strcpy(ext,t+strlen(t)-5);
 		if (!strcasecmp(ext,DEFAULT_TPDD1_IMG_SUFFIX)) model = 1;
 		else if (!strcasecmp(ext,DEFAULT_TPDD2_IMG_SUFFIX)) model = 2;
 	}

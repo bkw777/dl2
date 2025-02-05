@@ -1,0 +1,5 @@
+dl2 (2.2.003-1) UNRELEASED; urgency=medium
+
+  * Add Debian package support
+
+ -- Joshua O'Keefe <majick@nachomountain.com>  Thu, 13 Feb 2025 08:39:51 -0800

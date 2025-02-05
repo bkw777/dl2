@@ -1,0 +1,37 @@
+Description: Patch Makefile for Debian install
+ .
+ dl2 (2.2.003-1) UNRELEASED; urgency=medium
+ .
+   * Non-maintainer upload.
+   * Patch Makefile for Debian install
+Author: Joshua O'Keefe <majick@nachomountain.com>
+
+---
+The information above should follow the Patch Tagging Guidelines, please
+checkout https://dep.debian.net/deps/dep3/ to learn about the format. Here
+are templates for supplementary fields that you might want to add:
+
+Origin: (upstream|backport|vendor|other), (<patch-url>|commit:<commit-id>)
+Bug: <upstream-bugtracker-url>
+Bug-Debian: https://bugs.debian.org/<bugnumber>
+Bug-Ubuntu: https://launchpad.net/bugs/<bugnumber>
+Forwarded: (no|not-needed|<patch-forwarded-url>)
+Applied-Upstream: <version>, (<commit-url>|commit:<commid-id>)
+Reviewed-By: <name and email of someone who approved/reviewed the patch>
+Last-Update: 2025-02-13
+
+--- dl2-2.2.003.orig/Makefile
++++ dl2-2.2.003/Makefile
+@@ -2,9 +2,10 @@
+ 
+ OS ?= $(shell uname)
+ CC ?= gcc
+-CFLAGS +=
++CFLAGS += -O2 -Wall
+ #CFLAGS += -std=c99 -D_DEFAULT_SOURCE    # prove the code is still plain c
+-PREFIX ?= /usr/local
++DESTDIR ?= /usr/local
++PREFIX ?= $(DESTDIR)
+ NAME := dl
+ APP_NAME := DeskLink2
+ APP_LIB_DIR := $(PREFIX)/lib/$(NAME)
