@@ -738,7 +738,7 @@ void find_lib_file (char* f) {
 
 }
 
-int set_disk_image (char* f) {
+int set_disk_img_fname (char* f) {
 
 	if (ckhelp(f)) show_diskimage_help(0);
 
@@ -2826,7 +2826,7 @@ int main(int argc, char** argv) {
 			case 'g': getty_mode = true; debug = 0;               break;
 #endif
 			case 'h': show_main_help(); exit(0);                  break;
-			case 'i': set_disk_image(optarg);                     break;
+			case 'i': set_disk_img_fname(optarg);                 break;
 			case 'l': show_bootstrap_help(0);                     break; // back compat, short for -b help / -i help
 			case 'm': model = atoi(optarg);                       break;
 			case 'n': dme_en = false;                             break; // back compat, short for -e false
