@@ -1,0 +1,22 @@
+Source: dl2
+Section: contrib/otherosfs
+Priority: optional
+Maintainer: bkw
+Rules-Requires-Root: no
+Build-Depends:
+ debhelper-compat (= 13),
+Standards-Version: 4.6.2
+Homepage: https://github.com/bkw777/dl2
+#Vcs-Browser: https://salsa.debian.org/debian/dl2
+#Vcs-Git: https://salsa.debian.org/debian/dl2.git
+
+Package: dl2
+Architecture: any
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+Description: DeskLink2 is a Tandy Portable Disk Drive emulator
+ dl2 emulates the TPDD1 (Brother FB100) and TPDD2 floppy
+ disk drives. A wide variety of quality of life features are
+ included for bootstrapping and operation.
+
