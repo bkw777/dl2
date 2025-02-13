@@ -1,19 +1,21 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Source: <url://example.com>
+Source: https://github.com/bkw777/dl2/
 Upstream-Name: dl2
-Upstream-Contact: <preferred name and address to reach the upstream project>
+Upstream-Contact: bkw
 
 Files:
  *
 Copyright:
- <years> <put author's name and email here>
- <years> <likewise for another author>
+ 2004 Stephen Hurd
+ 2005 John R. Hogerhuis
+ 2019 Brian K. White
+ 2023 Brian K. White (DeskLink2)
 License: GPL-2.0+
 
 Files:
  debian/*
 Copyright:
- 2025 Joshua O'Keefe <majick@nachomountain.com>
+ 2025 Brian K. White
 License: GPL-2.0+
 
 License: GPL-2.0+
