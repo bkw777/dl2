@@ -1,0 +1,19 @@
+Some good TPDD info from Joel Dinda in 1997
+https://dillernet.com/m100/docs/pdd2-sector-0.html
+
+It's not complete or all correct but it has a few things that aren't elsewhere:
+
+* The sectors-in-use counter at Sector 0 Byte 1260 does not include the directory sector.
+  [BKW: Is this true? There is something funny about that field, maybe this is it.]
+
+* My Tandy Utilities disk has CHR$(255) at byte 1280 in Sector 0.
+  Note that this means EOF in any other sector, wonder if it means something similar here.
+  No copy I've made of the disk has that.
+  The Powr-DOS source disk has what appears to be a machine language routine beginning at the same location.
+  Naturally it doesn't copy either.
+  No other disk in my collection has ANYTHING beyond 1260 in that sector.
+
+* The directory is stored in alpha order and has no intermediate blank entries.
+  Deleting or adding a file moves everything around.
+  It appears that the TDD's built-in software cares what order the directory's in, as it stops reading the directory when it finds an out-of-order filename.
+
