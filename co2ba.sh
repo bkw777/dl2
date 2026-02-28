@@ -10,7 +10,7 @@ ACTION=${1^^} ;shift
 CO=${CO_IN##*/} ;CO=${CO:0:6} ;CO="${CO%%.*}.CO"
 
 typeset -ra h=({a..p})  # hex data output alphabet
-typeset -i i t b c SUM TOP END EXE LEN LINE=0
+typeset -i i c SUM TOP END EXE LEN LINE=0
 typeset -a d=()
 
 abrt () { printf '%s: Usage\n%s IN.CO [call|exec|savem|bsave] > OUT.DO\n%s\n' "$0" "${0##*/}" "$@" >&2 ;exit 1 ; }
