@@ -2,14 +2,15 @@
 # Read a .CO file and generate a BASIC loader
 # Brian K. White <b.kenyon.w@gmail.com>
 
-: ${BYTES_PER_DATA_LINE:=120}
+BYTES_PER_DATA_LINE=120
 
 CO_IN=$1 ;shift
 ACTION=${1^^} ;shift
 
 CO=${CO_IN##*/} ;CO=${CO:0:6} ;CO="${CO%%.*}.CO"
 
-typeset -i i b c SUM TOP END EXE LEN LN
+typeset -ra h=({a..p})  # hex data output alphabet
+typeset -i i c SUM TOP END EXE LEN LINE=0
 typeset -a d=()
 
 abrt () { printf '%s: Usage\n%s IN.CO [call|exec|savem|bsave] > OUT.DO\n%s\n' "$0" "${0##*/}" "$@" >&2 ;exit 1 ; }
@@ -38,38 +39,23 @@ d=(${d[*]:6})
 ((END=TOP+LEN-1))
 SUM= ;for ((i=0;i<LEN;i++)) { ((SUM+=${d[i]})) ; }
 
-# loader
+# BASIC loader
 printf '0%c%s - loader: co2ba.sh b.kenyon.w@gmail.com %(%F)T\r' "'" "$CO" -1
-printf '0CLEAR2,%u:READN$,T,L,X,S:E=T+L-1:A=T:C%%=0:K=0:CLS:PRINT"Installing "N$" ..";\r' $TOP
-printf '1PRINT".";:READD$:D%%=LEN(D$):FORI%%=1TOD%%:B$=MID$(D$,I%%,1):IFB$="!"THENC%%=1:GOTO3\r'
-printf '2B%%=ASC(B$)-64*C%%:POKEA,B%%:C%%=0:A=A+1:K=K+B%%\r'
-printf '3NEXTI%%:IFA<=ETHEN1\r'
-printf '4PRINT:IFK<>STHENPRINT"BAD CHECKSUM":END\r'
-LN=4
+printf '0CLEAR0,%u:A=%u:S=0:N$="%s":CLS:?"Installing "N$" ..";\r' $TOP $TOP "$CO"
+printf '%uD$="":READD$:FORI=1TOLEN(D$)STEP2:B=(ASC(MID$(D$,I,1))-%u)*16+ASC(MID$(D$,I+1,1))-%u:POKEA,B:A=A+1:S=S+B:NEXT:?".";:IFA<%uTHEN%u\r' $((++LINE)) "'${h[0]}" "'${h[0]}" $((END+1)) $LINE
+printf '%uIFS<>%uTHEN?"Bad Checksum":END\r' $((++LINE)) $SUM
 
-# action
+# action after loading
 case "$ACTION" in
-	CALL|EXEC) printf '%u%sX\r' $((++LN)) $ACTION ;;
-	SAVEM|BSAVE) printf '%uPRINT"Done. Please type: NEW":%sN$,T,E,X\r' $((++LN)) $ACTION ;;
-	*) printf '%uR$=CHR$(13):PRINT"top",T,R$"end",E,R$"exe",X,R$"Please type: NEW"\r' $((++LN)) ;;
+	CALL|EXEC) printf '%u%s%u\r' $((++LINE)) $ACTION $EXE ;;
+	SAVEM|BSAVE) printf '%u?:?"Done. Please type: NEW":%sN$,%u,%u,%u\r' $((++LINE)) $ACTION $TOP $END $EXE ;;
+	*) printf '%uCLS:?"Loaded:":?"top %u":?"end %u":?"exe %u":?"Please type: NEW"\r' $((++LINE)) $TOP $END $EXE ;;
 esac
 
-# header
-printf '%uDATA"%s",%u,%u,%u,%u\r' $((++LN)) "$CO" $TOP $LEN $EXE $SUM
-
-# data
-c=0 ;for ((i=0;i<LEN;i++)) {
-	((c++)) || printf '%uDATA"' $((++LN))
-
-	b=${d[i]}
-	((b>34||b==32||b==9)) && {
-		printf -v o '%03o' $b
-		printf '%b' \\$o
-	} || {
-		printf -v o '%03o' $((b+64))
-		printf '!%b' \\$o
-	}
-
-	((c<BYTES_PER_DATA_LINE)) || { c=0 ;printf '"\r' ; }
+# DATA lines
+c= ;for ((i=0;i<LEN;i++)) {
+	((c++)) || printf '%uDATA' $((++LINE))
+	printf '%c%c' ${h[${d[i]}/16]} ${h[${d[i]}%16]}
+	((c<BYTES_PER_DATA_LINE)) || { c=0 ;printf '\r' ; }
 }
-((c)) && printf '"\r'
+((c)) && printf '\r'
