@@ -3,22 +3,17 @@
 # Brian K. White <b.kenyon.w@gmail.com>
 
 LANG=C
-set +H
-shopt -u extglob extquote globstar nullglob
 
-: ${BYTES_PER_DATA:=120}
+: ${LINE_LEN:=256}
 : ${SHIFT:=64}
-: ${SIGIL:=!}
-# sigil:
-# FAIL: @ ^ \ _
-# WORK: ~ ! # $ % & * ` - + = / ? , . | : ;
+: ${SIGIL:='!'}    # any of these work: ~!#$%&*`-+=/?,.|:;'  THESE FAIL: @^\_
 
 CO_IN=$1 ;shift
 ACTION=${1^^} ;shift
 
 CO=${CO_IN##*/} ;CO=${CO:0:6} ;CO="${CO%%.*}.CO"
 
-typeset -i i b c e SUM TOP END EXE LEN LN
+typeset -i i b e SUM TOP END EXE LEN LN
 typeset -a d=()
 
 abrt () { printf '%s: Usage\n%s IN.CO [call|exec|savem|bsave] > OUT.DO\n%s\n' "$0" "${0##*/}" "$@" >&2 ;exit 1 ; }
@@ -68,19 +63,26 @@ printf '%uDATA%u,%u,%u,%u,"%s",%u,"%c"\r' $((++LN)) $TOP $LEN $EXE $SUM "$CO" $S
 
 # data
 printf -v e '%u' "'${SIGIL}"
-c=0 ;for ((i=0;i<LEN;i++)) {
-	((c++)) || printf '%uDATA"' $((++LN))
+O= o=
+for ((i=0;i<LEN;i++)) {
+
+	((${#O})) || printf -v O '%uDATA"%s' $((++LN)) "$o"
 
 	b=${d[i]}
-
 	(( ( b<32 && b!=9 ) || b==34 || b==e )) && {
 		printf -v o '%03o' $((b+SHIFT))
-		printf '%c%b' "${SIGIL}" "\\$o"
+		printf -v o '%c%b' "${SIGIL}" "\\$o"
 	} || {
 		printf -v o '%03o' $b
-		printf '%b' "\\$o"
+		printf -v o '%b' "\\$o"
 	}
 
-	((c<BYTES_PER_DATA)) || { c=0 ;printf '"\r' ; }
+	((${#O}+${#o}<LINE_LEN)) && {
+		O+=$o
+		o=
+	} || {
+		printf '%s"\r' "$O"
+		O=
+	}
 }
-((c)) && printf '"\r'
+((${#O})) && printf '%s"\r' "$O"
