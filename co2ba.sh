@@ -2,14 +2,23 @@
 # Read a .CO file and generate a BASIC loader
 # Brian K. White <b.kenyon.w@gmail.com>
 
-: ${BYTES_PER_DATA_LINE:=120}
+LANG=C
+set +H
+shopt -u extglob extquote globstar nullglob
+
+: ${BYTES_PER_DATA:=120}
+: ${SHIFT:=64}
+: ${SIGIL:=!}
+# sigil:
+# FAIL: @ ^ \ _
+# WORK: ~ ! # $ % & * ` - + = / ? , . | : ;
 
 CO_IN=$1 ;shift
 ACTION=${1^^} ;shift
 
 CO=${CO_IN##*/} ;CO=${CO:0:6} ;CO="${CO%%.*}.CO"
 
-typeset -i i b c SUM TOP END EXE LEN LN
+typeset -i i b c e SUM TOP END EXE LEN LN
 typeset -a d=()
 
 abrt () { printf '%s: Usage\n%s IN.CO [call|exec|savem|bsave] > OUT.DO\n%s\n' "$0" "${0##*/}" "$@" >&2 ;exit 1 ; }
@@ -40,9 +49,9 @@ SUM= ;for ((i=0;i<LEN;i++)) { ((SUM+=${d[i]})) ; }
 
 # loader
 printf '0%c%s - loader: co2ba.sh b.kenyon.w@gmail.com %(%F)T\r' "'" "$CO" -1
-printf '0CLEAR2,%u:READN$,T,L,X,S:E=T+L-1:A=T:C%%=0:K=0:CLS:PRINT"Installing "N$" ..";\r' $TOP
-printf '1PRINT".";:READD$:D%%=LEN(D$):FORI%%=1TOD%%:B$=MID$(D$,I%%,1):IFB$="!"THENC%%=1:GOTO3\r'
-printf '2B%%=ASC(B$)-64*C%%:POKEA,B%%:C%%=0:A=A+1:K=K+B%%\r'
+printf '0CLEAR0:READT:CLEAR2,T:READT,L,X,S,N$,O%%,M$:E=T+L-1:A=T:K=0:C%%=0:CLS:PRINT"Installing "N$" ..";\r'
+printf '1PRINT".";:READD$:D%%=LEN(D$):FORI%%=1TOD%%:B$=MID$(D$,I%%,1):IFB$=M$THENC%%=1:GOTO3\r'
+printf '2B%%=ASC(B$)-O%%*C%%:POKEA,B%%:C%%=0:A=A+1:K=K+B%%\r'
 printf '3NEXTI%%:IFA<=ETHEN1\r'
 printf '4PRINT:IFK<>STHENPRINT"BAD CHECKSUM":END\r'
 LN=4
@@ -55,21 +64,23 @@ case "$ACTION" in
 esac
 
 # header
-printf '%uDATA"%s",%u,%u,%u,%u\r' $((++LN)) "$CO" $TOP $LEN $EXE $SUM
+printf '%uDATA%u,%u,%u,%u,"%s",%u,"%c"\r' $((++LN)) $TOP $LEN $EXE $SUM "$CO" $SHIFT "${SIGIL}"
 
 # data
+printf -v e '%u' "'${SIGIL}"
 c=0 ;for ((i=0;i<LEN;i++)) {
 	((c++)) || printf '%uDATA"' $((++LN))
 
 	b=${d[i]}
-	((b>34||b==32||b==9)) && {
-		printf -v o '%03o' $b
-		printf '%b' \\$o
+
+	(( ( b<32 && b!=9 ) || b==34 || b==e )) && {
+		printf -v o '%03o' $((b+SHIFT))
+		printf '%c%b' "${SIGIL}" "\\$o"
 	} || {
-		printf -v o '%03o' $((b+64))
-		printf '!%b' \\$o
+		printf -v o '%03o' $b
+		printf '%b' "\\$o"
 	}
 
-	((c<BYTES_PER_DATA_LINE)) || { c=0 ;printf '"\r' ; }
+	((c<BYTES_PER_DATA)) || { c=0 ;printf '"\r' ; }
 }
 ((c)) && printf '"\r'
