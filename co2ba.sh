@@ -69,6 +69,7 @@ for ((i=0;i<LEN;i++)) {
 	((${#O})) || printf -v O '%uDATA"%s' $((++n*g)) "$o"
 
 	b=${d[i]}
+
 	(( ( b<32 && b!=9 ) || b==34 || b==e )) && {
 		printf -v o '%03o' $((b+SHIFT))
 		printf -v o '%c%b' "${SIGIL}" "\\$o"
