@@ -4,6 +4,7 @@
 
 LANG=C
 
+: ${LINE_GAP:=1}
 : ${LINE_LEN:=256}
 : ${SHIFT:=64}
 : ${SIGIL:='!'}    # any of these work: ~!#$%&*`-+=/?,.|:;'  THESE FAIL: @^\_
@@ -13,7 +14,7 @@ ACTION=${1^^} ;shift
 
 CO=${CO_IN##*/} ;CO=${CO:0:6} ;CO="${CO%%.*}.CO"
 
-typeset -i i b e SUM TOP END EXE LEN LN
+typeset -i i b e SUM TOP END EXE LEN n p g=${LINE_GAP}
 typeset -a d=()
 
 abrt () { printf '%s: Usage\n%s IN.CO [call|exec|savem|bsave] > OUT.DO\n%s\n' "$0" "${0##*/}" "$@" >&2 ;exit 1 ; }
@@ -44,29 +45,27 @@ SUM= ;for ((i=0;i<LEN;i++)) { ((SUM+=${d[i]})) ; }
 
 # loader
 printf '0%c%s - loader: co2ba.sh b.kenyon.w@gmail.com %(%F)T\r' "'" "$CO" -1
-printf '0CLEAR0:READT:CLEAR2,T:READT,L,X,S,N$,O%%,M$:E=T+L-1:A=T:K=0:C%%=0:CLS:PRINT"Installing "N$" ..";\r'
-printf '1PRINT".";:READD$:D%%=LEN(D$):FORI%%=1TOD%%:B$=MID$(D$,I%%,1):IFB$=M$THENC%%=1:GOTO3\r'
-printf '2B%%=ASC(B$)-O%%*C%%:POKEA,B%%:C%%=0:A=A+1:K=K+B%%\r'
-printf '3NEXTI%%:IFA<=ETHEN1\r'
-printf '4PRINT:IFK<>STHENPRINT"BAD CHECKSUM":END\r'
-LN=4
+printf '0CLEAR0:READT:CLEAR2,T:DEFINTI,O,C,V,L,W:DEFSNGA,K,S,T,X,E:DEFSTRB,M,D,N:READT,L,X,K,N,O,M:E=T+L-1:A=T:S=0:C=0:B=" ":W=0:CLS:PRINT"Installing "N\r'
+printf '%uPRINT@20,CINT((L-(E-A))/L*100)"%%":READD:W=LEN(D):FORI=1TOW:B=MID$(D,I,1):IFB=MTHENC=O:NEXT\r' $((++n*g)) ;((p=n*g))
+printf '%uV=ASC(B)-C:POKEA,V:C=0:A=A+1:S=S+V:NEXT:IFA<=ETHEN%u\r' $((++n*g)) $p
+printf '%uPRINT:IFS<>KTHENPRINT"Bad Checksum":END\r' $((++n*g))
 
 # action
 case "$ACTION" in
-	CALL|EXEC) printf '%u%sX\r' $((++LN)) $ACTION ;;
-	SAVEM|BSAVE) printf '%uPRINT"Done. Please type: NEW":%sN$,T,E,X\r' $((++LN)) $ACTION ;;
-	*) printf '%uR$=CHR$(13):PRINT"top",T,R$"end",E,R$"exe",X,R$"Please type: NEW"\r' $((++LN)) ;;
+	CALL|EXEC) printf '%u%sX\r' $((++n*g)) $ACTION ;;
+	SAVEM|BSAVE) printf '%uPRINT"Done. Please type: NEW":%sN,T,E,X:NEW\r' $((++n*g)) $ACTION ;;
+	*) printf '%uPRINT"top "T:PRINT"end "E:PRINT"exe "X\r' $((++n*g)) ;;
 esac
 
 # header
-printf '%uDATA%u,%u,%u,%u,"%s",%u,"%c"\r' $((++LN)) $TOP $LEN $EXE $SUM "$CO" $SHIFT "${SIGIL}"
+printf '%uDATA%u,%u,%u,%u,"%s",%u,"%c"\r' $((++n*g)) $TOP $LEN $EXE $SUM "$CO" $SHIFT "${SIGIL}"
 
 # data
 printf -v e '%u' "'${SIGIL}"
 O= o=
 for ((i=0;i<LEN;i++)) {
 
-	((${#O})) || printf -v O '%uDATA"%s' $((++LN)) "$o"
+	((${#O})) || printf -v O '%uDATA"%s' $((++n*g)) "$o"
 
 	b=${d[i]}
 	(( ( b<32 && b!=9 ) || b==34 || b==e )) && {
@@ -81,8 +80,8 @@ for ((i=0;i<LEN;i++)) {
 		O+=$o
 		o=
 	} || {
-		printf '%s"\r' "$O"
+		printf '%s\r' "$O"
 		O=
 	}
 }
-((${#O})) && printf '%s"\r' "$O"
+((${#O})) && printf '%s\r' "$O"
