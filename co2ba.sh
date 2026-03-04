@@ -47,7 +47,7 @@ SUM= ;for ((i=0;i<LEN;i++)) { ((SUM+=${d[i]})) ; }
 # loader
 n=$FIRST g=${LINE_GAP}
 printf '%u%c%s - loader: co2ba.sh b.kenyon.w@gmail.com %(%F)T\r' $n "'" "$CO" -1
-printf '%uCLEAR0:READT:CLEAR2,T:DEFINTI,O,C,V,L:DEFSNGA,K,S,T,X,E:DEFSTRB,M,D,N:READT,L,X,K,N,O,M:E=T+L-1:A=T:S=0:C=0:B=" ":CLS:PRINT"Installing "N\r' $n
+printf '%uREADT:CLEAR2,T:DEFINTI,O,C,V,L:DEFSNGA,K,S,T,X,E:DEFSTRB,M,D,N:READT,L,X,K,N,O,M:E=T+L-1:A=T:S=0:C=0:CLS:PRINT"Installing "N\r' $n
 printf '%uPRINT@20,CINT((L-(E-A))/L*100)"%%":READD:FORI=1TOLEN(D):B=MID$(D,I,1):IFB=MTHENC=O:NEXT\r' $((++n*g)) ;((p=n*g))
 printf '%uV=ASC(B)-C:POKEA,V:C=0:A=A+1:S=S+V:NEXT:IFA<=ETHEN%u\r' $((++n*g)) $p
 printf '%uPRINT:IFS<>KTHENPRINT"Bad Checksum":END\r' $((++n*g))
