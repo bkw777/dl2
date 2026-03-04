@@ -55,7 +55,7 @@ printf '%uPRINT:IFS<>KTHENPRINT"Bad Checksum":END\r' $((++n*g))
 # action
 case "$ACTION" in
 	CALL|EXEC) printf '%u%sX\r' $((++n*g)) $ACTION ;;
-	SAVEM|BSAVE) printf '%uPRINT"Done. Please type: NEW":%sN,T,E,X:NEW\r' $((++n*g)) $ACTION ;;
+	SAVEM|BSAVE) printf '%uPRINT"Done. Please type: NEW":%sN,T,E,X\r' $((++n*g)) $ACTION ;;
 	*) printf '%uPRINT"top "T:PRINT"end "E:PRINT"exe "X\r' $((++n*g)) ;;
 esac
 
