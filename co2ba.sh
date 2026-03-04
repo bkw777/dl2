@@ -4,17 +4,18 @@
 
 LANG=C
 
+: ${FIRST:=0}
 : ${LINE_GAP:=1}
 : ${LINE_LEN:=256}
 : ${SHIFT:=64}
-: ${SIGIL:='!'}    # any of these work: ~!#$%&*`-+=/?,.|:;'  THESE FAIL: @^\_
+: ${SIGIL:='!'}    # any of these work: ~!#$%&*`-+=/?,.|:;'<>  THESE FAIL: @^\_
 
 CO_IN=$1 ;shift
 ACTION=${1^^} ;shift
 
 CO=${CO_IN##*/} ;CO=${CO:0:6} ;CO="${CO%%.*}.CO"
 
-typeset -i i b e SUM TOP END EXE LEN n p g=${LINE_GAP}
+typeset -i i b e SUM TOP END EXE LEN n p g
 typeset -a d=()
 
 abrt () { printf '%s: Usage\n%s IN.CO [call|exec|savem|bsave] > OUT.DO\n%s\n' "$0" "${0##*/}" "$@" >&2 ;exit 1 ; }
@@ -44,8 +45,9 @@ d=(${d[*]:6})
 SUM= ;for ((i=0;i<LEN;i++)) { ((SUM+=${d[i]})) ; }
 
 # loader
-printf '0%c%s - loader: co2ba.sh b.kenyon.w@gmail.com %(%F)T\r' "'" "$CO" -1
-printf '0CLEAR0:READT:CLEAR2,T:DEFINTI,O,C,V,L,W:DEFSNGA,K,S,T,X,E:DEFSTRB,M,D,N:READT,L,X,K,N,O,M:E=T+L-1:A=T:S=0:C=0:B=" ":W=0:CLS:PRINT"Installing "N\r'
+n=$FIRST g=${LINE_GAP}
+printf '%u%c%s - loader: co2ba.sh b.kenyon.w@gmail.com %(%F)T\r' $n "'" "$CO" -1
+printf '%uCLEAR0:READT:CLEAR2,T:DEFINTI,O,C,V,L,W:DEFSNGA,K,S,T,X,E:DEFSTRB,M,D,N:READT,L,X,K,N,O,M:E=T+L-1:A=T:S=0:C=0:B=" ":W=0:CLS:PRINT"Installing "N\r' $n
 printf '%uPRINT@20,CINT((L-(E-A))/L*100)"%%":READD:W=LEN(D):FORI=1TOW:B=MID$(D,I,1):IFB=MTHENC=O:NEXT\r' $((++n*g)) ;((p=n*g))
 printf '%uV=ASC(B)-C:POKEA,V:C=0:A=A+1:S=S+V:NEXT:IFA<=ETHEN%u\r' $((++n*g)) $p
 printf '%uPRINT:IFS<>KTHENPRINT"Bad Checksum":END\r' $((++n*g))
