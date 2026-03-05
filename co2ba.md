@@ -1,5 +1,6 @@
 # co2ba.sh
 
+![co2ba.sh](co2ba.sh)  
 Reads a binary .CO file and generates an ascii BASIC loader .DO file
 
 ## Usage
