@@ -8,7 +8,7 @@ LANG=C
 : ${LINE_GAP:=1}
 : ${LINE_LEN:=256}
 
-# SIGIL, SIGIL+SHIFT, and any UNSAFE+SHIFT must not equal any UNSAFE nor SIGIL itself nor exceed 255.
+# SIGIL, SIGIL+SHIFT, and any UNSAFE+SHIFT must not equal any UNSAFE nor exceed 255.
 : ${SHIFT:=64}
 : ${SIGIL:='!'}
 : ${UNSAFE:=0 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 34}
