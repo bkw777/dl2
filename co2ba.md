@@ -9,10 +9,12 @@ Reads a binary .CO file and generates an ascii BASIC loader .DO file
 **FILE.CO** is the input binary .CO filename that you want to bootstrap onto the portable.
 
 **action** is what the loader should do with the .CO after it's done re-creating it on the portable:  
- call  - Immediately execute - for TANDY, Kyotronic, Olivetti  
- exec  - Immediately execute - for NEC  
- savem - Save FILE.CO - for TANDY, Kyotronic, Olivetti  
- bsave - Save FILE.CO - for NEC  
+ call   - Immediately execute - for TANDY, Kyotronic, Olivetti  
+ exec   - Immediately execute - for NEC  
+ callba - Create a launcher NAME.BA - for TANDY, Kyotronic, Olivetti  
+ execba - Create a launcher NAME.BA - for NEC  
+ savem  - Save NAME.CO - for TANDY, Kyotronic, Olivetti  
+ bsave  - Save NAME.CO - for NEC  
  Otherwise if the option is not given, or any other value than these, the loader will only print a message showing the Top, End, and Exec addresses of the loaded binary.  
 
 <!--

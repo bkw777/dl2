@@ -13,14 +13,13 @@ LANG=C
 : ${SIGIL:='!'}
 : ${UNSAFE:=0 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 34}
 
-CO_IN=$1 ;shift
+COFN=$1 ;shift
 ACTION=${1^^} ;shift
-
-CO=${CO_IN##*/} ;CO=${CO:0:6} ;CO="${CO%%.*}.CO"
 
 typeset -i i b e SUM TOP END EXE LEN n g
 typeset -ia d=()
 
+PN=${COFN##*/} ;PN=${PN:0:6} ;PN=${PN%%.*}
 printf -v e '%u' "'${SIGIL}"
 readonly e g=$LINE_GAP u=",${UNSAFE// /,},$e,"
 n=$FIRST
@@ -37,7 +36,7 @@ ftoi () {
 ###############################################################################
 
 # help
-[[ "$CO_IN" ]] || abrt
+[[ "$COFN" ]] || abrt
 
 # sanity check SHIFT SIGIL UNSAFE
 b=0 ;for i in $UNSAFE $e ;do ((i>b)) && b=$i ;done
@@ -45,7 +44,7 @@ b=0 ;for i in $UNSAFE $e ;do ((i>b)) && b=$i ;done
 (((b+SHIFT)<256)) || abrt "Highest UNSAFE ($b) + SHIFT ($SHIFT) must not exceed 255"
 
 # read the .CO file into d[]
-ftoi "$CO_IN"
+ftoi "$COFN"
 
 # parse & discard the .CO header
 ((TOP=${d[0]}+${d[1]}*256))
@@ -61,20 +60,21 @@ SUM= ;for ((i=0;i<LEN;i++)) { ((SUM+=${d[i]})) ; }
 # Unsafe bytes, add a shift value, output sigil and shifted byte.
 
 # loader
-printf '%u%c%s - loader: co2ba.sh b.kenyon.w@gmail.com %(%F)T\r' $n "'" "$CO" -1
-printf '%uREADF:CLEAR2,F:DEFINTA-E:DEFSNGF-K:DEFSTRL-O:READF,A,J,G,N,E,M:C=0:I=F:H=F+A-1:K=0:D=0:CLS:PRINT"Installing "N\r' $n
-printf '%uPRINT@20,USING"###%%";(I-F)*100/A:READL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)-D:POKEI,B:D=0:I=I+1:K=K+B:NEXT:IFI<=HTHEN%u\r' $((++n*g)) $n
-printf '%uPRINT:IFK<>GTHENPRINT"Bad Checksum":ELSE' $((++n*g))
+printf '%u%c%s - loader: co2ba.sh b.kenyon.w@gmail.com %(%F)T\r' $n "'" "$PN" -1
+printf '%uREADF:CLEAR2,F:DEFINTA-E:DEFSNGF-K:DEFSTRL-O:READF,A,J,G,N,E,M:C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing "N\r' $n
+printf '%u?@18,USING"###%%";(I-F)*100/A:READL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)-D:POKEI,B:D=0:I=I+1:K=K+B:NEXT:IFI<=HTHEN%u\r' $((++n*g)) $n
+printf '%uIFK<>GTHEN?"Bad Checksum":ELSE?@18,"100%%":' $((++n*g))
 
 # action
 case "$ACTION" in
 	CALL|EXEC) printf '%sJ\r' $ACTION ;;
-	SAVEM|BSAVE) printf 'PRINT"Done. Please type: NEW":%sN,F,H,J\r' $ACTION ;;
-	*) printf 'PRINT"top "F:PRINT"end "H:PRINT"exe "J\r' ;;
+	SAVEM|BSAVE) printf '?"Please type: NEW":%sN,F,H,J\r' $ACTION ;;
+	CALLBA|EXECBA) printf 'M=CHR$(34):L="X.DO":OPENLFOROUTPUTAS1:?#1,"0CLEAR0,"F":%s"J:CLOSE1:?"Please type:":?"KILL"M""L:?"SAVE"M""N:LOADL\r' ${ACTION:0:4} ;;
+	*) printf '?"top "F:?"end "H:?"exe "J\r' ;;
 esac
 
 # header
-printf '%uDATA%u,%u,%u,%u,"%s",%u,"%c"\r' $((++n*g)) $TOP $LEN $EXE $SUM "$CO" $SHIFT "${SIGIL}"
+printf '%uDATA%u,%u,%u,%u,"%s",%u,"%c"\r' $((++n*g)) $TOP $LEN $EXE $SUM "$PN" $SHIFT "${SIGIL}"
 
 # data
 O= o=
