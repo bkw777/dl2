@@ -55,7 +55,7 @@ d=(${d[*]:6})
 ((END=TOP+LEN-1))
 SUM= ;for ((i=0;i<LEN;i++)) { ((SUM+=${d[i]})) ; }
 
-# Stephen Adolh encoding scheme:
+# Stephen Adolph encoding scheme:
 # Most bytes just copy input to output without change.
 # Unsafe bytes, add a shift value, output sigil and shifted byte.
 
