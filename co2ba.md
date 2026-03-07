@@ -33,8 +33,7 @@ Available options and their default values:
 FIRST=0        # first line number
 LINE_GAP=1     # line number increment
 LINE_LEN=256   # length of DATA lines
-SHIFT=64       # encoded byte value offset
-SIGIL='!'      # encoded byte prefix/marker,  these work: ~!#$%&*`-+=/?,.|:;'<>  THESE FAIL: @^\_
+BASAFE=false   # add 0xFF to unsafe list so that the BASIC can be saved as .BA
 ```
 
 ## Examples
@@ -46,4 +45,4 @@ Generate [RAM100.DO](https://github.com/bkw777/NODE_DATAPAC/tree/main/software/R
 `co2ba RAM100.CO savem >RAM100.DO`
 
 Generate [ALTERN.DO](https://github.com/LivingM100SIG/Living_M100SIG/blob/main/M100SIG/Lib-07-UTILITIES/ALTERN.100) to execute immediately, every option customized  
-`FIRST=50 LINE_GAP=5 LINE_LEN=74 SHIFT=128 SIGIL='+' co2ba ALTERN.CO call >ALTERN.DO`
+`FIRST=50 LINE_GAP=5 LINE_LEN=74 BASAFE=true co2ba ALTERN.CO call >ALTERN.DO`
