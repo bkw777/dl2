@@ -46,3 +46,6 @@ Generate [RAM100.DO](https://github.com/bkw777/NODE_DATAPAC/tree/main/software/R
 
 Generate [ALTERN.DO](https://github.com/LivingM100SIG/Living_M100SIG/blob/main/M100SIG/Lib-07-UTILITIES/ALTERN.100) to execute immediately, every option customized  
 `FIRST=50 LINE_GAP=5 LINE_LEN=74 BASAFE=true co2ba ALTERN.CO call >ALTERN.DO`
+
+## See also
+https://github.com/hackerb9/co2do/
