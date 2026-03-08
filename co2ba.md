@@ -34,17 +34,19 @@ FIRST=0        # first line number
 LINE_GAP=1     # line number increment
 LINE_LEN=256   # length of DATA lines
 BASAFE=false   # add 0xFF to unsafe list so that the BASIC can be saved as .BA
+METHOD=A       # which encoding scheme: A=ModifiedAdolph B=AwithoutIF H=hexpairs I=ints
 ```
+Methods A & B generate identical data, just different loader implementations.
 
 ## Examples
 <!--
 `co2ba TSLOAD.CO savem "TSLOAD for TANDY 200 - Travelling Software" >TSLOAD.200`
 -->
 
-Generate [RAM100.DO](https://github.com/bkw777/NODE_DATAPAC/tree/main/software/RAMDSK/RAM100) to SAVEM RAM100.CO, default options  
+[RAM100.DO](https://github.com/bkw777/NODE_DATAPAC/tree/main/software/RAMDSK/RAM100)
 `co2ba RAM100.CO savem >RAM100.DO`
 
-Generate [ALTERN.DO](https://github.com/LivingM100SIG/Living_M100SIG/blob/main/M100SIG/Lib-07-UTILITIES/ALTERN.100) to execute immediately, every option customized  
+[ALTERN.DO](https://github.com/LivingM100SIG/Living_M100SIG/blob/main/M100SIG/Lib-07-UTILITIES/ALTERN.100)
 `FIRST=50 LINE_GAP=5 LINE_LEN=74 BASAFE=true co2ba ALTERN.CO call >ALTERN.DO`
 
 ## See also

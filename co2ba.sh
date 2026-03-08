@@ -57,15 +57,24 @@ SUM= ;for ((i=0;i<LEN;i++)) { ((SUM+=${d[i]})) ; }
 # loader
 printf '%u%c%s - loader: co2ba.sh b.kenyon.w@gmail.com %(%F)T\r' $n "'" "$PN" -1
 case $METHOD in
-	A)
-	printf '%uREADF:CLEAR2,F:DEFINTA-E:DEFSNGF-K:DEFSTRL-O:READF,A,J,G,N:E=%u:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing "N"   0%%"\r' $n $c $Q
-	printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)XORD:POKEI,B:D=0:I=I+1:K=K+B:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $n
+	A) # Adolph/B9/White encoding
+		printf '%uREADF:CLEAR2,F:DEFINTA-E:DEFSNGF-K:DEFSTRL-O:READF,A,J,G,N:E=%u:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing "N"   0%%"\r' $n $c $Q
+		printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)XORD:POKEI,B:D=0:I=I+1:K=K+B:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $n
 	;;
-	B) # Avoids using IF in the inner loop, but actually runs slower.
-	printf '%uREADF:CLEAR2,F:DEFINTA-E,O-P:DEFSNGF-K:DEFSTRL-N:READF,A,J,G,N:E=%u:M="":C=0:I=F:H=F+A-1:K=0:D=0:O=%u:P=0:CLS:?"Installing "N"   0%%"\r' $n $c $q
-	printf '%uREADL:FORC=1TOLEN(L):B=ASC(MID$(L,C,1)):P=SGN(BXORO):B=BXORE*D:POKEI,B:I=I+P:K=K+B*P:D=PXOR1:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $n
+	B) # Same as A but avoids using IF in the inner loop, but actually runs slower
+		printf '%uREADF:CLEAR2,F:DEFINTA-E,O-P:DEFSNGF-K:DEFSTRL-N:READF,A,J,G,N:E=%u:M="":C=0:I=F:H=F+A-1:K=0:D=0:O=%u:P=0:CLS:?"Installing "N"   0%%"\r' $n $c $q
+		printf '%uREADL:FORC=1TOLEN(L):B=ASC(MID$(L,C,1)):P=SGN(BXORO):B=BXORE*D:POKEI,B:I=I+P:K=K+B*P:D=PXOR1:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $n
+	;;
+	H) # Classic quasi hex pairs
+		typeset -ra h=({a..p})  # hex data output alphabet
+		printf '%uREADF:CLEAR2,F:DEFINTA-E:DEFSNGF-K:DEFSTRL-N:READF,A,J,G,N:E=%u:M="":C=0:I=F:H=F+A-1:K=0:CLS:?"Installing "N"   0%%";\r' $n "'${h[0]}"
+		printf '%uREADL:FORC=1TOLEN(L)STEP2:B=(ASC(MID$(L,C,1))-E)*16+ASC(MID$(L,C+1,1))-E:POKEI,B:I=I+1:K=K+B:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $n
+	;;
+	I) # The simplest csv ints
+		printf '%uREADF:CLEAR2,F:DEFINTA-E:DEFSNGF-K:DEFSTRL-N:READF,A,J,G,N:H=F+A-1:K=0:CLS:?"Installing "N:FORI=FTOH:READB:POKEI,B:K=K+B:?".";:NEXT\r' $n
 	;;
 esac
+
 printf '%uIFK<>GTHEN?"Bad Checksum":ELSE' $((++n*g))
 
 # action
@@ -83,24 +92,43 @@ printf '%uDATA%u,%u,%u,%u,"%s"\r' $((++n*g)) $TOP $LEN $EXE $SUM "$PN"
 O= o=
 for ((i=0;i<LEN;i++)) {
 
-	((${#O})) || printf -v O '%uDATA"%s' $((++n*g)) "$o"
+	((${#O})) || {
+		O="$((++n*g))DATA" 
+		case $METHOD in
+			H|I) ;;
+			*) O+='"' ;;
+		esac
+		O+="$o"
+	}
 
 	b=${d[i]}
 
-	[[ $u = *,${b},* ]] && {
-		printf -v o '%03o' $((b^c))
-		printf -v o '%c%b' $Q "\\$o"
-	} || {
-		printf -v o '%03o' $b
-		printf -v o '%b' "\\$o"
-	}
+	case $METHOD in
+		I) o=$b, ;;
+		H) o=${h[b/16]}${h[b%16]} ;;
+		*)
+			[[ $u = *,${b},* ]] && {
+				printf -v o '%03o' $((b^c))
+				printf -v o '%c%b' $Q "\\$o"
+			} || {
+				printf -v o '%03o' $b
+				printf -v o '%b' "\\$o"
+			}
+			;;
+	esac
 
 	((${#O}+${#o}<LINE_LEN)) && {
 		O+=$o
 		o=
 	} || {
+		[[ "$METHOD" == "I" ]] && O=${O:0:-1}
 		printf '%s\r' "$O"
 		O=
 	}
+
 }
-((${#O})) && printf '%s\r' "$O"
+
+((${#O})) && {
+	[[ "$METHOD" == "I" ]] && O=${O:0:-1}
+	printf '%s\r' "$O"
+}
