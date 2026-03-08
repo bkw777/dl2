@@ -8,7 +8,7 @@ LANG=C
 : ${LINE_GAP:=1}
 : ${LINE_LEN:=256}
 : ${UNSAFE:=0 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 34}
-: ${BASAFE:=false}
+: ${EDITSAFE:=false}
 : ${METHOD:=A}
 Q="!"
 C=128
@@ -21,7 +21,7 @@ typeset -i i b SUM TOP END EXE LEN n g q c=$C
 typeset -ia d=()
 
 printf -v q '%u' "'$Q" ;UNSAFE+=" $q"
-$BASAFE && UNSAFE+=" 255"
+$EDITSAFE && UNSAFE+=" 127"
 readonly g=$LINE_GAP u=",${UNSAFE// /,}," Q q C c
 n=$FIRST
 
