@@ -10,19 +10,19 @@ LANG=C
 : ${UNSAFE:=0 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 34}
 : ${EDITSAFE:=false}
 : ${METHOD:=A}
-Q="!"
-C=128
+: ${ESC:=!}
+: ${XOR:=128}
 
 COFN=$1 ;shift
 ACTION=${1^^} ;shift
 PN=${COFN##*/} ;PN=${PN:0:6} ;PN=${PN%%.*}
 
-typeset -i i b SUM TOP END EXE LEN n g q c=$C
+typeset -i i b SUM TOP END EXE LEN n g q c=${XOR}
 typeset -ia d=()
 
-printf -v q '%u' "'$Q" ;UNSAFE+=" $q"
+printf -v q '%u' "'$ESC" ;UNSAFE+=" $q"
 $EDITSAFE && UNSAFE+=" 127"
-readonly g=$LINE_GAP u=",${UNSAFE// /,}," Q q C c
+readonly g=$LINE_GAP u=",${UNSAFE// /,}," ESC q c
 n=$FIRST
 
 abrt () { printf '%s: Usage\n%s IN.CO [call|exec|callba|execba|savem|bsave] > OUT.DO\n%s\n' "$0" "${0##*/}" "$@" >&2 ;exit 1 ; }
@@ -51,14 +51,11 @@ d=(${d[*]:6})
 ((END=TOP+LEN-1))
 SUM= ;for ((i=0;i<LEN;i++)) { ((SUM+=${d[i]})) ; }
 
-# Encoding scheme Stephen Adolph, HackerB9, BrianWhite
-# Most bytes copy input to output unchanged. Unsafe bytes output !+byte^128 .
-
 # loader
 printf '%u%c%s - loader: co2ba.sh b.kenyon.w@gmail.com %(%F)T\r' $n "'" "$PN" -1
 case $METHOD in
-	A) # Adolph/B9/White encoding
-		printf '%uREADF:CLEAR2,F:DEFINTA-E:DEFSNGF-K:DEFSTRL-O:READF,A,J,G,N:E=%u:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing "N"   0%%"\r' $n $c $Q
+	A) # Adolph/B9/White encoding - Safe bytes copy unchanged, unsafe write !+byte^128
+		printf '%uREADF:CLEAR2,F:DEFINTA-E:DEFSNGF-K:DEFSTRL-O:READF,A,J,G,N:E=%u:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing "N"   0%%"\r' $n $c $ESC
 		printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)XORD:POKEI,B:D=0:I=I+1:K=K+B:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $n
 	;;
 	B) # Same as A but avoids using IF in the inner loop, but actually runs slower
@@ -109,7 +106,7 @@ for ((i=0;i<LEN;i++)) {
 		*)
 			[[ $u = *,${b},* ]] && {
 				printf -v o '%03o' $((b^c))
-				printf -v o '%c%b' $Q "\\$o"
+				printf -v o '%c%b' $ESC "\\$o"
 			} || {
 				printf -v o '%03o' $b
 				printf -v o '%b' "\\$o"
