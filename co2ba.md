@@ -45,18 +45,18 @@ ROT=0          # transform all bytes before encoding: add this value, >255 wraps
 XROT=64        # transform all bytes before encoding: xor this value
 ```
 
-METHOD A:  
+Method A:  
   Modified Stephen Adolph  
   Most bytes simply copy unchanged from input to output.  
   Only for unsafe bytes apply a simple transform (xor128, aka flip the high bit) and prefix with '!'
 
-METHOD B:  
+Method B:  
   Identical data to A.  
   The loader BASIC code is just written a different way to try to make it faster.  
   It's actually slower so don't use it.  
   It's just here to head off trying to write the same "improvement" if you didn't know it was already done.
 
-METHOD H:  
+Method H:  
   Quasi-hex pairs a-la James Yi / Kurt McCullum.  
   Hex pairs but using a more convenient alphabet.
 
