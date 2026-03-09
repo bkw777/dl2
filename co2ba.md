@@ -45,30 +45,28 @@ ROT=0          # transform all bytes before encoding: add this value, >255 wraps
 XROT=64        # transform all bytes before encoding: xor this value
 ```
 
-METHOD A:
-  Modified Stephen Adolph
-  Most bytes simply copy unchanged from input to output.
-  Only for unsafe bytes apply a simple transform (xor128, aka flip the high bit) and prefix with '!'  
+METHOD A:  
+  Modified Stephen Adolph  
+  Most bytes simply copy unchanged from input to output.  
+  Only for unsafe bytes apply a simple transform (xor128, aka flip the high bit) and prefix with '!'
 
-METHOD B:
-  Identical data to A.
-  The loader BASIC code is just written a different way to try to make it faster.
-  It's actually slower so don't use it.
+METHOD B:  
+  Identical data to A.  
+  The loader BASIC code is just written a different way to try to make it faster.  
+  It's actually slower so don't use it.  
   It's just here to head off trying to write the same "improvement" if you didn't know it was already done.
 
-METHOD H:
-  Quasi-hex pairs a-la James Yi / Kurt McCullum.
+METHOD H:  
+  Quasi-hex pairs a-la James Yi / Kurt McCullum.  
   Hex pairs but using a more convenient alphabet.
 
-Method I:
-  The simplest possible way to put binary into DATA statements and read them.
-  Plain comma seperated ints.
+Method I:  
+  The simplest possible way to put binary into DATA statements and read them.  
+  Plain comma seperated ints.  
   It's useful for very small payloads because the BASIC to load it is almost nothing.
 
-The purpose of ROT or XROT is like yEnc which adds 42 to everything to shift NULs
-to where they don't need to be encoded, because strings of nuls are common.
-It ends up reducing the encoded file size (on average)
-simply because fewer bytes need to be encoded (on average).
+The purpose of ROT or XROT is like yEnc which adds 42 to everything to shift NULs to where they don't need to be encoded, because strings of nuls are common.  
+It ends up reducing the encoded file size (on average) simply because fewer bytes need to be encoded (on average).  
 This only applies to method A (or B), no effect on H or I.
 
 ## Examples
