@@ -69,6 +69,7 @@ The purpose of ROT or XROT is like yEnc which adds 42 to everything to shift NUL
 to where they don't need to be encoded, because strings of nuls are common.
 It ends up reducing the encoded file size (on average)
 simply because fewer bytes need to be encoded (on average).
+This only applies to method A (or B), no effect on H or I.
 
 ## Examples
 <!--
@@ -80,6 +81,74 @@ simply because fewer bytes need to be encoded (on average).
 
 [ALTERN.DO](https://github.com/LivingM100SIG/Living_M100SIG/blob/main/M100SIG/Lib-07-UTILITIES/ALTERN.100)  
 `FIRST=50 LINE_GAP=5 LINE_LEN=74 EDITSAFE=true co2ba ALTERN.CO call >ALTERN.DO`
+
+## Results
+
+```
+$ ls -l ALTERN.CO
+-rw-rw-r-- 1 bkw bkw 3620 Feb 28 14:10 ALTERN.CO
+```
+
+Simple INT encoding  
+```
+$ METHOD=I co2ba ALTERN.CO call >ALTERN.DO ;ls -l ALTERN.DO ;tr '\r' '\n' <ALTERN.DO      
+-rw-rw-r-- 1 bkw bkw 12478 Mar  9 15:29 ALTERN.DO
+0'ALTERN - loader: co2ba.sh b.kenyon.w@gmail.com 2026-03-09
+0READF:CLEAR2,F:DEFINTA-E:DEFSNGF-K:DEFSTRL-N:READF,A,J,G,N:H=F+A-1:K=0:CLS:?"Installing "N:FORI=FTOH:READB:POKEI,B:K=K+B:?".";:NEXT:?
+1IFK<>GTHEN?"Bad Checksum":ELSECALLJ
+2DATA59346,3614,59346,454932,"ALTERN"
+3DATA205,60,245,205,49,66,42,191,245,235,33,140,4,205,143,245,124,181,202,234,231,195,222,232,205,106,245,34,189,245,42,189,245,235,33,88,2,205,119,245,205,99,245,124,181,202,19,232,42,189,245,235,33,88,2,235,66,75,8,34,187,245,195,216,231,42,189,245,235
+4DATA33,0,0,205,119,245,124,181,194,114,232,205,106,245,34,185,245,42,191,245,235,33,1,0,25,34,191,245,33,239,0,235,42,189,245,235,66,75,8,101,229,33,63,0,235,42,187,245,235,66,75,8,209,93,213,33,239,0,235,42,185,245,235,66,75,8,101,229,33,63,0,235,42
+5DATA187,245,235,66,75,8,209,93,213,33,1,0,205,161,245,195,216,231,42,189,245,235,33,244,1,43,205,99,245,205,143,245,124,181,202,182,232,33,0,0,34,189,245,42,191,245,235,33,1,0,25,34,191,245,33,239,0,235,42,189,245,235,66,75,8,229,33,63,0,235,42,187,245
+...
+51DATA0,0,0,0,0,0,0,0,0,0
+```
+
+Classic hex pair encoding used by many old loaders  
+```
+$ METHOD=H co2ba ALTERN.CO call >ALTERN.DO ;ls -l ALTERN.DO ;tr '\r' '\n' <ALTERN.DO
+-rw-rw-r-- 1 bkw bkw 7825 Mar  9 15:29 ALTERN.DO
+0'ALTERN - loader: co2ba.sh b.kenyon.w@gmail.com 2026-03-09
+0READF:CLEAR2,F:DEFINTA-E:DEFSNGF-K:DEFSTRL-N:READF,A,J,G,N:E=97:M="":C=0:I=F:H=F+A-1:K=0:CLS:?"Installing "N"   0%";
+1READL:FORC=1TOLEN(L)STEP2:B=(ASC(MID$(L,C,1))-E)*16+ASC(MID$(L,C+1,1))-E:POKEI,B:I=I+1:K=K+B:NEXT:?@18,USING"###%";(I-F)*100/A:IFI<=HTHEN1
+2IFK<>GTHEN?"Bad Checksum":ELSECALLJ
+3DATA59346,3614,59346,454932,"ALTERN"
+4DATAmndmpfmndbeccklppfolcbimaemnippfhmlfmkokohmdnooimngkpfcclnpfcklnpfolcbfiacmnhhpfmngdpfhmlfmkbdoicklnpfolcbfiacolecelaiccllpfmdniohcklnpfolcbaaaamnhhpfhmlfmchcoimngkpfccljpfcklppfolcbabaabjcclppfcbopaaolcklnpfolecelaigfofcbdpaaolckllpfolecelainbfnnfcb
+5DATAopaaolckljpfolecelaigfofcbdpaaolckllpfolecelainbfnnfcbabaamnkbpfmdniohcklnpfolcbpeabclmngdpfmnippfhmlfmklgoicbaaaacclnpfcklppfolcbabaabjcclppfcbopaaolcklnpfolecelaiofcbdpaaolckllpfolecelaifnobffmnemhemdniohcklppfolcbabaabjcclppfcbopaaolcklnpfbjofcbdp
+...
+33DATAaaaaaaaaaaaaaaaaaaaaaaaa
+```
+
+Default new encoding without the extra yEnc-like rotation before encoding  
+```
+$ XROT=0 co2ba ALTERN.CO call >ALTERN.DO ;ls -l ALTERN.DO ;tr '\r' '\n' <ALTERN.DO
+-rw-rw-r-- 1 bkw bkw 5305 Mar  9 15:30 ALTERN.DO
+0'ALTERN - loader: co2ba.sh b.kenyon.w@gmail.com 2026-03-09
+0READF:CLEAR2,F:DEFINTA-E:DEFSNGF-K:DEFSTRL-O:READF,A,J,G,N:E=128:M="!":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing "N"   0%"
+1READL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)XORD:POKEI,B:D=0:I=I+1:K=K+B:NEXT:?@18,USING"###%";(I-F)*100/A:IFI<=HTHEN1
+2IFK<>GTHEN?"Bad Checksum":ELSECALLJ
+3DATA59346,3614,59346,454932,"ALTERN"
+4DATA"�<��1B*���!��!�͏�|��������j�!���*���!�X!��w��c�|��!��*���!�X!��BK!�!������*���!�!�!��w�|��r��j�!���*���!�!�!�!�!���!��!��*���BK!�e�!�?!��*���BK!��]�!��!��*���BK!�e�!�?!��*���BK!��]�!�!�!�͡����*���!��!�+�c�͏�|�ʶ�!�!�!�!���*���!�!�!�!�!���!��!��*�
+5DATA"��BK!��!�?!��*���BK!�]�U�Lt���*���!�!�!�!�!���!��!��*��!��!�?!��*���BK!�]�U�Lt���!�!�!�!����Bro&!�!���*���!�!�!�͏��c�|����͗W��!�!�!�!�����1!�3!�7!�9!�=!�?!�I!�K!�a!�c!�g!�i!�s!�u!�y!�{!��!��!�t�[��!��!�Q�L�H�D�!��!��Y!���������!�!� !�+!�,!��������
+...
+23DATA"!�!�!�!�!�!�!�!�!�!�!�!�!�!�!�!�!�!�!�
+```
+
+Default new encoding  
+```
+$ co2ba ALTERN.CO call >ALTERN.DO ;ls -l ALTERN.DO ;tr '\r' '\n' <ALTERN.DO
+-rw-rw-r-- 1 bkw bkw 4378 Mar  9 15:30 ALTERN.DO
+0'ALTERN - loader: co2ba.sh b.kenyon.w@gmail.com 2026-03-09
+0READF:CLEAR2,F:DEFINTA-E:DEFSNGF-K:DEFSTRL-O:READF,A,J,G,N:E=128:M="!":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing "N"   0%"
+1READL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)XORD:B=BXOR64:POKEI,B:D=0:I=I+1:K=K+B:NEXT:?@18,USING"###%";(I-F)*100/A:IFI<=HTHEN1
+2IFK<>GTHEN?"Bad Checksum":ELSECALLJ
+3DATA59346,3614,59346,454932,"ALTERN"
+4DATA"�|��q!�j���a�D�ϵ<��������*�b��j���a!�B�7��#�<��S�j���a!�B�!�!�Hb�����j���a@@�7�<��2��*�b��j���aA@Yb��a�@�j���!�!�H%�a@�j���!�!�H�!��a�@�j���!�!�H%�a@�j���!�!�H�!��aA@�ᵃ��j���a�Ak�#��ϵ<����a@@b��j���aA@Yb��a�@�j���!�!�H�a@�j���!�!�H!��!��!�4��
+5DATA"�j���aA@Yb��a�@�j��Y�a@�j���!�!�H!��!��!�4���a@@b���!�2/f@b��j���a[@�ϵ�#�<������!���Y@[@����q@s@w@y@}@@	@!�@!�@#@'@)@3@5@9@;@�@�@4�!���@�@!��!��!��!��_�[�!�B��������_@`@k@l@�����������������ܿڿֿοʿȿĿ<�8��@�@!��!��!��!���@�@�@�@`�^�[�!�BL���
+...
+19DATA"�<��':����ĵ;��˵a@@�a���<��ݵ=��ݵa���a@@�=a!�4�A��n!�b!��������\@@@@@@�������@@@@@@@@@@@@@X@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+```
 
 ## See also
 https://github.com/hackerb9/co2do/
