@@ -12,6 +12,8 @@ LANG=C
 : ${METHOD:=A}
 : ${ESC:=!}
 : ${XOR:=128}
+: ${ROT:=0}
+: ${XROT:=64}
 
 COFN=$1 ;shift
 ACTION=${1^^} ;shift
@@ -32,6 +34,22 @@ ftoi () {
 	[[ -r "$1" ]] || abrt "Can't read \"$1\""
 	local -i i= ;local x= LANG=C ;d=()
 	while IFS= read -d '' -r -n 1 x ;do printf -v d[i++] '%u' "'$x" ;done < $1
+}
+
+# shift all values before encoding so that nuls don't need to be encoded
+# load UNROT with the BASIC code to reverse it
+rot () {
+	unset UNROT
+	((ROT)) && {
+		# rotate - add ROT, wrap result > 255
+		for ((i=0;i<LEN;i++)) { ((d[i]=(d[i]+ROT)%256)) ; }
+		UNROT="B=(B+$((256-ROT)))MOD256:"
+	}
+	((XROT)) && {
+		# xor
+		for ((i=0;i<LEN;i++)) { ((d[i]=d[i]^XROT)) ; }
+		UNROT="B=BXOR$XROT:"
+	}
 }
 
 ###############################################################################
@@ -55,12 +73,14 @@ SUM= ;for ((i=0;i<LEN;i++)) { ((SUM+=${d[i]})) ; }
 printf '%u%c%s - loader: co2ba.sh b.kenyon.w@gmail.com %(%F)T\r' $n "'" "$PN" -1
 case $METHOD in
 	A) # Adolph/B9/White encoding - Safe bytes copy unchanged, unsafe write !+byte^128
+		rot
 		printf '%uREADF:CLEAR2,F:DEFINTA-E:DEFSNGF-K:DEFSTRL-O:READF,A,J,G,N:E=%u:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing "N"   0%%"\r' $n $c $ESC
-		printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)XORD:POKEI,B:D=0:I=I+1:K=K+B:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $n
+		printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)XORD:%sPOKEI,B:D=0:I=I+1:K=K+B:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$UNROT" $n
 	;;
 	B) # Same as A but avoids using IF in the inner loop, but actually runs slower
+		rot
 		printf '%uREADF:CLEAR2,F:DEFINTA-E,O-P:DEFSNGF-K:DEFSTRL-N:READF,A,J,G,N:E=%u:M="":C=0:I=F:H=F+A-1:K=0:D=0:O=%u:P=0:CLS:?"Installing "N"   0%%"\r' $n $c $q
-		printf '%uREADL:FORC=1TOLEN(L):B=ASC(MID$(L,C,1)):P=SGN(BXORO):B=BXORE*D:POKEI,B:I=I+P:K=K+B*P:D=PXOR1:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $n
+		printf '%uREADL:FORC=1TOLEN(L):B=ASC(MID$(L,C,1)):P=SGN(BXORO):B=BXORE*D:%sPOKEI,B:I=I+P:K=K+B*P:D=PXOR1:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$UNROT" $n
 	;;
 	H) # Classic quasi hex pairs
 		typeset -ra h=({a..p})  # hex data output alphabet
