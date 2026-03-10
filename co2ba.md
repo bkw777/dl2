@@ -30,7 +30,8 @@ Reads a binary .CO file and generates an ascii BASIC loader .DO file
 
 ## Options
 A few parameters are run-time configurable by setting environment variables.  
-Available options and their default values:  
+You don't need to change any of these. They exist and are documented here just for flexability and completeness, but you never need to change any of these just to use the app. Well *maybe* EDITSAFE=true.  
+Available settings and their default values:  
 ```
 FIRST=0        # first line number
 LINE_GAP=1     # line number increment
@@ -38,36 +39,42 @@ LINE_LEN=256   # length of DATA lines
 UNSAFE="0 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 34"
                # list of byte values that need to be encoded
 EDITSAFE=false # add 127 to unsafe list so FILE.DO can be opened in EDIT
-METHOD=A       # which encoding scheme: A=!code B=AwithoutIF H=hexpairs I=ints
+METHOD=A       # which encoding scheme: A=!yenc B=AwithoutIF H=hexpairs I=ints
 ESC='!'        # character that indicates the next byte is encoded
-XOR=128        # encode unsafe bytes by applying xor this value
-ROT=0          # transform all bytes before encoding: add this value, >255 wraps around to 0+
-XROT=64        # transform all bytes before encoding: xor this value
+XOR=128        # encoding transform unsafe bytes B using B^XOR
+ROT=0          # initial transform all bytes B using (B+ROT)%256
+XROT=64        # initial transform all bytes B using B^XROT
 ```
 
-Method A:  
-  Modified Stephen Adolph  
-  Most bytes simply copy unchanged from input to output.  
-  Only for unsafe bytes apply a simple transform (xor128, aka flip the high bit) and prefix with '!'
+## Encoding schemes
+Method A "!yenc" (default):  
+The main idea of this one comes from Stephen Adolph, modified by HackerB9 & Brian White.  
+It is very similar to [yEnc](http://www.yenc.org/yenc-draft.1.3.txt).  
+  - Apply a simple transform the same way to all input bytes. yenc does (b+42)%256, we do b^64.  
+  - For each (transformed) byte:  
+    - If a byte is safe, copy it to output without any changes.  
+    - If a byte is unsafe,  
+    Output an escape character prefix. yenc uses '=', we use '!'  
+    Apply another simple transform to make a safe byte. yenc does (b+64)%256, we do b^128.
 
 Method B:  
   Identical data to A.  
-  The loader BASIC code is just written a different way to try to make it faster.  
+  The difference is the inner loop in BASIC to decode bytes does not use any IF branching.  
   It's actually slower so don't use it.  
-  It's just here to head off trying to write the same "improvement" if you didn't know it was already done.
+  It's just here because if it wasn't, you or I would try to do it again.  
+  Also it was hard to figure out so I want to keep it as a reference for tricks. And who knows maybe it can get better.
 
 Method H:  
-  Quasi-hex pairs a-la James Yi / Kurt McCullum.  
-  Hex pairs but using a more convenient alphabet.
+  Hex pairs a-la James Yi / Kurt McCullum / others.  
+  Hex pairs, but using a single contiguous range of ascii values like a-p for the alphabet instead of 0-9A-F.  
+  0x00 = aa, 0x01 = ab, ... 0xFF = pp  
+  A lot of old loaders use this because the code is small and simple, and the output is at least better than plain ints.
 
 Method I:  
+  Plain comma seperated integers.  
   The simplest possible way to put binary into DATA statements and read them.  
-  Plain comma seperated ints.  
   It's useful for very small payloads because the BASIC to load it is almost nothing.
 
-The purpose of ROT or XROT is like yEnc which adds 42 to everything to shift NULs to where they don't need to be encoded, because strings of nuls are common.  
-It ends up reducing the encoded file size (on average) simply because fewer bytes need to be encoded (on average).  
-This only applies to method A (or B), no effect on H or I.
 
 ## Examples
 <!--
@@ -82,12 +89,15 @@ This only applies to method A (or B), no effect on H or I.
 
 ## Results
 
+Sample input .CO file = 3620 bytes  
 ```
 $ ls -l ALTERN.CO
 -rw-rw-r-- 1 bkw bkw 3620 Feb 28 14:10 ALTERN.CO
 ```
 
-Simple INT encoding  
+(All of these actually consume 60 bytes less than the file size, because the first line 0 gets overwritten on the receiving machine.)
+
+Simple INT encoding -> 12,478 bytes  
 ```
 $ METHOD=I co2ba ALTERN.CO call >ALTERN.DO ;ls -l ALTERN.DO ;tr '\r' '\n' <ALTERN.DO      
 -rw-rw-r-- 1 bkw bkw 12478 Mar  9 15:29 ALTERN.DO
@@ -102,7 +112,7 @@ $ METHOD=I co2ba ALTERN.CO call >ALTERN.DO ;ls -l ALTERN.DO ;tr '\r' '\n' <ALTER
 51DATA0,0,0,0,0,0,0,0,0,0
 ```
 
-Classic hex pair encoding used by many old loaders  
+Hex pair encoding -> 7825 bytes  
 ```
 $ METHOD=H co2ba ALTERN.CO call >ALTERN.DO ;ls -l ALTERN.DO ;tr '\r' '\n' <ALTERN.DO
 -rw-rw-r-- 1 bkw bkw 7825 Mar  9 15:29 ALTERN.DO
@@ -117,22 +127,7 @@ $ METHOD=H co2ba ALTERN.CO call >ALTERN.DO ;ls -l ALTERN.DO ;tr '\r' '\n' <ALTER
 33DATAaaaaaaaaaaaaaaaaaaaaaaaa
 ```
 
-Default new encoding without the extra yEnc-like rotation before encoding  
-```
-$ XROT=0 co2ba ALTERN.CO call >ALTERN.DO ;ls -l ALTERN.DO ;tr '\r' '\n' <ALTERN.DO
--rw-rw-r-- 1 bkw bkw 5305 Mar  9 15:30 ALTERN.DO
-0'ALTERN - loader: co2ba.sh b.kenyon.w@gmail.com 2026-03-09
-0READF:CLEAR2,F:DEFINTA-E:DEFSNGF-K:DEFSTRL-O:READF,A,J,G,N:E=128:M="!":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing "N"   0%"
-1READL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)XORD:POKEI,B:D=0:I=I+1:K=K+B:NEXT:?@18,USING"###%";(I-F)*100/A:IFI<=HTHEN1
-2IFK<>GTHEN?"Bad Checksum":ELSECALLJ
-3DATA59346,3614,59346,454932,"ALTERN"
-4DATA"�<��1B*���!��!�͏�|��������j�!���*���!�X!��w��c�|��!��*���!�X!��BK!�!������*���!�!�!��w�|��r��j�!���*���!�!�!�!�!���!��!��*���BK!�e�!�?!��*���BK!��]�!��!��*���BK!�e�!�?!��*���BK!��]�!�!�!�͡����*���!��!�+�c�͏�|�ʶ�!�!�!�!���*���!�!�!�!�!���!��!��*�
-5DATA"��BK!��!�?!��*���BK!�]�U�Lt���*���!�!�!�!�!���!��!��*��!��!�?!��*���BK!�]�U�Lt���!�!�!�!����Bro&!�!���*���!�!�!�͏��c�|����͗W��!�!�!�!�����1!�3!�7!�9!�=!�?!�I!�K!�a!�c!�g!�i!�s!�u!�y!�{!��!��!�t�[��!��!�Q�L�H�D�!��!��Y!���������!�!� !�+!�,!��������
-...
-23DATA"!�!�!�!�!�!�!�!�!�!�!�!�!�!�!�!�!�!�!�
-```
-
-Default new encoding  
+Default new encoding -> 4378 bytes  
 ```
 $ co2ba ALTERN.CO call >ALTERN.DO ;ls -l ALTERN.DO ;tr '\r' '\n' <ALTERN.DO
 -rw-rw-r-- 1 bkw bkw 4378 Mar  9 15:30 ALTERN.DO
