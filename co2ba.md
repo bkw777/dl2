@@ -39,7 +39,7 @@ LINE_LEN=256   # length of DATA lines
 UNSAFE="0 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 34"
                # list of byte values that need to be encoded
 EDITSAFE=false # add 127 to unsafe list so FILE.DO can be opened in EDIT
-METHOD=A       # which encoding scheme: A=!yenc B=AwithoutIF H=hexpairs I=ints
+METHOD=Y       # which encoding scheme: Y=!yenc B=YwithoutIF H=hexpairs I=ints
 ESC='!'        # character that indicates the next byte is encoded
 XA=^64         # initial transform applied to all bytes
 XB=^128        # encoding transform applied to unsafe bytes
