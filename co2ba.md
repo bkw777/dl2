@@ -51,7 +51,7 @@ CARAT=false    # output standard carat encoding, shorthand for ESC='^' XA=0 XB="
 -->
 
 ## Encoding schemes
-Method A "!yenc" (default):  
+Method Y "!yenc" (default):  
 The main idea of this one comes from Stephen Adolph, modified by HackerB9 & Brian White.  
 It is very similar to [yEnc](http://www.yenc.org/yenc-draft.1.3.txt).  
   - Apply a simple transform the same way to all input bytes. yenc does (b+42)%256, we do b^64.  
@@ -62,7 +62,7 @@ It is very similar to [yEnc](http://www.yenc.org/yenc-draft.1.3.txt).
     Apply another simple transform to make a safe byte. yenc does (b+64)%256, we do b^128.
 
 Method B:  
-  Identical data to A.  
+  Identical data to Y.  
   The difference is the inner loop in BASIC to decode bytes does not use any IF branching.  
   It's actually slower so don't use it.  
   It's just here because if it wasn't, you or I would try to do it again.  
