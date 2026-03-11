@@ -41,10 +41,14 @@ UNSAFE="0 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 
 EDITSAFE=false # add 127 to unsafe list so FILE.DO can be opened in EDIT
 METHOD=A       # which encoding scheme: A=!yenc B=AwithoutIF H=hexpairs I=ints
 ESC='!'        # character that indicates the next byte is encoded
-XOR=128        # encoding transform unsafe bytes B using B^XOR
-ROT=0          # initial transform all bytes B using (B+ROT)%256
-XROT=64        # initial transform all bytes B using B^XROT
+XA=^64         # initial transform applied to all bytes
+XB=^128        # encoding transform applied to unsafe bytes
+YENC=false     # output standard yEnc, shorthand for ESC='=' XA='+42' XB='+64'
 ```
+<!-- does not work
+   "?OD error in 1"
+CARAT=false    # output standard carat encoding, shorthand for ESC='^' XA=0 XB="+64"
+-->
 
 ## Encoding schemes
 Method A "!yenc" (default):  
@@ -97,7 +101,7 @@ $ ls -l ALTERN.CO
 
 (All of these actually consume 60 bytes less than the file size, because the first line 0 gets overwritten on the receiving machine.)
 
-Simple INT encoding -> 12,478 bytes  
+Simple INT encoding -> 12478 bytes  
 ```
 $ METHOD=I co2ba ALTERN.CO call >ALTERN.DO ;ls -l ALTERN.DO ;tr '\r' '\n' <ALTERN.DO      
 -rw-rw-r-- 1 bkw bkw 12478 Mar  9 15:29 ALTERN.DO
@@ -127,7 +131,7 @@ $ METHOD=H co2ba ALTERN.CO call >ALTERN.DO ;ls -l ALTERN.DO ;tr '\r' '\n' <ALTER
 33DATAaaaaaaaaaaaaaaaaaaaaaaaa
 ```
 
-Default new encoding -> 4378 bytes  
+Default !yenc encoding -> 4378 bytes  
 ```
 $ co2ba ALTERN.CO call >ALTERN.DO ;ls -l ALTERN.DO ;tr '\r' '\n' <ALTERN.DO
 -rw-rw-r-- 1 bkw bkw 4378 Mar  9 15:30 ALTERN.DO
