@@ -36,13 +36,13 @@ Available settings and their default values:
 FIRST=0        # first line number
 LINE_GAP=1     # line number increment
 LINE_LEN=256   # length of DATA lines
-UNSAFE="0 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 34"
-               # list of byte values that need to be encoded
-EDITSAFE=false # add 127 to unsafe list so FILE.DO can be opened in EDIT
 METHOD=Y       # which encoding scheme: Y=!yenc B=YwithoutIF H=hexpairs I=ints
-ESC='!'        # character that indicates the next byte is encoded
-XA=^64         # initial transform applied to all bytes
-XB=^128        # encoding transform applied to unsafe bytes
+UNSAFE="0 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 34"
+               # (Y) list of byte values that need to be encoded
+EDITSAFE=true  # (Y) add 127 to the unsafe list so the output can be opened in EDIT
+ESC='!'        # (Y) character that indicates the next byte is encoded
+XA=^64         # (Y) initial transform applied to all bytes - best,0,^###,+###
+XB=^128        # (Y) encoding transform applied to unsafe bytes - ^###,+###
 YENC=false     # output standard yEnc, shorthand for ESC='=' XA='+42' XB='+64'
 ```
 <!-- does not work
@@ -52,7 +52,7 @@ CARAT=false    # output standard carat encoding, shorthand for ESC='^' XA=0 XB="
 
 ## Encoding schemes
 Method Y "!yenc" (default):  
-The main idea of this one comes from Stephen Adolph, modified by HackerB9 & Brian White.  
+The main idea of this one comes from [Stephen Adolph](https://www.mail-archive.com/m100@lists.bitchin100.com/msg06918.html), modified by [HackerB9 & Brian White](https://www.mail-archive.com/m100@lists.bitchin100.com/msg20099.html).  
 It is very similar to [yEnc](http://www.yenc.org/yenc-draft.1.3.txt).  
   - Apply a simple transform the same way to all input bytes. yenc does (b+42)%256, we do b^64.  
   - For each (transformed) byte:  
@@ -79,6 +79,9 @@ Method I:
   The simplest possible way to put binary into DATA statements and read them.  
   It's useful for very small payloads because the BASIC to load it is almost nothing.
 
+All cases use a rolling xor checksum.
+
+For !yenc, the default `XA=^64` is fast and pretty good. You can also say `XA=best` which will internally try all 256 possible vlues, both xor and rot. This will take several seconds (~5) and generally produce a smaller file, but not by very much.
 
 ## Examples
 <!--
@@ -145,6 +148,25 @@ $ co2ba ALTERN.CO call >ALTERN.DO ;ls -l ALTERN.DO ;tr '\r' '\n' <ALTERN.DO
 ...
 19DATA"�<��':����ĵ;��˵a@@�a���<��ݵ=��ݵa���a@@�=a!�4�A��n!�b!��������\@@@@@@�������@@@@@@@@@@@@@X@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
+```
+
+XA=best
+```
+$ time co2ba ALTERN.CO call |wc -c
+4401
+
+real	0m0.097s
+user	0m0.070s
+sys	0m0.031s
+
+$ time XA=best co2ba ALTERN.CO call |wc -c
+trying all possible XA values...
+XA=+122
+4354
+
+real	0m5.571s
+user	0m5.541s
+sys	0m0.032s
 ```
 
 ## See also

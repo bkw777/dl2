@@ -25,14 +25,15 @@ COFN=$1 ;shift
 ACTION=${1^^} ;shift
 PN=${COFN##*/} ;PN=${PN:0:6} ;PN=${PN%%.*}
 
-typeset -i i b SUM TOP END EXE LEN n g q ta tb
+typeset -i i b CHK TOP END EXE LEN n g q ta tb
 typeset -ia d=()
 
 printf -v q '%u' "'$ESC" ;UNSAFE+=" $q"
 $EDITSAFE && UNSAFE+=" 127"
 readonly g=$LINE_GAP u=",${UNSAFE// /,}," ESC q c
-ta=${XA:1} xa=true ;[[ "${XA:0:1}" = "+" ]] && xa=false ;readonly xa ta # transform A, to shift all bytes
+#ta=${XA:1} xa=true ;[[ "${XA:0:1}" = "+" ]] && xa=false ;readonly xa ta # transform A, to shift all bytes
 tb=${XB:1} xb=true ;[[ "${XB:0:1}" = "+" ]] && xb=false ;readonly xb tb # transform B, to encode unsafe bytes
+unset Ev Qd Qv
 n=$FIRST
 
 abrt () { printf '%s: Usage\n%s IN.CO [call|exec|callba|execba|savem|bsave] > OUT.DO\n%s\n' "$0" "${0##*/}" "$@" >&2 ;exit 1 ; }
@@ -44,19 +45,52 @@ ftoi () {
 	while IFS= read -d '' -r -n 1 x ;do printf -v d[i++] '%u' "'$x" ;done < $1
 }
 
+# $XA -> $xa $ta
+find_xa () {
+	xa=true ta=${XA:1}
+	case "$XA" in
+		\+*) xa=false ;;
+		best)
+			echo "trying all possible XA values..." >&2
+			local -i i n t s=$((LEN*2))
+			for ((n=0;n<255;n++)) {
+
+				# xor
+				for ((i=0,t=LEN;i<LEN;i++)) { [[ $u = *,$((d[i]^n)),* ]] && ((t++)) ; }
+				((t<s)) && s=$t ta=$n XA="^$n"
+
+				# rot
+				for ((i=0,t=LEN;i<LEN;i++)) { [[ $u = *,$(((d[i]+n)%256)),* ]] && ((t++)) ; }
+				((t<s)) && xa=false s=$t ta=$n XA="+$n"
+
+				:
+				#echo "$n $t" >&2
+			}
+			echo "XA=$XA" >&2
+			;;
+	esac
+	readonly xa ta
+}
+
 # Transform every byte according to XA
 # Write the BASIC code to reverse it in UNTA
 transform_a () {
-	unset UNTA
+	find_xa
+	unset Qd Qv UNTA
 	((ta)) || return
 	$xa && {
-		for ((i=0;i<LEN;i++)) { ((d[i]=d[i]^ta)) ; }
-		UNTA="B=BXOR$ta:"
+		# xor
+		for ((i=0;i<LEN;i++)) { ((d[i]^=ta)) ; }
+		Qd=",Q" Qv=$ta
+		UNTA="B=BXORQ:"
 	} || {
+		# rot
 		for ((i=0;i<LEN;i++)) { ((d[i]=(d[i]+ta)%256)) ; }
-		UNTA="B=(B+$((256-ta)))MOD256:"
+		Qd=",Q" Qv=$((256-ta))
+		UNTA="B=(B+Q)MOD256:"
 	}
 }
+
 
 ###############################################################################
 
@@ -73,32 +107,34 @@ ftoi "$COFN"
 d=(${d[*]:6})
 ((LEN==${#d[*]})) || abrt "Corrupt .CO file?\nHeader declares LEN=$LEN\nFile has ${#d[*]} bytes after header"
 ((END=TOP+LEN-1))
-SUM= ;for ((i=0;i<LEN;i++)) { ((SUM+=${d[i]})) ; }
+
+# rolling xor checksum
+CHK=0 ;for ((i=0;i<LEN;i++)) { ((CHK^=${d[i]})) ; }
 
 # loader
 printf '%u%c%s - loader: co2ba.sh b.kenyon.w@gmail.com %(%F)T\r' $n "'" "$PN" -1
 case $METHOD in
 	Y) # !yenc - Adolph/B9/White yenc-like encoding
 		transform_a
-		unset Pd Ps ;((ta)) && Pd=",P" Ps="P=$ta:"
-		$xb && E=$tb UNTB="ASC(O)XORD" || E=$((256-tb)) UNTB="(ASC(O)+D)MOD256"
-		printf '%uREADF:CLEAR2,F:DEFINTA-E%s:DEFSNGF-K:DEFSTRL-O:READF,A,J,G,N:%sE=%u:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing "N"   0%%"\r' $n "$Pd" "$Ps" $E "$ESC"
-		printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=%s:%sPOKEI,B:D=0:I=I+1:K=K+B:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$UNTB" "$UNTA" $n
+		$xb && Ev=$tb UNTB="ASC(O)XORD" || Ev=$((256-tb)) UNTB="(ASC(O)+D)MOD256"
+		printf '%uREADF:CLEAR2,F:DEFINTA-E,G,K%s:DEFSNGF,H-J:DEFSTRL-O:READF,A,J,G,N,E%s:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing "N"   0%%"\r' $n "$Qd" "$Qd" "$ESC"
+		printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=%s:%sPOKEI,B:D=0:I=I+1:K=KXORB:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$UNTB" "$UNTA" $n
 	;;
 	B) # Same as Y but avoids using IF in the inner loop, but actually runs slower
 		transform_a
-		unset Qd Qs ;((ta)) && Qd=",Q" Qs="Q=$ta:"
-		$xb && E=$tb UNTB="BXORE*D" || E=$((256-tb)) UNTB="(B+E*D)MOD256"
-		printf '%uREADF:CLEAR2,F:DEFINTA-E,O-P%s:DEFSNGF-K:DEFSTRL-N:READF,A,J,G,N:%sE=%u:M="":C=0:I=F:H=F+A-1:K=0:D=0:O=%u:P=0:CLS:?"Installing "N"   0%%"\r' $n "$Qd" "$Qs" $E $q
-		printf '%uREADL:FORC=1TOLEN(L):B=ASC(MID$(L,C,1)):P=SGN(BXORO):B=%s:%sPOKEI,B:I=I+P:K=K+B*P:D=PXOR1:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$UNTB" "$UNTA" $n
+		$xb && Ev=$tb UNTB="BXORE*D" || Ev=$((256-tb)) UNTB="(B+E*D)MOD256"
+		printf '%uREADF:CLEAR2,F:DEFINTA-E,G,K,O-P%s:DEFSNGF,H-J:DEFSTRL-N:READF,A,J,G,N,E%s:M="":C=0:I=F:H=F+A-1:K=0:D=0:O=%u:P=0:CLS:?"Installing "N"   0%%"\r' $n "$Qd" "$Qd" $q
+		# X=SGN(AXORB) could be X=-(A<>B)  but SGN(XOR) is slightly faster, 40 vs 43 seconds for 10000
+		printf '%uREADL:FORC=1TOLEN(L):B=ASC(MID$(L,C,1)):P=SGN(BXORO):B=%s:%sPOKEI,B:I=I+P:K=KXORB*P:D=PXOR1:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$UNTB" "$UNTA" $n
 	;;
 	H) # hex pairs
 		typeset -ra h=({a..p})  # hex data output alphabet
-		printf '%uREADF:CLEAR2,F:DEFINTA-E:DEFSNGF-K:DEFSTRL-N:READF,A,J,G,N:E=%u:M="":C=0:I=F:H=F+A-1:K=0:CLS:?"Installing "N"   0%%";\r' $n "'${h[0]}"
-		printf '%uREADL:FORC=1TOLEN(L)STEP2:B=(ASC(MID$(L,C,1))-E)*16+ASC(MID$(L,C+1,1))-E:POKEI,B:I=I+1:K=K+B:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $n
+		printf -v Ev '%u' "'${h[0]}"
+		printf '%uREADF:CLEAR2,F:DEFINTA-E,G,K:DEFSNGF,H-J:DEFSTRL-N:READF,A,J,G,N,E:M="":C=0:I=F:H=F+A-1:K=0:CLS:?"Installing "N"   0%%";\r' $n
+		printf '%uREADL:FORC=1TOLEN(L)STEP2:B=(ASC(MID$(L,C,1))-E)*16+ASC(MID$(L,C+1,1))-E:POKEI,B:I=I+1:K=KXORB:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $n
 	;;
 	I) # ints
-		printf '%uREADF:CLEAR2,F:DEFINTA-E:DEFSNGF-K:DEFSTRL-N:READF,A,J,G,N:H=F+A-1:K=0:CLS:?"Installing "N:FORI=FTOH:READB:POKEI,B:K=K+B:?".";:NEXT:?\r' $n
+		printf '%uREADF:CLEAR2,F:DEFINTA-E,G,K:DEFSNGF,H-J:DEFSTRL-N:READF,A,J,G,N:H=F+A-1:K=0:CLS:?"Installing "N:FORI=FTOH:READB:POKEI,B:K=KXORB:?".";:NEXT:?\r' $n
 	;;
 esac
 
@@ -113,7 +149,7 @@ case "$ACTION" in
 esac
 
 # header
-printf '%uDATA%u,%u,%u,%u,"%s"\r' $((++n*g)) $TOP $LEN $EXE $SUM "$PN"
+printf '%uDATA%u,%u,%u,%u,"%s"%s%s\r' $((++n*g)) $TOP $LEN $EXE $CHK "$PN" "${Ev:+,$Ev}" "${Qv:+,$Qv}"
 
 # data
 O= o=
