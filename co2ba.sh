@@ -4,6 +4,7 @@
 
 LANG=C
 
+: ${COMMENT:=""}
 : ${FIRST:=0}
 : ${LINE_GAP:=1}
 : ${LINE_LEN:=256}
@@ -25,18 +26,18 @@ COFN=$1 ;shift
 ACTION=${1^^} ;shift
 PN=${COFN##*/} ;PN=${PN:0:6} ;PN=${PN%%.*}
 
-typeset -i i b CHK TOP END EXE LEN n g q ta tb
+typeset -i i b esc CHK TOP END EXE LEN n g ta tb
 typeset -ia d=()
 
-printf -v q '%u' "'$ESC" ;UNSAFE+=" $q"
+printf -v esc '%u' "'$ESC" ;UNSAFE+=" $esc"
 $EDITSAFE && UNSAFE+=" 127"
-readonly g=$LINE_GAP u=",${UNSAFE// /,}," ESC q c
+readonly g=$LINE_GAP u=",${UNSAFE// /,}," ESC esc
 #ta=${XA:1} xa=true ;[[ "${XA:0:1}" = "+" ]] && xa=false ;readonly xa ta # transform A, to shift all bytes
 tb=${XB:1} xb=true ;[[ "${XB:0:1}" = "+" ]] && xb=false ;readonly xb tb # transform B, to encode unsafe bytes
 unset Ev Qd Qv
 n=$FIRST
 
-abrt () { printf '%s: Usage\n%s IN.CO [call|exec|callba|execba|savem|bsave] > OUT.DO\n%s\n' "$0" "${0##*/}" "$@" >&2 ;exit 1 ; }
+abrt () { printf '%s: Usage\n%s IN.CO [call|exec|callba|execba|savem|bsave] > OUT.DO\n%b\n' "$0" "${0##*/}" "$@" >&2 ;exit 1 ; }
 
 # read a binary file into to global int array d[]
 ftoi () {
@@ -114,7 +115,11 @@ d=(${d[*]:6})
 CHK=0 ;for ((i=0;i<LEN;i++)) { ((CHK=(CHK^d[i])+1)) ; }
 
 # loader
-printf '%u%c%s - loader: co2ba.sh b.kenyon.w@gmail.com %(%F)T\r' $n "'" "$PN" -1
+
+printf -v O '%u%c%s%%s - loader: co2ba.sh b.kenyon.w@gmail.com %(%F)T' $n "'" "$PN" -1
+x=${COMMENT:+ - $COMMENT} ;((i=255-${#O}+2)) ;((${#x}>i)) && x=${x:0:i}
+printf '%s\r' "${O/\%s/$x}"
+
 case $METHOD in
 	Y) # !yenc - Adolph/B9/White yenc-like encoding
 		transform_a
@@ -125,7 +130,7 @@ case $METHOD in
 	B) # Same as Y but avoids using IF in the inner loop, but actually runs slower
 		transform_a
 		$xb && Ev=$tb UNTB="BXORE*D" || Ev=$((256-tb)) UNTB="(B+E*D)MOD256"
-		printf '%uREADF:CLEAR2,F:DEFINTA-E,G,K,O-P%s:DEFSNGF,H-J:DEFSTRL-N:READF,A,J,G,N,E%s:M="":C=0:I=F:H=F+A-1:K=0:D=0:O=%u:P=0:CLS:?"Installing "N"   0%%"\r' $n "$Qd" "$Qd" $q
+		printf '%uREADF:CLEAR2,F:DEFINTA-E,G,K,O-P%s:DEFSNGF,H-J:DEFSTRL-N:READF,A,J,G,N,E%s:M="":C=0:I=F:H=F+A-1:K=0:D=0:O=%u:P=0:CLS:?"Installing "N"   0%%"\r' $n "$Qd" "$Qd" $esc
 		# X=SGN(AXORB) could be X=-(A<>B)  but SGN(XOR) is slightly faster, 40 vs 43 seconds for 10000
 		printf '%uREADL:FORC=1TOLEN(L):B=ASC(MID$(L,C,1)):P=SGN(BXORO):B=%s:%sPOKEI,B:I=I+P:K=((KXORB)+1)*P:D=PXOR1:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$UNTB" "$UNTA" $n
 	;;

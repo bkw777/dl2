@@ -33,6 +33,7 @@ A few parameters are run-time configurable by setting environment variables.
 You don't need to change any of these. They exist and are documented here just for flexability and completeness.  
 Available settings and their default values:  
 ```
+COMMENT=""     # extra text inserted into the first line comment
 FIRST=0        # first line number
 LINE_GAP=1     # line number increment
 LINE_LEN=256   # length of DATA lines
