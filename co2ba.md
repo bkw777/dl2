@@ -84,7 +84,10 @@ Method I:
 
 All cases use a rolling xor checksum.
 
-For !yenc, the default `XA=^64` is fast and pretty good. You can also say `XA=best` which will internally try all 256 possible vlues, both xor and rot. This will take 5 or 6 seconds and generally produce a smaller file, but not by a lot.
+For !yenc, you can get a slightly smaller output file by using `XA=best` .  
+This will internally try all possible XA values with both xor & rot (^0-^255 +0-+255) and pick the best.  
+This will take several seconds and generally produce a smaller file, but not greatly, which is why it's not the default.  
+The best value will be different for every input file.
 
 ## Examples
 <!--
