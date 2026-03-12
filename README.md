@@ -1,7 +1,8 @@
 # dl2
 DeskLink2 is a [Tandy Portable Disk Drive](http://tandy.wiki/TPDD) emulator or "[TPDD server](http://tandy.wiki/TPDD_server)" written in C.  
 
-Also in this repo is [co2ba](co2ba.md), which generates loaders for use with the bootstrap function (-b).
+The project is named "dl2" but the installed binary is just `dl` .  
+Also included is [co2ba](co2ba.md), which generates loaders for use with the bootstrap function (`dl -b filename`).
 
 ## Install
 ```
