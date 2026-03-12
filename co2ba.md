@@ -30,7 +30,7 @@ Reads a binary .CO file and generates an ascii BASIC loader .DO file
 
 ## Options
 A few parameters are run-time configurable by setting environment variables.  
-You don't need to change any of these. They exist and are documented here just for flexability and completeness, but you never need to change any of these just to use the app. Well *maybe* EDITSAFE=true.  
+You don't need to change any of these. They exist and are documented here just for flexability and completeness.  
 Available settings and their default values:  
 ```
 FIRST=0        # first line number
@@ -54,12 +54,15 @@ CARAT=false    # output standard carat encoding, shorthand for ESC='^' XA=0 XB="
 Method Y "!yenc" (default):  
 The main idea of this one comes from [Stephen Adolph](https://www.mail-archive.com/m100@lists.bitchin100.com/msg06918.html), modified by [HackerB9 & Brian White](https://www.mail-archive.com/m100@lists.bitchin100.com/msg20099.html).  
 It is very similar to [yEnc](http://www.yenc.org/yenc-draft.1.3.txt).  
-  - Apply a simple transform the same way to all input bytes. yenc does (b+42)%256, we do b^64.  
+  - First, apply a simple transform the same way to all input bytes.  
+    yenc does rot42 `(val+42)%256`, we do xor64 `val^64`.  
   - For each (transformed) byte:  
     - If a byte is safe, copy it to output without any changes.  
     - If a byte is unsafe,  
-    Output an escape character prefix. yenc uses '=', we use '!'  
-    Apply another simple transform to make a safe byte. yenc does (b+64)%256, we do b^128.
+      - Output an escape character prefix.  
+        yenc uses `=`, we use `!`  
+      - Apply another simple transform to make a safe byte.  
+        yenc does rot64 `(val+64)%256`, we do xor128 `val^128`, aka toggle the high bit.
 
 Method B:  
   Identical data to Y.  
@@ -81,7 +84,7 @@ Method I:
 
 All cases use a rolling xor checksum.
 
-For !yenc, the default `XA=^64` is fast and pretty good. You can also say `XA=best` which will internally try all 256 possible vlues, both xor and rot. This will take several seconds (~5) and generally produce a smaller file, but not by very much.
+For !yenc, the default `XA=^64` is fast and pretty good. You can also say `XA=best` which will internally try all 256 possible vlues, both xor and rot. This will take 5 or 6 seconds and generally produce a smaller file, but not by a lot.
 
 ## Examples
 <!--
