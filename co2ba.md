@@ -56,7 +56,7 @@ The main idea of this one comes from [Stephen Adolph](https://www.mail-archive.c
 It is very similar to [yEnc](http://www.yenc.org/yenc-draft.1.3.txt).  
   - First, apply a simple transform the same way to all input bytes.  
     yenc does rot42 `(val+42)%256`, we do xor64 `val^64`.  
-  - For each (transformed) byte:  
+  - Then, for each (transformed) byte:  
     - If a byte is safe, copy it to output without any changes.  
     - If a byte is unsafe,  
       - Output an escape character prefix.  
