@@ -97,14 +97,14 @@ The best value will be different for every input file.
 For most input files this will only make the output larger, and the loader slower.
 
 The encoding scheme is `DRN` , where:  
-  - `D` is a byte of data that is the first byte of a run of duplicates.  
-  - `R` is the rle-prefix character `RP` defined above, default is 0x20, aka space.  
-  - `N` is a single byte value for the number of additional copies of `D` to generate.  
+`D` is a byte of data that is the first byte of a run of duplicates.  
+`R` is the rle-prefix character `RP` defined above, default is 0x20, aka space.  
+`N` is a single byte value for the number of additional copies of `D` to generate.  
 
-- `D` and `N` are encoded as necessary like all other normal data. The !yenc encoding must be decoded first to get the actual value of them.  
-- `R` (RP above) is NOT encoded. When RLE is enabled, all of the ' ' in the input data get encoded, and ' ' becomes part of the encoding scheme itself like '!'.  
-- `N` can only encode up to 255. Longer runs simply use multiple rle codes up to 255 each.  
-- `N` is one less than the length of the total run. `D` is the first byte in the run, `N` adds to it.  
+`D` and `N` are encoded as necessary like all other normal data. The !yenc encoding must be decoded first to get the actual value of them.  
+`R` (RP above) is NOT encoded. When RLE is enabled, all of the ' ' in the input data get encoded, and ' ' becomes part of the encoding scheme itself like '!'.  
+`N` can only encode up to 255. Longer runs simply use multiple rle codes up to 255 each.  
+`N` is one less than the length of the total run. `D` is the first byte in the run, `N` adds to it.  
 
 ## Examples
 <!--
