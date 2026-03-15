@@ -143,7 +143,7 @@ case $METHOD in
 			printf '%uREADF:CLEAR8,F:DEFINTA-E,G,K,P,S,T%s:DEFSNGF,H-J:DEFSTRL-O,R:READF,A,J,G,N,E%s:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:R="%c":S=0:B=-1:P=-1:CLS:?USING"Installing \    \   0%%";N\r' $n "$Qd" "$Qd" "$EP" "$RP"
 			printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IF(O=M)THEND=E:NEXT:ELSEIF(O=R)THENS=1:NEXT\r' $((++n*g)) ;((l=n))
 
-			# cute no dupes, but slow of course doing a FOR1TO1 loop on every byte  ALTERN.DO 3:09 vs 2:55
+			# cute no dupes, but slow of course doing a FOR1TO1 loop on every byte  ALTERN.DO 3:09 vs 2:54
 			#printf '%uB=%s:%sD=0:IFS=0THENP=B:B=1\r' $((++n*g)) "$UNTB" "$UNTA"
 			#printf '%uFORT=1TOB:POKEI,P:I=I+1:K=(KXORP)+1:NEXT:S=0:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $((l*g))
 

@@ -41,11 +41,11 @@ METHOD=Y       # which encoding scheme: Y=!yenc B=YwithoutIF H=hexpairs I=ints
 UNSAFE="0 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 34"
                # (Y) list of byte values that need to be encoded
 EDITSAFE=true  # (Y) add 127 to the unsafe list so the output can be opened in EDIT
-RLE=false      # (Y) enable run-length encoding (experimental)
 EP='!'         # (Y) escape prefix - character that indicates the next byte is encoded
-RP=' '         # (Y) rle prefix - character that indicates the next byte is how many copies of the previous byte to append here
 XA=^64         # (Y) initial transform applied to all bytes - best,0,^###,+###
 XB=^128        # (Y) encoding transform applied to unsafe bytes - ^###,+###
+RLE=false      # (Y) enable run-length encoding (doesn't help, and the loader is much slower)
+RP=' '         # (Y) rle prefix - character that indicates the next byte is how many copies of the previous byte to append here
 YENC=false     # output standard yEnc, shorthand for ESC='=' XA='+42' XB='+64'
 ```
 <!-- does not work
