@@ -92,83 +92,19 @@ This will internally try all possible XA values with both xor & rot (^0-^255 +0-
 This will take several seconds and generally produce a smaller file, but not greatly, which is why it's not the default.  
 The best value will be different for every input file.
 
-## RLE
-*Experimental* Only supported in METHOD=Y  
-`$RLE=true XA=0 co2ba call ALTERN.CO >ALTERN.DO`
+`RLE=true` enables run-length-encoding compression.
 
-Currently only works if XA=0
+For most input files this will only make the output larger, and the loader slower.
 
-The BASIC code is larger and slower, and the file size is usually larger because of XA=0.  
-Also because enabling RLE means adding another value (the RP character) to the unsafe list,  
-so all occurrances of that value in the data now need to be encoded.  
+The encoding scheme is `DRN` , where:  
+  - `D` is a byte of data that is the first byte of a run of duplicates.  
+  - `R` is the rle-prefix character `RP` defined above, default is 0x20, aka space.  
+  - `N` is a single byte value for the number of additional copies of `D` to generate.  
 
-So you usually don't want this.
-
-The encoding scheme is:  
-
-  RP N
-  
-Wher RP is the rle-prefix byte ' ' (0x20, a single space)  
-and N is a a single byte (or encoded !+byte) value for the number of times to copy the byte that came before the RP.
-
-So if the source input has a run of 10 nulls, that becomes:  
-0x21  '!'/EP esc-prefix because the first byte of the run is output normally, and nuls are encoded.  
-0x80  nul after transforming with xor128, these 2 bytes make up the single nul.  
-0x20  ' '/RP rle-prefix, says to remember the previous byte (nul) and read the next byte as a number.  
-0x21  '!' EP because the number will be 9, and a 9 byte needs to be encoded.
-0x89  9 after transforming by xor128.
-
-On reading the RP and then the 9, write 9 copies of nul, leaving a run of 10 at the end.  
-Number is a single byte, so runs longer than 255 bytes use multiple rle sequences.  
-
-Short runs are inefficient currently because of the XA bug. If XA didn't have to be disabled  
-when using RLE, then the XA would shift all the low byte values up to where they don't need to be encoded.  
-The same goes for the byte value being copied too. More often the value happens to be null,  
-so the XA shifts that too. Resulting that an rle-sequence of up to 128 nulls would only need 3 total bytes, the first null, the RP, and a byte for the number 127.
-
-But only because you currently have to disable XA with RLE, if the byte being copied is a low number like null, then it needs to be encoded.  
-And if the run is under 35 bytes long, then the byte for the number also needs to be encoded,  
-so the entire sequence takes 5 bytes.
-
-<!-- 
-
- 
-While encoding:
-  - if the current byte (before encoding with EP) matches the previous byte,  
-  increment the rl counter instead of writing more copies  
-  - when the current byte no longer matches the previous byte, or rl reaches 255, write the rle sequence.  
-  (if rl<2, or even <3, just write multiple copies of the byte instead of the rle sequence) 
-
-While decoding:
-  - Each time you actually poke a byte (IE after doing all necessary decoding to arrive at the actual data),  
-  Save the current byte to a previous-byte variable (overwrite).  
-  - If you encounter RP,  
-    - read the next byte, decode as normal, and interpret the decoded value as a number.  
-    - write number more copies of previous-byte.
-
-number is a single byte, and so can only range from 0-255.  
-number is one less than the total string of dupes.  
-runs longer than 255 simply use multiple rle sequences.  
-
-Both source-byte and number are normal data that are encoded as necessary, so it may actually be:  
-
-  EP shifted-source-byte RP EP shifted-number
-
-
-Normally and ideally, the default XA would shift all data values up before the main processing,  
-such that nulls become 64s which don't need to be encoded with EP.  
-And that would also mean that short rle runs with a small number would also not need to be encoded.  
-So short rle runs would only need 2 bytes.  
-
-But only because currently the BASIC decoder isn't fully working yet, XA must be disabled,  
-and that means short runs have a number that is small, which as a byte value needs to be encoded,  
-so short runs actually wind up needing more characters to encode than long runs.
-
-So untill the XA problem is fixed, RLE is very inefficiean and doesn't actually gain much.
-
-In fact it often makes the file *larger*, because the BASIC code to decode is larger,  
-and disabling XA hurts a lot. The BASIC code also runs slower.
--->
+- `D` and `N` are encoded as necessary like all other normal data. The !yenc encoding must be decoded first to get the actual value of them.  
+- `R` (RP above) is NOT encoded. When RLE is enabled, all of the ' ' in the input data get encoded, and ' ' becomes part of the encoding scheme itself like '!'.  
+- `N` can only encode up to 255. Longer runs simply use multiple rle codes up to 255 each.  
+- `N` is one less than the length of the total run. `D` is the first byte in the run, `N` adds to it.  
 
 ## Examples
 <!--
@@ -254,6 +190,38 @@ XA=+122
 real	0m5.571s
 user	0m5.541s
 sys	0m0.032s
+```
+
+## Sending the loader to the 100
+Aside from using `dl -vb` which is reliable and easy but slow, here is another option that is crude but fast.
+
+Paste this function into a terminal for a quick & dirty bootstrapper.  
+Or save it as a script obviously.  
+
+```
+tsend () {
+	local d=${2:-/dev/ttyUSB0} b=${3:-9600} s=([19200]=9 [9600]=8 [4800]=7 [2400]=6 [1200]=5 [600]=4 [300]=3)
+	((${#1})) || { echo "${FUNCNAME[0]} FILE.DO [/dev/ttyX] [baud]" ;return ; }
+	[[ -c $d ]] || { echo /dev/tty* ;return ; }
+	((${#s[b]})) || { echo ${!s[*]} ;return ; }
+	echo "100/200/K85/M10: RUN\"COM:${s[b]}8N1ENN"
+	echo "      8201/8300: RUN\"COM:${s[b]}N81XN"
+	read -p "Press [Enter] whean ready: " ;echo "Sending..."
+	stty -F $d $b raw pass8 clocal cread time 1 min 1 -crtscts ixon ixoff flusho -drain
+	cat $1 >$d
+	printf '%b' '\x1A' >$d
+}
+```
+
+```
+$ RLE=true co2ba ALTERN.CO call >t
+RLE ENABLED
+$ tsend t
+100/200/K85/M10: RUN"COM:88N1ENN
+      8201/8300: RUN"COM:8N81XN
+Press [Enter] whean ready: 
+Sending...
+$
 ```
 
 ## See also

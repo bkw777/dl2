@@ -12,19 +12,18 @@ LANG=C
 : ${EDITSAFE:=true}
 : ${METHOD:=Y}
 : ${EP:='!'}
-: ${XA:=^64}
-: ${XB:=^128}
-: ${YENC:=false}
-: ${CARAT:=false}
-
+: ${XA:=^64}       # 0 best ^### +###     default '^64'  
+: ${XB:=^128}      # ^### +###            default '^128'
 : ${RLE:=false}
 : ${RP:=' '}
+: ${YENC:=false}
+: ${CARAT:=false}
 
 # shorthands for some generic standards we can output
 $YENC && EP='=' XA="+42" XB="+64"
 $CARAT && EP='^' XA=0 XB="+64"
 $CARAT && echo "Notice: carat-encoding is broken" >&2
-$RLE && echo "(UG)RLE ENABLED  Notice: WIP: currently only works if XA=0, and only supported in METHOD=Y" >&2
+$RLE && echo "RLE ENABLED" >&2
 
 COFN=$1 ;shift
 ACTION=${1^^} ;shift
@@ -37,9 +36,8 @@ printf -v ep '%u' "'$EP" ;UNSAFE+=" $ep"
 $RLE && { printf -v rp '%u' "'$RP" ;UNSAFE+=" $rp" ; }
 $EDITSAFE && UNSAFE+=" 127"
 readonly g=$LINE_GAP u=",${UNSAFE// /,}," EP ep RP rp
-#ta=${XA:1} xa=true ;[[ "${XA:0:1}" = "+" ]] && xa=false ;readonly xa ta # transform A, to shift all bytes
 tb=${XB:1} xb=true ;[[ "${XB:0:1}" = "+" ]] && xb=false ;readonly xb tb # transform B, to encode unsafe bytes
-unset Ev Qd Qv
+unset Ev Qd Qv UNTA
 n=$FIRST
 
 abrt () { printf '%s: Usage\n%s IN.CO [call|exec|callba|execba|savem|bsave] > OUT.DO\n%b\n' "$0" "${0##*/}" "$@" >&2 ;exit 1 ; }
@@ -80,28 +78,10 @@ find_xa () {
 	readonly xa ta
 }
 
-# Transform every byte according to XA
-# Write the BASIC code to reverse it in UNTA
-transform_a () {
-	find_xa
-	unset Qd Qv UNTA
-	((ta)) || return
-	$xa && {
-		# xor
-		for ((i=0;i<LEN;i++)) { ((d[i]^=ta)) ; }
-		Qd=",Q" Qv=$ta
-		UNTA="B=BXORQ:"
-	} || {
-		# rot
-		for ((i=0;i<LEN;i++)) { ((d[i]=(d[i]+ta)%256)) ; }
-		Qd=",Q" Qv=$((256-ta))
-		UNTA="B=(B+Q)MOD256:"
-	}
-}
-
 # encode a single byte $1 to $o
 enc_o () {
 	local -i b=$1
+	((ta)) && { $xa && b=$((b^ta)) || b=$(((b+ta)%256)) ; }
 	[[ $u = *,$b,* ]] && {
 		$xb && b=$((b^tb)) || b=$(((b+tb)%256))
 		printf -v o '%03o' $b
@@ -157,25 +137,32 @@ printf '%s\r' "${O/\%s/$x}"
 
 case $METHOD in
 	Y) # !yenc - Adolph/B9/White yenc-like encoding
-		transform_a
+		unset Qd Qv UNTA ;find_xa ;((ta)) && { Qd=",Q" ;$xa && Qv=$ta UNTA="B=BXORQ:" || Qv=$((256-ta)) UNTA="B=(B+Q)MOD256:" ; }
 		$xb && Ev=$tb UNTB="ASC(O)XORD" || Ev=$((256-tb)) UNTB="(ASC(O)+D)MOD256"
-
-		$RLE && { # works!!!! if XA=0, otherwise bad checksum - but even then call to the exe addr seems to work anyway
+		$RLE && {
 			printf '%uREADF:CLEAR8,F:DEFINTA-E,G,K,P,S,T%s:DEFSNGF,H-J:DEFSTRL-O,R:READF,A,J,G,N,E%s:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:R="%c":S=0:B=-1:P=-1:CLS:?USING"Installing \    \   0%%";N\r' $n "$Qd" "$Qd" "$EP" "$RP"
-			printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IF(O=M)THEND=E:NEXT\r' $((++n*g)) ;((l=n))
-			printf '%uIF(D=0ANDO=R)THENS=1:NEXT\r' $((++n*g))
+			printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IF(O=M)THEND=E:NEXT:ELSEIF(O=R)THENS=1:NEXT\r' $((++n*g)) ;((l=n))
+
+			# cute no dupes, but slow of course doing a FOR1TO1 loop on every byte  ALTERN.DO 3:09 vs 2:55
+			#printf '%uB=%s:%sD=0:IFS=0THENP=B:B=1\r' $((++n*g)) "$UNTB" "$UNTA"
+			#printf '%uFORT=1TOB:POKEI,P:I=I+1:K=(KXORP)+1:NEXT:S=0:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $((l*g))
+
+			# annoying dupe code but faster
 			printf '%uB=%s:%sD=0\r' $((++n*g)) "$UNTB" "$UNTA"
-			printf '%uIFS>0THENFORT=1TOB:POKEI,P:I=I+1:K=(KXORP)+1:NEXTT\r' $((++n*g))
-			printf '%uIFS=0THENP=B:POKEI,P:I=I+1:K=(KXORP)+1\r' $((++n*g))
-			printf '%uS=0:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $((l*g))
+			printf '%uIFS=0THENP=B:POKEI,P:I=I+1:K=(KXORP)+1:NEXT:ELSES=0:FORT=1TOB:POKEI,P:I=I+1:K=(KXORP)+1:NEXT:NEXT\r' $((++n*g))
+			printf '%u?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $((l*g))
+
+			# 3 seconds slower just from trying to de-dupe the NEXTS
+			#printf '%uIFS=0THENP=B:POKEI,P:I=I+1:K=(KXORP)+1:ELSES=0:FORT=1TOB:POKEI,P:I=I+1:K=(KXORP)+1:NEXT\r' $((++n*g))
+			#printf '%uS=0:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $((l*g))
+
 		} || {
 			printf '%uREADF:CLEAR2,F:DEFINTA-E,G,K%s:DEFSNGF,H-J:DEFSTRL-O:READF,A,J,G,N,E%s:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing "N"   0%%"\r' $n "$Qd" "$Qd" "$EP"
 			printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=%s:%sD=0:POKEI,B:I=I+1:K=(KXORB)+1:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$UNTB" "$UNTA" $((n*g))
 		}
-
 	;;
 	B) # Same as Y but avoids using IF in the inner loop, but actually runs slower
-		transform_a
+		unset Qd Qv UNTA ;find_xa ;((ta)) && { Qd=",Q" ;$xa && Qv=$ta UNTA="B=BXORQ:" || Qv=$((256-ta)) UNTA="B=(B+Q)MOD256:" ; }
 		$xb && Ev=$tb UNTB="BXORE*D" || Ev=$((256-tb)) UNTB="(B+E*D)MOD256"
 		printf '%uREADF:CLEAR2,F:DEFINTA-E,G,K,O-P%s:DEFSNGF,H-J:DEFSTRL-N:READF,A,J,G,N,E%s:M="":C=0:I=F:H=F+A-1:K=0:D=0:O=%u:P=0:CLS:?"Installing "N"   0%%"\r' $n "$Qd" "$Qd" $ep
 		# X=SGN(AXORB) could be X=-(A<>B)  but SGN(XOR) is slightly faster, 40 vs 43 seconds for 10000
@@ -252,25 +239,4 @@ for ((i=0;i<LEN;i++)) {
 	[[ "$METHOD" == "I" ]] && O=${O:0:-1}
 	$RLE && { rle_o $pb $rl ;O+="$o" ; }
 	printf '%s\r' "$O"
-}
-
-# output trailing ^Z for directly catting into BASIC without dl -b
-#printf '%b' '\032'
-
-exit
-
-# paste this function into a terminal for a quick & dirty bootstrapper
-#   $ RLE=true XA=0 co2ba.sh ALTERN.CO callba >t
-#   $ tsend t
-tsend () {
-	local d=${2:-/dev/ttyUSB0} b=${3:-9600} s=([19200]=9 [9600]=8 [4800]=7 [2400]=6 [1200]=5 [600]=4 [300]=3)
-	((${#1})) || { echo "${FUNCNAME[0]} FILE.DO [/dev/ttyX] [baud]" ;return ; }
-	[[ -c $d ]] || { echo /dev/tty* ;return ; }
-	((${#s[b]})) || { echo ${!s[*]} ;return ; }
-	echo "NEC: RUN\"COM:${s[b]}N81XN"
-	echo "100/102/200/K85/M10: RUN\"COM:${s[b]}8N1ENN"
-	read -p "Press [Enter] whean ready: " ;echo "Sending..."
-	stty -F $d $b raw pass8 clocal cread time 1 min 1 -crtscts ixon ixoff flusho -drain
-	cat $1 >$d
-	printf '%b' '\x1A' >$d
 }
