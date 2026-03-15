@@ -140,21 +140,21 @@ case $METHOD in
 		unset Qd Qv UNTA ;find_xa ;((ta)) && { Qd=",Q" ;$xa && Qv=$ta UNTA="B=BXORQ:" || Qv=$((256-ta)) UNTA="B=(B+Q)MOD256:" ; }
 		$xb && Ev=$tb UNTB="ASC(O)XORD" || Ev=$((256-tb)) UNTB="(ASC(O)+D)MOD256"
 		$RLE && {
-			printf '%uREADF:CLEAR8,F:DEFINTA-E,G,K,P,S,T%s:DEFSNGF,H-J:DEFSTRL-O,R:READF,A,J,G,N,E%s:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:R="%c":S=0:B=-1:P=-1:CLS:?USING"Installing \    \   0%%";N\r' $n "$Qd" "$Qd" "$EP" "$RP"
+			printf '%uREADF:CLEAR8,F:DEFINTA-E,G,K,P,S%s:DEFSNGF,H-J:DEFSTRL-O,R:READF,A,J,G,N,E%s:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:R="%c":S=0:B=-1:P=-1:CLS:?USING"Installing \    \   0%%";N\r' $n "$Qd" "$Qd" "$EP" "$RP"
 			printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IF(O=M)THEND=E:NEXT:ELSEIF(O=R)THENS=1:NEXT\r' $((++n*g)) ;((l=n))
 
 			# cute no dupes, but slow of course doing a FOR1TO1 loop on every byte  ALTERN.DO 3:09 vs 2:54
 			#printf '%uB=%s:%sD=0:IFS=0THENP=B:B=1\r' $((++n*g)) "$UNTB" "$UNTA"
-			#printf '%uFORT=1TOB:POKEI,P:I=I+1:K=(KXORP)+1:NEXT:S=0:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $((l*g))
+			#printf '%uFORS=-BTO-1:POKEI,P:I=I+1:K=(KXORP)+1:NEXT:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $((l*g))
 
 			# annoying dupe code but faster
 			printf '%uB=%s:%sD=0\r' $((++n*g)) "$UNTB" "$UNTA"
-			printf '%uIFS=0THENP=B:POKEI,P:I=I+1:K=(KXORP)+1:NEXT:ELSES=0:FORT=1TOB:POKEI,P:I=I+1:K=(KXORP)+1:NEXT:NEXT\r' $((++n*g))
+			printf '%uIFS=0THENP=B:POKEI,P:I=I+1:K=(KXORP)+1:NEXT:ELSEFORS=-BTO-1:POKEI,P:I=I+1:K=(KXORP)+1:NEXT:NEXT\r' $((++n*g))
 			printf '%u?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $((l*g))
 
-			# 3 seconds slower just from trying to de-dupe the NEXTS
-			#printf '%uIFS=0THENP=B:POKEI,P:I=I+1:K=(KXORP)+1:ELSES=0:FORT=1TOB:POKEI,P:I=I+1:K=(KXORP)+1:NEXT\r' $((++n*g))
-			#printf '%uS=0:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $((l*g))
+			# 3 seconds slower just from deduping a NEXT
+			#printf '%uIFS=0THENP=B:POKEI,P:I=I+1:K=(KXORP)+1:ELSEFORS=-BTO-1:POKEI,P:I=I+1:K=(KXORP)+1:NEXT\r' $((++n*g))
+			#printf '%uNEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $((l*g))
 
 		} || {
 			printf '%uREADF:CLEAR2,F:DEFINTA-E,G,K%s:DEFSNGF,H-J:DEFSTRL-O:READF,A,J,G,N,E%s:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing "N"   0%%"\r' $n "$Qd" "$Qd" "$EP"
