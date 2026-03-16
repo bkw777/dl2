@@ -56,7 +56,8 @@ CARAT=false    # output standard carat encoding, shorthand for ESC='^' XA=0 XB="
 -->
 
 ## Encoding schemes
-Method Y "!yenc" (default):  
+### Method Y  
+"!yenc" (default)  
 The main idea of this one comes from [Stephen Adolph](https://www.mail-archive.com/m100@lists.bitchin100.com/msg06918.html), modified by [HackerB9 & Brian White](https://www.mail-archive.com/m100@lists.bitchin100.com/msg20099.html).  
 It is very similar to [yEnc](http://www.yenc.org/yenc-draft.1.3.txt).  
   - First, apply a simple transform the same way to all input bytes.  
@@ -69,32 +70,36 @@ It is very similar to [yEnc](http://www.yenc.org/yenc-draft.1.3.txt).
       - Apply another simple transform to make a safe byte.  
         yenc does rot64 `(val+64)%256`, we do xor128 `val^128`, aka toggle the high bit.
 
-Method B:  
+### Method B:  
   Identical data to Y.  
   The difference is the inner loop in BASIC to decode bytes does not use any IF branching.  
   It's actually slower so don't use it.  
   It's just here because if it wasn't, you or I would try to do it again.  
   Also it was hard to figure out so I want to keep it as a reference for tricks. And who knows maybe it can get better.
 
-Method H:  
+### Method H:  
   Hex pairs a-la James Yi / Kurt McCullum / others.  
   Hex pairs, but using a single contiguous range of ascii values like a-p for the alphabet instead of 0-9A-F.  
   0x00 = aa, 0x01 = ab, ... 0xFF = pp  
   A lot of old loaders use this because the code is small and simple, and the output is at least better than plain ints.
 
-Method I:  
+### Method I:  
   Plain comma seperated integers.  
   The simplest possible way to put binary into DATA statements and read them.  
   It's useful for very small payloads because the BASIC to load it is almost nothing.
 
-All methods include a rolling xor checksum to catch corrupt serial transfers.
 
+## Optimization
+
+### XA=n
 For !yenc, you can get a slightly smaller output file by using `XA=best` .  
 This will internally try all possible XA values with both xor & rot (^0-^255 +0-+255) and pick the best.  
-This will take several seconds and generally produce a smaller file, but usually not by much,
-and the loader may actually run slower if "best" lands on a + value rather than a ^ value, which is why "best" is not the default.  
+This will take several seconds and generally produce a smaller file, but usually not by much,  
+and the loader may actually run slower if "best" lands on a + value rather than a ^ value,  
+which is why "best" is not the default.  
 Note, every input file will have it's own different best value.
 
+### Run-Length Encoding
 `RLE=true` enables run-length-encoding compression.
 
 For most input files this will only make the output larger, and the loader slower.
@@ -108,6 +113,16 @@ The encoding scheme is `DRN` , where:
 `R` (RP above) is NOT encoded. When RLE is enabled, all of the ' ' in the input data get encoded, and ' ' becomes part of the encoding scheme itself like '!'.  
 `N` can only encode up to 255. Longer runs simply use multiple rle codes up to 255 each.  
 `N` is one less than the length of the total run. `D` is the first byte in the run, `N` adds to it.  
+
+### Checksum
+By default all methods include a rolling xor checksum to catch corrupt serial transfers.
+
+There are a few other checksum strategies to choose from if you want something more bulletproof than the simple rolling xor.
+
+xor  - `sum = sum ^ byte`  fastest, only needs INT variables, but will miss some errors in some input data patterns  
+xor+ - `sum = sum ^ byte + 1`  slower but stronger (nuls count), and needs DEFSNG variables  
+mod+ - `sum=(sum+1+byte)%32512`  strong while still only needing INT variables, but slower  
+sum+ - `sum = sum + byte + 1`  strong, needs DEFSNG variables, and suprizingly the slowest
 
 ## Examples
 <!--
