@@ -16,6 +16,7 @@ Reads a binary .CO file and generates an ascii BASIC loader .DO file
  execba - Create a launcher NAME.BA - for NEC
  savem  - Save NAME.CO - for TANDY, Kyotronic, Olivetti
  bsave  - Save NAME.CO - for NEC
+ time   - Just show how many seconds it took the loader to run
  ```
  Otherwise if the option is not given, or any other value than these, the loader will only print a message showing the Top, End, and Exec addresses of the loaded binary.  
 
@@ -46,6 +47,7 @@ XA=^64         # (Y) initial transform applied to all bytes - best,0,^###,+###
 XB=^128        # (Y) encoding transform applied to unsafe bytes - ^###,+###
 RLE=false      # (Y) enable run-length encoding (doesn't help, and the loader is much slower)
 RP=' '         # (Y) rle prefix - character that indicates the next byte is how many copies of the previous byte to append here
+CHECKSUM=xor   # xor xor+ mod+ sum+
 YENC=false     # output standard yEnc, shorthand for ESC='=' XA='+42' XB='+64'
 ```
 <!-- does not work
@@ -89,8 +91,9 @@ All methods include a rolling + incrementing xor checksum to catch corrupt seria
 
 For !yenc, you can get a slightly smaller output file by using `XA=best` .  
 This will internally try all possible XA values with both xor & rot (^0-^255 +0-+255) and pick the best.  
-This will take several seconds and generally produce a smaller file, but not greatly, which is why it's not the default.  
-The best value will be different for every input file.
+This will take several seconds and generally produce a smaller file, but usually not by much,
+and the loader may actually run slower if "best" lands on a + value rather than a ^ value, which is why "best" is not the default.  
+Note, every input file will have it's own different best value.
 
 `RLE=true` enables run-length-encoding compression.
 
