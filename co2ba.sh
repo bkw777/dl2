@@ -100,16 +100,12 @@ enc_o () {
 rle_o () {
 	local -i b=$1 n=$2 ;local x=
 	((n>2)) && {
-		x="$RP"
 		enc_o $n
-		x+="$o"
+		o="$RP$o"
 	} || {
-		for ((;n;n--)) {
-			enc_o $b
-			x+="$o"
-		}
+		enc_o $b ;x="$o" o=
+		for ((;n;n--)) { o+="$x" ; }
 	}
-	o="$x"
 }
 
 ###############################################################################
@@ -240,13 +236,9 @@ for ((i=0;i<LEN;i++)) {
 		I) o=$cb, ;;
 		H) o=${h[cb/16]}${h[cb%16]} ;;
 		*)
-			$RLE && ((cb==pb && rl<255)) && {
-				: $((rl++))
-			} || {
-				x=
-				$RLE && { rle_o $pb $rl ;rl=0 x="$o" ; }
+			$RLE && ((cb==pb && rl++<255)) || {
 				enc_o $cb
-				o="$x$o"
+				((rl)) && { x="$o" ;rle_o $pb $rl ;rl=0 o+="$x" ; }
 			}
 			;;
 	esac
@@ -266,6 +258,6 @@ for ((i=0;i<LEN;i++)) {
 
 ((${#O})) && {
 	[[ "$METHOD" == "I" ]] && O=${O:0:-1}
-	$RLE && { rle_o $pb $rl ;O+="$o" ; }
+	((rl)) && { rle_o $pb $rl ;O+="$o" ; }
 	printf '%s\r' "$O"
 }
