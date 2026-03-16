@@ -99,6 +99,7 @@ enc_o () {
 # $2 number of copies
 rle_o () {
 	local -i b=$1 n=$2 ;local x=
+	#echo "b=$b n=$n" >&2
 	((n>2)) && {
 		enc_o $n
 		o="$RP$o"
@@ -152,18 +153,17 @@ case ${METHOD^^} in
 			$TIME && printf '%uGOSUB%u\r' $((++n*g)) $((tn*g))
 			printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IF(O=M)THEND=E:NEXT:ELSEIF(O=R)THENS=1:NEXT\r' $((++n*g)) ;((l=n))
 
-			# cute no dupes, but slow of course doing a FOR1TO1 loop on every byte
-			#printf '%uB=%s:%sD=0:IFS=0THENP=B:B=1\r' $((++n*g)) "$UNTB" "$UNTA"
-			#printf '%uFORS=-BTO-1:POKEI,P:I=I+1:K=%s:NEXT:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$K" $((l*g))
-
-			# annoying dupe code but faster
-			printf '%uB=%s:%sD=0\r' $((++n*g)) "$UNTB" "$UNTA"
-			printf '%uIFS=0THENP=B:POKEI,P:I=I+1:K=%s:NEXT:ELSEFORS=-BTO-1:POKEI,P:I=I+1:K=%s:NEXT:NEXT\r' $((++n*g)) "$K" "$K"
+			# fastest
+			printf '%uB=%s:%sD=0:IFS=0THENP=B:POKEI,P:I=I+1:K=%s:NEXT:ELSEFORS=-BTO-1:POKEI,P:I=I+1:K=%s:NEXT:NEXT\r' $((++n*g)) "$UNTB" "$UNTA" "$K" "$K"
 			printf '%u?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $((l*g))
 
-			# 3 seconds slower just from deduping a NEXT
-			#printf '%uIFS=0THENP=B:POKEI,P:I=I+1:K=%s:ELSEFORS=-BTO-1:POKEI,P:I=I+1:K=%s:NEXT\r' $((++n*g)) "$K" "$K"
+			# slower
+			#printf '%uB=%s:%sD=0:IFS=0THENP=B:POKEI,P:I=I+1:K=%s:ELSEFORS=-BTO-1:POKEI,P:I=I+1:K=%s:NEXT\r' $((++n*g)) "$UNTB" "$UNTA" "$K" "$K"
 			#printf '%uNEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $((l*g))
+
+			# slowest
+			#printf '%uB=%s:%sD=0:IFS=0THENP=B:B=1\r' $((++n*g)) "$UNTB" "$UNTA"
+			#printf '%uFORS=-BTO-1:POKEI,P:I=I+1:K=%s:NEXT:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$K" $((l*g))
 
 		} || {
 			$ik && printf '%uREADF:CLEAR12,F:DEFINTA-E,G,K%s:DEFSNGF,H-J:DEFSTRL-O:READF,A,J,G,N,E%s:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing "N"   0%%"\r' $n "$Qd" "$Qd" "$EP" \
@@ -246,12 +246,10 @@ for ((i=0;i<LEN;i++)) {
 	((pb=cb))
 
 	((${#O}+${#o}<LINE_LEN)) && {
-		O+=$o
-		o=
+		O+=$o o=
 	} || {
 		[[ "$METHOD" == "I" ]] && O=${O:0:-1}
-		printf '%s\r' "$O"
-		O=
+		printf '%s\r' "$O" ;O=
 	}
 
 }
