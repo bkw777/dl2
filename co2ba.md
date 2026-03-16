@@ -87,7 +87,7 @@ Method I:
   The simplest possible way to put binary into DATA statements and read them.  
   It's useful for very small payloads because the BASIC to load it is almost nothing.
 
-All methods include a rolling + incrementing xor checksum to catch corrupt serial transfers.
+All methods include a rolling xor checksum to catch corrupt serial transfers.
 
 For !yenc, you can get a slightly smaller output file by using `XA=best` .  
 This will internally try all possible XA values with both xor & rot (^0-^255 +0-+255) and pick the best.  
