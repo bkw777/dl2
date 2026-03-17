@@ -144,7 +144,7 @@ $TIME && tn=20
 $ik && di=",G,K" dn="F,H-J" || di="" dn="F-K"  # DEFINT DEFSNG
 case ${METHOD^^} in
 	Y) # !yenc - Adolph/B9/White yenc-like encoding
-		unset Qd Qv UNTA ;find_xa ;((ta)) && { Qd=",Q" ;$xa && Qv=$ta UNTA="B=BXORQ:" || Qv=$((256-ta)) UNTA="B=(B+Q)MOD256:" ; }
+		unset Qd Qv UNTA ;find_xa ;((ta)) && { Qd=",Q" ;$xa && Qv=$ta UNTA=":B=BXORQ" || Qv=$((256-ta)) UNTA=":B=(B+Q)MOD256" ; }
 		$xb && Ev=$tb UNTB="ASC(O)XORD" || Ev=$((256-tb)) UNTB="(ASC(O)+D)MOD256"
 
 		$RLE && {
@@ -155,21 +155,21 @@ case ${METHOD^^} in
 			printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IF(O=M)THEND=E:NEXT:ELSEIF(O=R)THENS=1:NEXT\r' $((++n*g)) ;((l=n))
 
 			# fastest
-			printf '%uB=%s:%sD=0:IFS=0THENP=B:POKEI,P:I=I+1:K=%s:NEXT:ELSEFORS=-BTO-1:POKEI,P:I=I+1:K=%s:NEXT:NEXT\r' $((++n*g)) "$UNTB" "$UNTA" "$K" "$K"
+			printf '%uB=%s%s:D=0:IFS=0THENP=B:POKEI,P:I=I+1:K=%s:NEXT:ELSEFORS=-BTO-1:POKEI,P:I=I+1:K=%s:NEXT:NEXT\r' $((++n*g)) "$UNTB" "$UNTA" "$K" "$K"
 			printf '%u?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $((l*g))
 
 			# slower
-			#printf '%uB=%s:%sD=0:IFS=0THENP=B:POKEI,P:I=I+1:K=%s:ELSEFORS=-BTO-1:POKEI,P:I=I+1:K=%s:NEXT\r' $((++n*g)) "$UNTB" "$UNTA" "$K" "$K"
+			#printf '%uB=%s%s:D=0:IFS=0THENP=B:POKEI,P:I=I+1:K=%s:ELSEFORS=-BTO-1:POKEI,P:I=I+1:K=%s:NEXT\r' $((++n*g)) "$UNTB" "$UNTA" "$K" "$K"
 			#printf '%uNEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) $((l*g))
 
 			# slowest
-			#printf '%uB=%s:%sD=0:IFS=0THENP=B:B=1\r' $((++n*g)) "$UNTB" "$UNTA"
+			#printf '%uB=%s%s:D=0:IFS=0THENP=B:B=1\r' $((++n*g)) "$UNTB" "$UNTA"
 			#printf '%uFORS=-BTO-1:POKEI,P:I=I+1:K=%s:NEXT:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$K" $((l*g))
 
 		} || {
 			printf '%uREADF:CLEAR12,F:DEFINTA-E%s%s:DEFSNG%s:DEFSTRL-O:READF,A,J,G,N,E%s:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing "N"   0%%"\r' $n "$Qd" "$di" "$dn" "$Qd" "$EP"
 			$TIME && printf '%uGOSUB%u\r' $((++n*g)) $((tn*g))
-			printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=%s:%sD=0:POKEI,B:I=I+1:K=%s:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$UNTB" "$UNTA" "$K" $((n*g))
+			printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=%s%s:D=0:POKEI,B:I=I+1:K=%s:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$UNTB" "$UNTA" "$K" $((n*g))
 		}
 	;;
 	B) # Same as Y but avoids using IF in the inner loop, but actually runs slower - NO RLE
@@ -179,7 +179,7 @@ case ${METHOD^^} in
 		$TIME && printf '%uGOSUB%u\r' $((++n*g)) $((tn*g))
 		K="${K/B/B\*P}" K="${K/1/P}"
 		# P=SGN(BXORO) is faster than P=-(P<>O)
-		printf '%uREADL:FORC=1TOLEN(L):B=ASC(MID$(L,C,1)):P=SGN(BXORO):B=%s:%sD=PXOR1:POKEI,B:I=I+P:K=%s:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$UNTB" "$UNTA" "$K" $((n*g))
+		printf '%uREADL:FORC=1TOLEN(L):B=ASC(MID$(L,C,1)):P=SGN(BXORO):B=%s%s:D=PXOR1:POKEI,B:I=I+P:K=%s:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$UNTB" "$UNTA" "$K" $((n*g))
 	;;
 	H) # hex pairs
 		typeset -ra h=({a..p})  # hex data output alphabet
