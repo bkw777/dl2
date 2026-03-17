@@ -130,7 +130,7 @@ d=(${d[*]:6})
 CHK=0 ik=true
 case "$CHECKSUM" in
 	sum\+|strongest) for ((i=0;i<LEN;i++)) { ((CHK+=d[i]+1)) ; } ;K="K+B+1" ik=false ;; # SNG - 144 seconds
-	mod\+|stronger) M=32512 ;for ((i=0;i<LEN;i++)) { ((CHK=(CHK+1+d[i])%M)) ; } ;K="(K+1+B)MOD$M" ;; # INT - 142 seconds (any M)
+	mod\+|stronger) M=32512 ;for ((i=0;i<LEN;i++)) { ((CHK=(CHK+1+d[i])%M)) ; } ;K="(K+B+1)MOD$M" ;; # INT - 142 seconds (any M)
 	xor\+|strong) for ((i=0;i<LEN;i++)) { ((CHK^=d[i]+1)) ; } ;K="KXORB+1" ik=false ;; # SNG - 134 seconds   DEFSNG because while CHK generally stays small it is possible to exceed INT with the right input data
 	xor|fast|*) for ((i=0;i<LEN;i++)) { ((CHK^=d[i])) ; } ;K="KXORB" ;; # INT - 126 seconds
 esac
@@ -176,9 +176,10 @@ case ${METHOD^^} in
 		unset Qd Qv UNTA ;find_xa ;((ta)) && { Qd=",Q" ;$xa && Qv=$ta UNTA="B=BXORQ:" || Qv=$((256-ta)) UNTA="B=(B+Q)MOD256:" ; }
 		$xb && Ev=$tb UNTB="BXORE*D" || Ev=$((256-tb)) UNTB="(B+E*D)MOD256"
 		printf '%uREADF:CLEAR12,F:DEFINTA-E,O-P%s%s:DEFSNG%s:DEFSTRL-N:READF,A,J,G,N,E%s:M="":C=0:I=F:H=F+A-1:K=0:D=0:O=%u:P=0:CLS:?"Installing "N"   0%%"\r' $n "$Qd" "$di" "$dn" "$Qd" $ep
-		# X=SGN(AXORB) could be X=-(A<>B)  but SGN(XOR) is slightly faster, 40 vs 43 seconds for 10000
 		$TIME && printf '%uGOSUB%u\r' $((++n*g)) $((tn*g))
-		printf '%uREADL:FORC=1TOLEN(L):B=ASC(MID$(L,C,1)):P=SGN(BXORO):B=%s:%sPOKEI,B:I=I+P:K=%s*P:D=PXOR1:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$UNTB" "$UNTA" "$K" $((n*g))
+		K="${K/B/B\*P}" K="${K/1/P}"
+		# P=SGN(BXORO) is faster than P=-(P<>O)
+		printf '%uREADL:FORC=1TOLEN(L):B=ASC(MID$(L,C,1)):P=SGN(BXORO):B=%s:%sD=PXOR1:POKEI,B:I=I+P:K=%s:NEXT:?@18,USING"###%%";(I-F)*100/A:IFI<=HTHEN%u\r' $((++n*g)) "$UNTB" "$UNTA" "$K" $((n*g))
 	;;
 	H) # hex pairs
 		typeset -ra h=({a..p})  # hex data output alphabet
