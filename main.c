@@ -78,6 +78,18 @@ MA 02111, USA.
 #define DEFAULT_BAUD 19200
 #endif
 
+#ifndef BOOTSTRAP_BAUD
+#define BOOTSTRAP_BAUD 9600
+#endif
+
+#ifndef DEFAULT_XONOFF
+#define DEFAULT_XONOFF false
+#endif
+
+#ifndef DEFAULT_RTSCTS
+#define DEFAULT_RTSCTS false
+#endif
+
 // default model emulation, 1=pdd1 2=pdd2
 // TS-DOS sub-directories requires tpdd1
 #ifndef DEFAULT_MODEL
@@ -86,7 +98,7 @@ MA 02111, USA.
 
 // if a loader fails in bootstrap(), try increasing this
 #ifndef DEFAULT_BASIC_BYTE_MS
-#define DEFAULT_BASIC_BYTE_MS 8
+#define DEFAULT_BASIC_BYTE_MS 0
 #endif
 
 #define DEFAULT_TPDD1_IMG_SUFFIX ".pdd1"
@@ -94,10 +106,6 @@ MA 02111, USA.
 
 #ifndef DEFAULT_UPCASE
 #define DEFAULT_UPCASE false
-#endif
-
-#ifndef DEFAULT_RTSCTS
-#define DEFAULT_RTSCTS false
 #endif
 
 #ifndef DEFAULT_PROFILE
@@ -121,6 +129,7 @@ MA 02111, USA.
 #define TSDOS_PARENT_LABEL "^     "
 #endif
 // you can't change this unless you also hack ts-dos
+// conflicts with https://github.com/LivingM100SIG/Living_M100SIG/blob/main/M100SIG/Lib-07-UTILITIES/CRUNCH.100 but go back in time and complain to Travelling Software about it
 #define TSDOS_DIR_LABEL    "<>"
 
 /*
@@ -225,17 +234,18 @@ const char * magic_files[] = {
 
 // termios VMIN & VTIME
 #define C_CC_VMIN 1
-#define C_CC_VTIME 5
+#define C_CC_VTIME 0
 
 /*************************************************************/
 
 int debug = 0;
+uint16_t baud = DEFAULT_BAUD;
+bool xonoff = DEFAULT_XONOFF;
+bool rtscts = DEFAULT_RTSCTS;
 int operation_mode = DEFAULT_OPERATION_MODE;
 bool upcase = DEFAULT_UPCASE;
-bool rtscts = DEFAULT_RTSCTS;
 bool tildes = DEFAULT_TILDES;
 uint8_t model = DEFAULT_MODEL;
-uint16_t baud = DEFAULT_BAUD;
 int BASIC_byte_us = DEFAULT_BASIC_BYTE_MS*1000;
 
 char client_tty_name[PATH_MAX+1] = {0x00};
@@ -322,11 +332,15 @@ void dbg( const int v, const char* format, ... ) {
 // dbg_b(3, b, 24); // like dbg() except
 // print n bytes of b[] as hex pairs and a trailing newline
 // if n<0, then use TPDD_MSG_MAX
-void dbg_b(const int v, unsigned char* b, int n) {
+void _dbg_b(const int v, unsigned char* b, int n) {
 	if (debug<v) return;
 	unsigned i;
 	if (n<0) n = TPDD_MSG_MAX;
 	for (i=0;i<n;i++) fprintf (stderr,"%02X ",b[i]);
+}
+void dbg_b(const int v, unsigned char* b, int n) {
+	if (debug<v) return;
+	_dbg_b(v,b,n);
 	fprintf (stderr, "\n");
 	fflush(stderr);
 }
@@ -425,6 +439,85 @@ speed_t itobaud (uint32_t i) {
 #endif
 #ifdef B4000000
 		i==4000000?B4000000:
+#endif
+		0;
+}
+
+// rate-to-int - given macro B9600 return int 9600
+uint32_t baudtoi (speed_t i) {
+	return
+		i==B0?0:
+		i==B50?50:
+		i==B75?75:
+		i==B110?110:
+		i==B134?134:
+		i==B150?150:
+		i==B200?200:
+		i==B300?300:
+		i==B600?600:
+		i==B1200?1200:
+		i==B1800?1800:
+		i==B2400?2400:
+		i==B4800?4800:
+		i==B9600?9600:
+		i==B19200?19200:
+		i==B38400?38400:
+#ifdef B57600
+		i==B57600?57600:
+#endif
+#ifdef B76800
+		i==B76800?76800:
+#endif
+#ifdef B115200
+		i==B115200?115200:
+#endif
+#ifdef B153600
+		i==B153600?153600:
+#endif
+#ifdef B230400
+		i==B230400?230400:
+#endif
+#ifdef B307200
+		i==B307200?307200:
+#endif
+#ifdef B460800
+		i==B460800?460800:
+#endif
+#ifdef B500000
+		i==B500000?500000:
+#endif
+#ifdef B576000
+		i==B576000?576000:
+#endif
+#ifdef B614400
+		i==B614400?614400:
+#endif
+#ifdef B921600
+		i==B921600?921600:
+#endif
+#ifdef B1000000
+		i==B1000000?1000000:
+#endif
+#ifdef B1152000
+		i==B1152000?1152000:
+#endif
+#ifdef B1500000
+		i==B1500000?1500000:
+#endif
+#ifdef B2000000
+		i==B2000000?2000000:
+#endif
+#ifdef B2500000
+		i==B2500000?2500000:
+#endif
+#ifdef B3000000
+		i==B3000000?3000000:
+#endif
+#ifdef B3500000
+		i==B3500000?3500000:
+#endif
+#ifdef B4000000
+		i==B4000000?4000000:
 #endif
 		0;
 }
@@ -885,6 +978,9 @@ void resolve_client_tty_name () {
 }
 
 // set termios VMIN & VTIME
+// >=0 set the value explicitly
+// -1 set app default
+// -2 set app default if currently different
 void client_tty_vmt(int m,int t) {
 	if (m<-1 || t<-1) tcgetattr(client_tty_fd,&client_termios);
 	if (m<0) m = C_CC_VMIN;
@@ -893,6 +989,20 @@ void client_tty_vmt(int m,int t) {
 	client_termios.c_cc[VMIN] = m;
 	client_termios.c_cc[VTIME] = t;
 	tcsetattr(client_tty_fd,TCSANOW,&client_termios);
+}
+
+void show_tty_settings() {
+	if (debug<2) return;
+	tcgetattr(client_tty_fd,&client_termios);
+	dbg(0,"BAUD %u\n",baudtoi(cfgetispeed(&client_termios)));
+	dbg(0,"CRTSCTS %u\n",(client_termios.c_cflag & CRTSCTS) != 0 );
+	dbg(0,"IXON %u\n",(client_termios.c_iflag & IXON) != 0 );
+	dbg(0,"IXOFF %u\n",(client_termios.c_iflag & IXOFF) != 0 );
+	dbg(0,"IXANY %u\n",(client_termios.c_iflag & IXANY) != 0 );
+	dbg(0,"XON 0x%02X\n",client_termios.c_cc[VSTART]);
+	dbg(0,"XOFF 0x%02X\n",client_termios.c_cc[VSTOP]);
+	dbg(0,"VMIN %u\n",client_termios.c_cc[VMIN]);
+	dbg(0,"VTIME %u\n",client_termios.c_cc[VTIME]);
 }
 
 int open_client_tty () {
@@ -912,6 +1022,10 @@ int open_client_tty () {
 
 #ifdef TIOCEXCL
 	ioctl(client_tty_fd,TIOCEXCL);
+//#else
+//  #include <sys/file.h>
+//	if (flock(client_tty_fd,LOCK_EX|LOCK_NB) == -1) dbg(0,"Failed to get exclusive lock on tty.");
+//	flock(client_tty_fd,LOCK_EX|LOCK_NB);
 #endif
 
 #if !defined(_WIN)
@@ -924,30 +1038,47 @@ int open_client_tty () {
 
 	(void)!tcflush(client_tty_fd, TCIOFLUSH);
 
-	// unset O_NONBLOCK
-	fcntl(client_tty_fd, F_SETFL, fcntl(client_tty_fd, F_GETFL, NULL) & ~O_NONBLOCK);
-
 	if (tcgetattr(client_tty_fd,&client_termios)==-1) return 21;
 
 	cfmakeraw(&client_termios);
-	client_termios.c_cflag |= CLOCAL|CS8;
+
+	// unset O_NONBLOCK
+	fcntl(client_tty_fd, F_SETFL, fcntl(client_tty_fd, F_GETFL, NULL) & ~O_NONBLOCK);
+
+	if (cfsetspeed(&client_termios,itobaud(baud))==-1) return 22;
+
+	client_termios.c_iflag &= ~IXANY; // disable IXANY in all cases
+	if (xonoff) client_termios.c_iflag |= (IXON|IXOFF); // do not include IXANY
+	else client_termios.c_iflag &= ~(IXON|IXOFF);
 
 	if (rtscts) client_termios.c_cflag |= CRTSCTS;
 	else client_termios.c_cflag &= ~CRTSCTS;
 
-	if (cfsetspeed(&client_termios,itobaud(baud))==-1) return 22;
+	client_termios.c_cflag |= (CREAD|CLOCAL);
+	client_termios.c_cflag &= ~PARENB;
+	client_termios.c_cflag &= ~CSTOPB;
+	client_termios.c_cflag &= ~CSIZE;
+	client_termios.c_cflag |= CS8;
 
 	if (tcsetattr(client_tty_fd,TCSANOW,&client_termios)==-1) return 23;
 
 	client_tty_vmt(-2,-2);
 
+	//show_tty_settings();
+
 	return 0;
 }
 
+
+// reference
+// if (something) tcflow(client_tty_fd,TCOOFF);  //stop sending
+// else tcflow(client_tty_fd,TCOON);   //start sending
+
 int write_client_tty(void* b, int n) {
 	dbg(4,"%s(%u)\n",__func__,n);
+	dbg(3,"SEND: "); dbg_b(3,b,n);
 	n = write(client_tty_fd,b,n);
-	dbg(3,"SENT: "); dbg_b(3,b,n);
+	tcdrain(client_tty_fd);
 	return n;
 }
 
@@ -2512,8 +2643,7 @@ void get_opr_cmd() {
 
 void slowbyte(uint8_t b) {
 	write_client_tty(&b,1);
-	tcdrain(client_tty_fd);
-	usleep(BASIC_byte_us);
+	if(BASIC_byte_us) usleep(BASIC_byte_us);
 
 	// line-endings - convert CR, LF, CRLF to local eol
 	if (ch[0]==BASIC_EOL) {
@@ -2548,6 +2678,7 @@ int send_BASIC(char* f) {
 #if defined(PRINT_8BIT)
 	dbg(1,D8C); // disable 8-bit vt codes (0x80-0x9F) so we can print them
 #endif
+
 	dbg(0,"-- start --\n");
 	ch[0]=0x00;
 	while(read(fd,&b,1)==1) slowbyte(b);
@@ -2567,6 +2698,9 @@ int bootstrap(char* f) {
 		dbg(0,"Not found.\n");
 		return 1;
 	}
+
+	//client_tty_vmt(1,0);
+	//show_tty_settings();
 
 	char t[PATH_MAX+1]={0x00};
 	uint8_t sc = baud_to_stat_code(baud);
@@ -2620,24 +2754,25 @@ void show_config () {
 	dbg(0,"xattr_name      : \"%s\"\n",xattr_name);
 #endif
 	dbg(0,"upcase          : %s\n",upcase?"true":"false");
-	dbg(0,"rtscts          : %s\n",rtscts?"true":"false");
 	dbg(0,"verbosity       : %d\n",debug);
 	dbg(0,"dme_en          : %s\n",dme_en?"true":"false");
 	dbg(0,"magic_files     : %s\n",enable_magic_files?"true":"false");
-	dbg(0,"BASIC_byte_ms   : %d\n",BASIC_byte_us/1000);
 	dbg(0,"bootstrap_fname : \"%s\"\n",bootstrap_fname);
+	dbg(0,"BASIC_byte_ms   : %d\n",BASIC_byte_us/1000);
 	dbg(0,"app_lib_dir     : \"%s\"\n",app_lib_dir);
-	dbg(0,"client_tty_name : \"%s\"\n",client_tty_name);
 	dbg(0,"disk_img_fname  : \"%s\"\n",disk_img_fname);
 	dbg(2,"iwd             : \"%s\"\n",iwd);
 	dbg(2,"cwd             : \"%s\"\n",cwd);
 	dbg(0,"share_path[0]   : \"%s\"\n",share_path[0]);
 	dbg(0,"share_path[1]   : \"%s\"\n",share_path[1]);
-	dbg(0,"baud            : %d\n",baud);
 	dbg(0,"dme_root_label  : \"%-*.*s\"\n",6,6,dme_root_label);
 	dbg(0,"dme_parent_label: \"%-*.*s\"\n",6,6,dme_parent_label);
 	dbg(0,"dme_dir_label   : \"%-2.2s\"\n",dme_dir_label);
 	dbg(0,"tildes          : %s\n",tildes?"true":"false");
+	dbg(0,"client_tty_name : \"%s\"\n",client_tty_name);
+	dbg(0,"baud            : %d\n",baud);
+	dbg(0,"rtscts          : %s\n",rtscts?"true":"false");
+	dbg(0,"xonoff          : %s\n",xonoff?"true":"false");
 #if !defined(_WIN)
 	dbg(0,"getty_mode      : %s\n",getty_mode?"true":"false");
 #endif
@@ -2655,9 +2790,9 @@ void show_main_help() {
 		" -a attr     Attribute - attribute byte used for all files (%2$c)\n"
 #endif
 		" -b file     Bootstrap - send loader file to client - empty for help\n"
-		" -c profile  Client compatibility profile (%9$s) - empty for help\n"
-		" -d tty      Serial device connected to the client (%4$s*)\n"
-		" -e bool     TS-DOS Subdirectories (%10$s) - TPDD1-only\n"
+		" -c profile  Client compatibility profile (%8$s) - empty for help\n"
+		" -d tty      Serial device connected to the client (%3$s*)\n"
+		" -e bool     TS-DOS Subdirectories (%9$s) - TPDD1-only\n"
 		" -f          Start in FDC mode - TPDD1-only\n"
 #if !defined(_WIN)
 		" -g          Getty mode - run as daemon\n"
@@ -2665,17 +2800,16 @@ void show_main_help() {
 		" -h          Print this help\n"
 		" -i file     Disk image filename for raw sector access - empty for help\n"
 //		" -l          List loader files and show bootstrap help\n"
-		" -m 1|2      Model - 1 = FB-100/TPDD1, 2 = TPDD2 (%5$u)\n"
+		" -m 1|2      Model - 1 = FB-100/TPDD1, 2 = TPDD2 (%4$u)\n"
 //		" -n          Disable TS-DOS directories\n"
 //		" -n #.#[p]   Names - Translate filenames to #.# format, optionally [p]added\n"
 		" -p dir      Path - /path/to/dir with files to be served (./)\n"
-		" -r bool     RTS/CTS hardware flow control (%7$s)\n"
-		" -s #        Speed - serial port baud rate (%6$d)\n"
-		" -u          Uppercase all filenames (%8$s)\n"
-		" -~ bool     Truncated filenames end in '~' (%11$s)\n"
+		" -r bool     RTS/CTS hardware flow control (%6$s)\n"
+		" -s #        Speed - serial port baud rate (%5$d)\n"
+		" -u          Uppercase all filenames (%7$s)\n"
+		" -~ bool     Truncated filenames end in '~' (%10$s)\n"
 		" -v          Verbosity - more v's = more verbose, both activity & help\n"
 //		" -w          WP-2 mode - 8.2 filenames for TANDY WP-2\n"
-		" -z #        Sleep # ms per byte in bootstrap (%3$d)\n"
 		" -^          Dump config and exit\n"
 		"\n"
 		"The 1st non-option argument is another way to specify the tty device.\n"
@@ -2693,7 +2827,6 @@ void show_main_help() {
 		"\n"
 		,args[0]
 		,ATTR_DEF
-		,DEFAULT_BASIC_BYTE_MS
 		,TTY_PREFIX
 		,DEFAULT_MODEL
 		,DEFAULT_BAUD
@@ -2714,10 +2847,14 @@ void show_bootstrap_help(int e) {
 		"\n"
 		"Usage:\n"
 		" -b filename     send file out over the serial port, slowly\n"
+		" -x bool         XON/XOFF software flow control in bootstrap (on)\n"
+		" -z #            Sleep extra ms per byte in bootstrap (%1$d)\n"
 		" -v -b           more help about bootstrap\n"
+
 		"\n"
-		"If filename is not found, then %1$s is searched.\n"
+		"If filename is not found, then %2$s is searched.\n"
 		"\n"
+		,DEFAULT_BASIC_BYTE_MS
 		,app_lib_dir
 	);
 	dbg(1,
@@ -2812,6 +2949,7 @@ int main(int argc, char** argv) {
 	if (getenv("CLIENT_TTY")) strcpy(client_tty_name,getenv("CLIENT_TTY"));
 	if (getenv("BAUD")) baud = atoi(getenv("BAUD"));
 	if (getenv("RTSCTS")) rtscts = atobool(getenv("RTSCTS"));
+	if (getenv("XONOFF")) xonoff = atobool(getenv("XONOFF"));
 	if (getenv("ROOT_LABEL")) snprintf(dme_root_label,6+1,"%-*.*s",6,6,getenv("ROOT_LABEL"));
 	if (getenv("PARENT_LABEL")) snprintf(dme_parent_label,6+1,"%-*.*s",6,6,getenv("PARENT_LABEL"));
 	if (getenv("DIR_LABEL")) snprintf(dme_dir_label,3,"%-2.2s",getenv("DIR_LABEL"));
@@ -2820,7 +2958,7 @@ int main(int argc, char** argv) {
 #endif
 
 	// commandline
-	while ((i = getopt (argc, argv, ":0a:b:c:d:e:fhi:lm:np:r:s:uvwz:~:^"
+	while ((i = getopt (argc, argv, ":0a:b:c:d:e:fhi:lm:np:r:s:uvwx:z:~:^"
 #if !defined(_WIN)
 		"g"
 #endif
@@ -2850,6 +2988,7 @@ int main(int argc, char** argv) {
 			case 'u': upcase = true;                              break;
 			case 'v': debug++;                                    break;
 			case 'w': load_profile("wp2");                        break; // back compat, short for -c wp2
+			case 'x': xonoff = atobool(optarg);                   break;
 			case 'z': BASIC_byte_us=atoi(optarg)*1000;            break;
 			case '~': tildes = atobool(optarg);                   break;
 			case '^': x = true;                                   break;
@@ -2883,11 +3022,19 @@ int main(int argc, char** argv) {
 	resolve_client_tty_name();
 	find_lib_file(bootstrap_fname);
 
+	// bootstrap overrides needed before opening the tty
+	if (bootstrap_fname[0]) {
+		xonoff = true;
+		baud = BOOTSTRAP_BAUD;
+	}
+
 	if (x) { show_config(); return 0; }
 
 	dbg(0,    "Serial Device: %s\n",client_tty_name);
 
 	if ((i=open_client_tty())) return i;
+
+	show_tty_settings();
 
 	// send loader and exit
 	if (bootstrap_fname[0]) return (bootstrap(bootstrap_fname));
