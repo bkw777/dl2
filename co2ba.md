@@ -34,10 +34,11 @@ A few parameters are run-time configurable by setting environment variables.
 You don't need to change any of these. They exist and are documented here just for flexability and completeness.  
 Available settings and their default values:  
 ```
+PN=""          # program/payload name, derived from the input filename by default
 COMMENT=""     # extra text inserted into the first line comment
 FIRST=0        # first line number
-LINE_GAP=1     # line number increment
-LINE_LEN=256   # length of DATA lines
+STEP=1         # line number increment
+LLEN=256       # length of DATA lines
 METHOD=Y       # which encoding scheme: Y=!yenc B=YwithoutIF H=hexpairs I=ints
 UNSAFE="0 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 34"
                # (Y) list of byte values that need to be encoded
@@ -47,7 +48,7 @@ XA=^64         # (Y) initial transform applied to all bytes - best,0,^###,+###
 XB=^128        # (Y) encoding transform applied to unsafe bytes - ^###,+###
 RLE=false      # (Y) enable run-length encoding (doesn't help, and the loader is much slower)
 RP=' '         # (Y) rle prefix - character that indicates the next byte is how many copies of the previous byte to append here
-CHECKSUM=xor   # xor xor+ mod+ sum+
+CK=xor         # checksum algorithm - xor xor+ mod+ sum+
 YENC=false     # output standard yEnc, shorthand for ESC='=' XA='+42' XB='+64'
 ```
 <!-- does not work
@@ -133,7 +134,7 @@ sum+ - `sum = sum + byte + 1`  strong, needs DEFSNG variables, and suprizingly t
 `co2ba RAM100.CO savem >RAM100.DO`
 
 [ALTERN.DO](https://github.com/LivingM100SIG/Living_M100SIG/blob/main/M100SIG/Lib-07-UTILITIES/ALTERN.100)  
-`FIRST=50 LINE_GAP=5 LINE_LEN=74 EDITSAFE=true co2ba ALTERN.CO call >ALTERN.DO`
+`FIRST=50 STEP=5 LLEN=74 EDITSAFE=true co2ba ALTERN.CO call >ALTERN.DO`
 
 ## Results
 
@@ -210,14 +211,31 @@ user	0m5.541s
 sys	0m0.032s
 ```
 
-## Sending the loader to the 100
-Aside from using `dl -vb` which is reliable and easy but slow, here is another option that is crude but fast.
+Override the default installed program name automatically derived from the input file name,  
+and supply some extra info in a comment.  
+`callba` for Tandy, or `execba` for NEC, installs the actual binary into high memory, and only a short "trigger file" in the ram filesystem.  
+A short 1-line BASIC program that just does CALL or EXEC to the EXE address of the installed binary.  
+TS-DOS is about 6k, and so having a .CO file of it in ram consumes a whopping 12k of ram because of the way the KC-85/Model 100 platform runs .CO files (partly forced by a limitation of the 8085 cpu).  
+```
+$ XA=best PN="TS-DOS" COMMENT="4.10 for TRS-80 Model 100/102" co2ba DOS100.CO callba >TS-DOS.100
+$ XA=best PN="TS-DOS" COMMENT="4.10 for TANDY Model 200" co2ba DOS200.CO callba >TS-DOS.200
+$ XA=best PN="TS-DOS" COMMENT="4.10 for NEC PC-8201/8300" co2ba DOSNEC.CO execba >TS-DOS.NEC
+```
 
-Paste this function into a terminal for a quick & dirty bootstrapper.  
-Or save it as a script obviously.  
+"Fire & Forget", `call` for Tandy or `exec` for NEC generates a loader for a binary that is only needed to be immediately executed once and not saved.  
+The firmware flasher for [REX Classic](https://bitchin100.com/wiki/index.php?title=REX_Release_4.9)  
+100/102 `co2ba rf149.co call >rf149.do`  
+200 `co2ba rf249.co call >rf249.do`  
+NEC `co2ba rfn49.co exec >rfn49.do`  
+
+## Sending the loader to the 100
+`dl -vb file.do`
+
+<!--
+or the following bash code
 
 ```
-tsend () {
+$ tsend () {
 	local d=${2:-/dev/ttyUSB0} b=${3:-9600} s=([19200]=9 [9600]=8 [4800]=7 [2400]=6 [1200]=5 [600]=4 [300]=3)
 	((${#1})) || { echo "${FUNCNAME[0]} FILE.DO [/dev/ttyX] [baud]" ;return ; }
 	[[ -c $d ]] || { echo /dev/tty* ;return ; }
@@ -225,11 +243,18 @@ tsend () {
 	echo "100/200/K85/M10: RUN\"COM:${s[b]}8N1ENN"
 	echo "      8201/8300: RUN\"COM:${s[b]}N81XN"
 	read -p "Press [Enter] whean ready: " ;echo "Sending..."
-	stty -F $d $b raw pass8 clocal cread time 1 min 1 -crtscts ixon ixoff flusho -drain
+	stty -F $d $b raw pass8 clocal cread min 1 time 0 -crtscts ixon ixoff flusho -drain
 	cat $1 >$d
 	printf '%b' '\x1A' >$d
 }
+
+$ tsend file.do
 ```
+Optionally replace the cat command with:  
+`tee $d <$1 |tr '\r' '\n'`  
+Or better:  
+`tee $d <$1 |mac2unix -q |dos2unix -q`
+
 
 ```
 $ RLE=true co2ba ALTERN.CO call >t
@@ -241,6 +266,7 @@ Press [Enter] whean ready:
 Sending...
 $
 ```
+-->
 
 ## See also
 https://github.com/hackerb9/co2do/
