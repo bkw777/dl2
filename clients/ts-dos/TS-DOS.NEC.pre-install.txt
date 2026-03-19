@@ -1,3 +1,0 @@
-Type the following into BASIC on the NEC PC-8201/PC-8300
-
-  RUN "COM:9N81XN"

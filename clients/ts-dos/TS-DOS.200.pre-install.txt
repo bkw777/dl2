@@ -1,4 +1,0 @@
-Type the following into BASIC on the TANDY Model 200
-
-  RUN "COM:98N1ENN"
-

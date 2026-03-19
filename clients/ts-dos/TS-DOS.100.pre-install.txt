@@ -1,3 +1,0 @@
-Type the following into BASIC on the TRS-80 Model 100/102
-
-  RUN "COM:98N1E"
