@@ -18,7 +18,7 @@ $ sudo make uninstall
 ## Manual
 ```
 $ dl -h
-DeskLink2 v2.2.001-7-g1cd1b38
+DeskLink2 v2.2.003-65-g1c6b0fd
 
 Usage: dl [options] [tty_device] [share_path]
 
@@ -39,7 +39,6 @@ Options      Description... (default setting)
  -u          Uppercase all filenames (off)
  -~ bool     Truncated filenames end in '~' (on)
  -v          Verbosity - more v's = more verbose, both activity & help
- -z #        Sleep # ms per byte in bootstrap (8)
  -^          Dump config and exit
 
 The 1st non-option argument is another way to specify the tty device.
@@ -52,38 +51,37 @@ Examples:
    $ dl ttyUSB1
    $ dl -v -p ~/Downloads/REX
    $ dl -c wp2 /dev/cu.usbserial-AB0MQNN1 "~/Documents/WP-2 Files"
-
-$
+   $ dl -m2 -p /tmp/bank0 -p /tmp/bank1
 ```
 
 ```
 $ dl -b
-DeskLink2 v2.2.001-7-g1cd1b38
+DeskLink2 v2.2.003-65-g1c6b0fd
 "-b" requires a value
 
 Help for Bootstrap
 
 Usage:
  -b filename     send file out over the serial port, slowly
+ -x bool         XON/XOFF software flow control in bootstrap (on)
+ -z #            Sleep extra ms per byte in bootstrap (0)
  -v -b           more help about bootstrap
 
 If filename is not found, then /usr/local/lib/dl is searched.
 
 Available built-in bootstrap/loader files (in /usr/local/lib/dl):
 
-TRS-80 Model 100/102 : DSKMGR.100 D.100 TSLOAD.100 TS-DOS.100 PAKDOS.100 TEENY.100 TINY.100
+TRS-80 Model 100/102 : DSKMGR.100 TSLOAD.100 TS-DOS.100 PAKDOS.100 TINY.100 D.100 TEENY.100
 TANDY Model 200      : DSKMGR.200 TSLOAD.200 TS-DOS.200 PAKDOS.200 TEENY.200
-NEC PC-8201/PC-8300  : TEENY.NEC TS-DOS.NEC
-Kyotronic KC-85      : Disk_Power.K85 DSKMGR.K85
-Olivetti M-10        : TEENY.M10 DSKMGR.M10
+NEC PC-8201/PC-8300  : TS-DOS.NEC TEENY.NEC
+Kyotronic KC-85      : DSKMGR.K85 Disk_Power.K85
+Olivetti M-10        : DSKMGR.M10 TEENY.M10
 
 Examples:
 
    dl -b TS-DOS.100
    dl -b ~/Documents/LivingM100SIG/Lib-03-TELCOM/XMDPW5.100
    dl -vb rxcini.DO && dl -v
-
-$ 
 ```
 
 ```
@@ -110,8 +108,6 @@ cpm	8	3	off	'F'	off	off	on
 rexcpm	6	2	on	'F'	off	off	on
 z88	12	3	off	'F'	off	off	off
 st	6	2	on	'F'	off	off	on
-
-$ 
 ```
 
 ```
@@ -137,8 +133,6 @@ TPDD2:
 Examples:
 	dl -v -i Sardine_American_English.pdd1
 	dl -v -i ./my_new_disk.pdd2
-
-$ 
 ```
 
 There are also several [environment variables](ref/advanced_options.txt)
