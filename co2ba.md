@@ -39,7 +39,7 @@ COMMENT=""     # extra text inserted into the first line comment
 FIRST=0        # first line number
 STEP=1         # line number increment
 LLEN=256       # length of DATA lines
-METHOD=Y       # which encoding scheme: Y=!yenc B=YwithoutIF H=hexpairs I=ints
+METHOD=Y       # which encoding scheme: Y=!yenc H=hexpairs I=ints
 UNSAFE="0 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 34"
                # list of byte values that need to be encoded
 EDITSAFE=true  # add 127 to the unsafe list so the output can be opened in EDIT
@@ -70,24 +70,28 @@ It is very similar to [yEnc](http://www.yenc.org/yenc-draft.1.3.txt).
         yenc uses `=`, we use `!`  
       - Apply another simple transform to make a safe byte.  
         yenc does rot64 `(val+64)%256`, we do xor128 `val^128`, aka toggle the high bit.
-
+<!--
 ### Method B:  
   Identical data to Y.  
   The difference is the inner loop in BASIC to decode bytes does not use any IF branching.  
   It's actually slower so don't use it.  
   It's just here because if it wasn't, you or I would try to do it again.  
   Also it was hard to figure out so I want to keep it as a reference for tricks. And who knows maybe it can get better.
+-->
 
 ### Method H:  
   Hex pairs a-la James Yi / Kurt McCullum / others.  
   Hex pairs, but using a single contiguous range of ascii values like a-p for the alphabet instead of 0-9A-F.  
   0x00 = aa, 0x01 = ab, ... 0xFF = pp  
-  A lot of old loaders use this because the code is small and simple, and the output is at least better than plain ints.
+  Some old loaders use this because the code is small and simple, and the output is at least better than plain ints.  
+  A lot of old loaders actually used regular hex pairs with the normal 0-9A-F alphabet,
+  but that requires larger and slower BASIC code to decode for no benefit other than maybe human readability.
 
 ### Method I:  
   Plain comma seperated integers.  
   The simplest possible way to put binary into DATA statements and read them.  
-  It's useful for very small payloads because the BASIC to load it is almost nothing.
+  It's useful for very small payloads because the BASIC to load it is almost nothing.  
+  An old example: [TINYLD.DO](https://www.club100.org/library/ups/tinyld.ba)
 
 
 ## Optimization
@@ -126,9 +130,6 @@ mod+ - `sum=(sum+1+byte)%32512`  strong while still only needing INT variables, 
 sum+ - `sum = sum + byte + 1`  strong, needs DEFSNG variables, and suprizingly the slowest
 
 ## Examples
-<!--
-`co2ba TSLOAD.CO savem "TSLOAD for TANDY 200 - Travelling Software" >TSLOAD.200`
--->
 
 [RAM100.DO](https://github.com/bkw777/NODE_DATAPAC/tree/main/software/RAMDSK/RAM100)  
 `co2ba RAM100.CO savem >RAM100.DO`
@@ -144,9 +145,9 @@ $ ls -l ALTERN.CO
 -rw-rw-r-- 1 bkw bkw 3620 Feb 28 14:10 ALTERN.CO
 ```
 
-(All of these actually consume 60 bytes less than the file size, because the first line 0 gets overwritten on the receiving machine.)
+(All of these actually consume 60 bytes less RAM than the file size, because the first line 0 gets overwritten on the receiving machine.)
 
-Simple INT encoding -> 12478 bytes  
+Simple INT encoding -> 12478 bytes    
 ```
 $ METHOD=I co2ba ALTERN.CO call >ALTERN.DO ;ls -l ALTERN.DO ;tr '\r' '\n' <ALTERN.DO      
 -rw-rw-r-- 1 bkw bkw 12478 Mar  9 15:29 ALTERN.DO
