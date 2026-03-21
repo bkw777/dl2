@@ -49,11 +49,11 @@ XB=^128        # encoding transform applied to unsafe bytes - ^###,+###
 RLE=false      # enable run-length encoding (doesn't help, and the loader is much slower)
 RP=' '         # rle prefix - character that indicates the next byte is how many copies of the previous byte to append here
 CK=xor         # checksum algorithm - xor xor+ mod+ sum+
-YENC=false     # output standard yEnc, shorthand for ESC='=' XA='+42' XB='+64'
+YENC=false     # output standard yEnc, shorthand for EP='=' XA='+42' XB='+64'
 ```
 <!-- does not work
    "?OD error in 1"
-CARAT=false    # output standard carat encoding, shorthand for ESC='^' XA=0 XB="+64"
+CARAT=false    # output standard carat encoding, shorthand for EP='^' XA=0 XB="+64"
 -->
 
 ## Encoding schemes
