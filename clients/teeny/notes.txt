@@ -10,10 +10,7 @@ except by running it, and having the Model 200 respond as teeny-linux expects.
 I was able to get TEENY.200 out of TEENY.EXE instead, by running TEENY.EXE in dosbox.
 
 Connect a Model 200 to the host with the right kind of serial cable and usb-serial adapter.
-http://tandy.wiki/Model_100_102_200_600_Serial_Cable
-  particularly:
-  https://www.cdw.com/shop/products/C2G-null-modem-cable-6-ft-white/1153481.aspx
-  https://www.amazon.com/dp/B005SYQV9C/
+http://tandy.wiki/Model_T_Serial_Cable
 
 Assuming the serial device tty is /dev/ttyUSB0
 

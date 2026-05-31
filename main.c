@@ -336,12 +336,12 @@ void _dbg_b(const int v, unsigned char* b, int n) {
 	if (debug<v) return;
 	unsigned i;
 	if (n<0) n = TPDD_MSG_MAX;
-	for (i=0;i<n;i++) fprintf (stderr,"%02X ",b[i]);
+	for (i=0;i<n;i++) fprintf(stderr,"%02X ",b[i]);
 }
 void dbg_b(const int v, unsigned char* b, int n) {
 	if (debug<v) return;
 	_dbg_b(v,b,n);
-	fprintf (stderr, "\n");
+	fprintf(stderr, "\n");
 	fflush(stderr);
 }
 

@@ -65,7 +65,7 @@ CLIENT_DOCS := \
 	clients/teeny/teenydoc.txt \
 	clients/teeny/hownec.do \
 	clients/teeny/TNYO10.TXT \
-	clients/teeny/tindoc.do \
+	clients/teeny/TINDOC.DO \
 	clients/teeny/ddoc.do \
 	clients/dskmgr/DSKMGR.DOC \
 	clients/ts-dos/tsdos.pdf \

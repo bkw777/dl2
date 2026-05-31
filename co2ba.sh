@@ -45,7 +45,8 @@ unset Ev Qd Qv UNTA
 n=$LFIRST
 TIME=false ;[[ "$ACTION" == "TIME" ]] && TIME=true
 
-abrt () { printf '%s: Usage\n%s IN.CO [call|exec|callba|execba|savem|bsave] > OUT.DO\n%b\n' "$0" "${0##*/}" "$@" >&2 ;exit 1 ; }
+DOCURL="https://github.com/bkw777/dl2/blob/master/co2ba.md"
+abrt () { printf '%s: Usage\n%s IN.CO [call|exec|callba|execba|savem|bsave] > OUT.DO\n\n%s\n\n%b\n' "$0" "${0##*/}" "$DOCURL" "$@" >&2 ;exit 1 ; }
 
 # read a binary file into to global int array d[]
 ftoi () {
@@ -141,7 +142,7 @@ esac
 # loader
 printf -v O '%u%c%s%%s - loader: co2ba.sh b.kenyon.w@gmail.com %(%F)T' $n "'" "$PN" -1
 x=${COMMENT:+ - $COMMENT} ;((i=255-${#O}+2)) ;((${#x}>i)) && x=${x:0:i}
-printf '%s\r' "${O/\%s/$x}"
+printf '%s\r\n' "${O/\%s/$x}"
 
 $TIME && tn=20
 $ik && di=",G,K" dn="F,H-J" || di="" dn="F-K"  # DEFINT DEFSNG
@@ -155,51 +156,51 @@ case ${METHOD^^} in
 		$RLE && {
 			K=${K/B/P}
 
-			printf '%uREADF:CLEAR12,F:DEFINTA-E,P,S%s%s:DEFSNG%s:DEFSTRL-O,R:READF,A,J,G,N,E%s:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:R="%c":S=0:B=-1:P=-1%s\r' $n "$Qd" "$di" "$dn" "$Qd" "$EP" "$RP" "$PRI"
-			$TIME && printf '%uGOSUB%u\r' $((++n*g)) $((tn*g))
-			printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IF(O=M)THEND=E:NEXT:ELSEIF(O=R)THENS=1:NEXT\r' $((++n*g)) ;((l=n))
+			printf '%uREADF:CLEAR12,F:DEFINTA-E,P,S%s%s:DEFSNG%s:DEFSTRL-O,R:READF,A,J,G,N,E%s:M="%c":C=0:I=F:H=F+A-1:K=0:D=0:R="%c":S=0:B=-1:P=-1%s\r\n' $n "$Qd" "$di" "$dn" "$Qd" "$EP" "$RP" "$PRI"
+			$TIME && printf '%uGOSUB%u\r\n' $((++n*g)) $((tn*g))
+			printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IF(O=M)THEND=E:NEXT:ELSEIF(O=R)THENS=1:NEXT\r\n' $((++n*g)) ;((l=n))
 
 			$SMALLEST && {
 				# smallest but slow
-				printf '%uB=%s%s:D=0:IFS=0THENP=B:B=1\r' $((++n*g)) "$UNTB" "$UNTA"
-				printf '%uFORS=-BTO-1:POKEI,P:I=I+1:K=%s:NEXT:NEXT%s:IFI<=HTHEN%u\r' $((++n*g)) "$K" "$PRP" $((l*g))
+				printf '%uB=%s%s:D=0:IFS=0THENP=B:B=1\r\n' $((++n*g)) "$UNTB" "$UNTA"
+				printf '%uFORS=-BTO-1:POKEI,P:I=I+1:K=%s:NEXT:NEXT%s:IFI<=HTHEN%u\r\n' $((++n*g)) "$K" "$PRP" $((l*g))
 			} || {
 				# slightly less slow
-				printf '%uB=%s%s:D=0:IFS=0THENP=B:POKEI,P:I=I+1:K=%s:NEXT:ELSEFORS=-BTO-1:POKEI,P:I=I+1:K=%s:NEXT:NEXT\r' $((++n*g)) "$UNTB" "$UNTA" "$K" "$K"
-				printf '%u%s:IFI<=HTHEN%u\r' $((++n*g)) "$PRP" $((l*g))
+				printf '%uB=%s%s:D=0:IFS=0THENP=B:POKEI,P:I=I+1:K=%s:NEXT:ELSEFORS=-BTO-1:POKEI,P:I=I+1:K=%s:NEXT:NEXT\r\n' $((++n*g)) "$UNTB" "$UNTA" "$K" "$K"
+				printf '%u%s:IFI<=HTHEN%u\r\n' $((++n*g)) "$PRP" $((l*g))
 			}
 
 		} || {
-			printf '%uREADF:CLEAR12,F:DEFINTA-E%s%s:DEFSNG%s:DEFSTRL-O:READF,A,J,G,N,E%s:M="%c":C=0:I=F:H=F+A-1:K=0:D=0%s\r' $n "$Qd" "$di" "$dn" "$Qd" "$EP" "$PRI"
-			$TIME && printf '%uGOSUB%u\r' $((++n*g)) $((tn*g))
-			printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=%s%s:D=0:POKEI,B:I=I+1:K=%s:NEXT%s:IFI<=HTHEN%u\r' $((++n*g)) "$UNTB" "$UNTA" "$K" "$PRP" $((n*g))
+			printf '%uREADF:CLEAR12,F:DEFINTA-E%s%s:DEFSNG%s:DEFSTRL-O:READF,A,J,G,N,E%s:M="%c":C=0:I=F:H=F+A-1:K=0:D=0%s\r\n' $n "$Qd" "$di" "$dn" "$Qd" "$EP" "$PRI"
+			$TIME && printf '%uGOSUB%u\r\n' $((++n*g)) $((tn*g))
+			printf '%uREADL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=%s%s:D=0:POKEI,B:I=I+1:K=%s:NEXT%s:IFI<=HTHEN%u\r\n' $((++n*g)) "$UNTB" "$UNTA" "$K" "$PRP" $((n*g))
 		}
 	;;
 	B) # Same as Y but avoids using IF in the inner loop, but actually runs slower - NO RLE
 		unset Qd Qv UNTA ;find_xa ;((ta)) && { Qd=",Q" ;$xa && Qv=$ta UNTA="B=BXORQ:" || Qv=$((256-ta)) UNTA="B=(B+Q)MOD256:" ; }
 		$xb && Ev=$tb UNTB="BXORE*D" || Ev=$((256-tb)) UNTB="(B+E*D)MOD256"
-		printf '%uREADF:CLEAR12,F:DEFINTA-E,O-P%s%s:DEFSNG%s:DEFSTRL-N:READF,A,J,G,N,E%s:M="":C=0:I=F:H=F+A-1:K=0:D=0:O=%u:P=0%s\r' $n "$Qd" "$di" "$dn" "$Qd" $ep "$PRI"
-		$TIME && printf '%uGOSUB%u\r' $((++n*g)) $((tn*g))
+		printf '%uREADF:CLEAR12,F:DEFINTA-E,O-P%s%s:DEFSNG%s:DEFSTRL-N:READF,A,J,G,N,E%s:M="":C=0:I=F:H=F+A-1:K=0:D=0:O=%u:P=0%s\r\n' $n "$Qd" "$di" "$dn" "$Qd" $ep "$PRI"
+		$TIME && printf '%uGOSUB%u\r\n' $((++n*g)) $((tn*g))
 		K="${K/B/B\*P}" K="${K/1/P}"
 		# P=SGN(BXORO) is faster than P=-(P<>O)
-		printf '%uREADL:FORC=1TOLEN(L):B=ASC(MID$(L,C,1)):P=SGN(BXORO):B=%s%s:D=PXOR1:POKEI,B:I=I+P:K=%s:NEXT%s:IFI<=HTHEN%u\r' $((++n*g)) "$UNTB" "$UNTA" "$K" "$PRP" $((n*g))
+		printf '%uREADL:FORC=1TOLEN(L):B=ASC(MID$(L,C,1)):P=SGN(BXORO):B=%s%s:D=PXOR1:POKEI,B:I=I+P:K=%s:NEXT%s:IFI<=HTHEN%u\r\n' $((++n*g)) "$UNTB" "$UNTA" "$K" "$PRP" $((n*g))
 	;;
 	H) # hex pairs
 		typeset -ra h=({a..p})  # hex data output alphabet
 		printf -v Ev '%u' "'${h[0]}"
-		printf '%uREADF:CLEAR12,F:DEFINTA-E%s:DEFSNG%s:DEFSTRL-N:READF,A,J,G,N,E:M="":C=0:I=F:H=F+A-1:K=0%s\r' $n "$di" "$dn" "$PRI"
-		$TIME && printf '%uGOSUB%u\r' $((++n*g)) $((tn*g))
-		printf '%uREADL:FORC=1TOLEN(L)STEP2:B=(ASC(MID$(L,C,1))-E)*16+ASC(MID$(L,C+1,1))-E:POKEI,B:I=I+1:K=%s:NEXT%s:IFI<=HTHEN%u\r' $((++n*g)) "$K" "$PRP" $((n*g))
+		printf '%uREADF:CLEAR12,F:DEFINTA-E%s:DEFSNG%s:DEFSTRL-N:READF,A,J,G,N,E:M="":C=0:I=F:H=F+A-1:K=0%s\r\n' $n "$di" "$dn" "$PRI"
+		$TIME && printf '%uGOSUB%u\r\n' $((++n*g)) $((tn*g))
+		printf '%uREADL:FORC=1TOLEN(L)STEP2:B=(ASC(MID$(L,C,1))-E)*16+ASC(MID$(L,C+1,1))-E:POKEI,B:I=I+1:K=%s:NEXT%s:IFI<=HTHEN%u\r\n' $((++n*g)) "$K" "$PRP" $((n*g))
 	;;
 	I) # ints
 		PRI=':CLS:?"Installing "N;'
 		PRP=':?".";'
 		$TIME && {
-			printf '%uREADF:CLEAR16,F:DEFINTA-E%s:DEFSNG%s:DEFSTRL-N:READF,A,J,G,N:H=F+A-1:K=0%s\r' $n "$di" "$dn" "$PRI"
-			printf '%uGOSUB%u\r' $((++n*g)) $((tn*g))
-			printf '%uFORI=FTOH:READB:POKEI,B:K=%s%s:NEXT:?\r' $((++n*g)) "$K" "$PRP"
+			printf '%uREADF:CLEAR16,F:DEFINTA-E%s:DEFSNG%s:DEFSTRL-N:READF,A,J,G,N:H=F+A-1:K=0%s\r\n' $n "$di" "$dn" "$PRI"
+			printf '%uGOSUB%u\r\n' $((++n*g)) $((tn*g))
+			printf '%uFORI=FTOH:READB:POKEI,B:K=%s%s:NEXT:?\r\n' $((++n*g)) "$K" "$PRP"
 		} || {
-			printf '%uREADF:CLEAR12,F:DEFINTA-E%s:DEFSNG%s:DEFSTRL-N:READF,A,J,G,N:H=F+A-1:K=0%s:FORI=FTOH:READB:POKEI,B:K=%s%s:NEXT:?\r' $n "$di" "$dn" "$PRI" "$K" "$PRP"
+			printf '%uREADF:CLEAR12,F:DEFINTA-E%s:DEFSNG%s:DEFSTRL-N:READF,A,J,G,N:H=F+A-1:K=0%s:FORI=FTOH:READB:POKEI,B:K=%s%s:NEXT:?\r\n' $n "$di" "$dn" "$PRI" "$K" "$PRP"
 		}
 	;;
 esac
@@ -208,17 +209,17 @@ printf '%uIFK<>GTHEN?"Bad Checksum":ELSE' $((++n*g))
 
 # action
 case "$ACTION" in
-	TIME) printf 'Y=Z:GOSUB%u:?Z-Y"seconds"\r' $((tn*g)) ;;
-	CALL|EXEC) printf '%sJ\r' $ACTION ;;
-	SAVEM|BSAVE) printf '?"Please type: NEW":%sN,F,H,J\r' $ACTION ;;
-	CALLBA|EXECBA) printf 'M=CHR$(34):L="X.DO":OPENLFOROUTPUTAS1:?#1,"0CLEAR0,"F":%s"J":MENU":CLOSE1:?"Please type:":?"KILL"M""L:?"SAVE"M""N:LOADL\r' ${ACTION:0:4} ;;
-	*) printf '?"top "F:?"end "H:?"exe "J\r' ;;
+	TIME) printf 'Y=Z:GOSUB%u:?Z-Y"seconds"\r\n' $((tn*g)) ;;
+	CALL|EXEC) printf '%sJ\r\n' $ACTION ;;
+	SAVEM|BSAVE) printf '?"Please type: NEW":%sN,F,H,J\r\n' $ACTION ;;
+	CALLBA|EXECBA) printf 'M=CHR$(34):L="X.DO":OPENLFOROUTPUTAS1:?#1,"0CLEAR0,"F":%s"J":MENU":CLOSE1:?"Please type:":?"KILL"M""L:?"SAVE"M""N:LOADL\r\n' ${ACTION:0:4} ;;
+	*) printf '?"top "F:?"end "H:?"exe "J\r\n' ;;
 esac
 
-$TIME && printf '%uEND\r%uL=TIME$:Z=VAL(LEFT$(L,2))*60*60+VAL(MID$(L,4,2))*60+VAL(RIGHT$(L,2)):RETURN\r' $((++n*g)) $(((n=tn)*g))
+$TIME && printf '%uEND\r\n%uL=TIME$:Z=VAL(LEFT$(L,2))*60*60+VAL(MID$(L,4,2))*60+VAL(RIGHT$(L,2)):RETURN\r\n' $((++n*g)) $(((n=tn)*g))
 
 # header
-printf '%uDATA%u,%u,%u,%u,"%s"%s%s\r' $((++n*g)) $TOP $LEN $EXE $CHK "$PN" "${Ev:+,$Ev}" "${Qv:+,$Qv}"
+printf '%uDATA%u,%u,%u,%u,"%s"%s%s\r\n' $((++n*g)) $TOP $LEN $EXE $CHK "$PN" "${Ev:+,$Ev}" "${Qv:+,$Qv}"
 
 # data
 O= o= rl=0 pb=-1
@@ -250,7 +251,7 @@ for ((i=0;i<LEN;i++)) {
 		O+=$o o=
 	} || {
 		[[ "$METHOD" == "I" ]] && O=${O:0:-1}
-		printf '%s\r' "$O" ;O=
+		printf '%s\r\n' "$O" ;O=
 	}
 
 }
@@ -258,5 +259,5 @@ for ((i=0;i<LEN;i++)) {
 ((${#O})) && {
 	[[ "$METHOD" == "I" ]] && O=${O:0:-1}
 	((rl)) && { rle_o $pb $rl ;O+="$o" ; }
-	printf '%s\r' "$O"
+	printf '%s\r\n' "$O"
 }
