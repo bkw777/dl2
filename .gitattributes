@@ -1,5 +1,5 @@
 # try to make github display the BASIC loaders slightly less stupidly
-*.DO linguist-language=BASIC encoding=CP437
+*.DO encoding=CP437
 *.100 linguist-language=BASIC encoding=CP437
 *.200 linguist-language=BASIC encoding=CP437
 *.M10 linguist-language=BASIC encoding=CP437
