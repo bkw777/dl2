@@ -1,8 +1,10 @@
-# make github display the BASIC loaders slightly less stupidly
-# *.DO linguist-language=bas text eol=cr
-*.DO text eol=cr diff encoding=ascii
-*.100 text eol=cr diff encoding=ascii
-*.200 text eol=cr diff encoding=ascii
-*.M10 text eol=cr diff encoding=ascii
-*.NEC text eol=cr diff encoding=ascii
-*.K85 text eol=cr diff encoding=ascii
+# try to make github display the BASIC loaders slightly less stupidly
+# not working
+# encoding=UTF-8
+
+*.DO text eol=cr linguist-language=BASIC working-tree-encoding=CP437
+*.100 text eol=cr linguist-language=BASIC working-tree-encoding=CP437
+*.200 text eol=cr linguist-language=BASIC working-tree-encoding=CP437
+*.M10 text eol=cr linguist-language=BASIC working-tree-encoding=CP437
+*.NEC text eol=cr linguist-language=BASIC working-tree-encoding=CP437
+*.K85 text eol=cr linguist-language=BASIC working-tree-encoding=CP437
