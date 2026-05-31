@@ -1,8 +1,8 @@
 # make github display the BASIC loaders slightly less stupidly
 # *.DO linguist-language=bas text eol=cr
-*.DO text eol=cr diff
-*.100 text eol=cr diff
-*.200 text eol=cr diff
-*.M10 text eol=cr diff
-*.NEC text eol=cr diff
-*.K85 text eol=cr diff
+*.DO text eol=cr diff encoding=utf-8
+*.100 text eol=cr diff encoding=utf-8
+*.200 text eol=cr diff encoding=utf-8
+*.M10 text eol=cr diff encoding=utf-8
+*.NEC text eol=cr diff encoding=utf-8
+*.K85 text eol=cr diff encoding=utf-8
