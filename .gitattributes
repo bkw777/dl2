@@ -1,7 +1,8 @@
 # make github display the BASIC loaders slightly less stupidly
-*.DO linguist-language=bas
-*.100 linguist-language=bas
-*.200 linguist-language=bas
-*.M10 linguist-language=bas
-*.NEC linguist-language=bas
-*.K85 linguist-language=bas
+# *.DO linguist-language=ba
+*.DO text eol=cr
+*.100 text eol=cr
+*.200 text eol=cr
+*.M10 text eol=cr
+*.NEC text eol=cr
+*.K85 text eol=cr
