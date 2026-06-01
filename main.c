@@ -239,7 +239,7 @@ const char * magic_files[] = {
 /*************************************************************/
 
 int debug = 0;
-uint16_t baud = DEFAULT_BAUD;
+uint16_t baud = 0;
 bool xonoff = DEFAULT_XONOFF;
 bool rtscts = DEFAULT_RTSCTS;
 int operation_mode = DEFAULT_OPERATION_MODE;
@@ -3025,7 +3025,9 @@ int main(int argc, char** argv) {
 	// bootstrap overrides needed before opening the tty
 	if (bootstrap_fname[0]) {
 		xonoff = true;
-		baud = BOOTSTRAP_BAUD;
+		if (!baud) baud = BOOTSTRAP_BAUD;
+	} else {
+		if (!baud) baud = DEFAULT_BAUD;
 	}
 
 	if (x) { show_config(); return 0; }
