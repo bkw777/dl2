@@ -2846,16 +2846,17 @@ void show_bootstrap_help(int e) {
 		"Help for Bootstrap\n"
 		"\n"
 		"Usage:\n"
-		" -b filename     send file out over the serial port, slowly\n"
-		" -x bool         XON/XOFF software flow control in bootstrap (on)\n"
+		" -b filename     Send file out over the serial port, slowly\n"
+		" -s #            Speed - serial port baud rate (%3$d)\n"
 		" -z #            Sleep extra ms per byte in bootstrap (%1$d)\n"
-		" -v -b           more help about bootstrap\n"
+		" -v -b           More help about bootstrap\n"
 
 		"\n"
 		"If filename is not found, then %2$s is searched.\n"
 		"\n"
 		,DEFAULT_BASIC_BYTE_MS
 		,app_lib_dir
+		,BOOTSTRAP_BAUD
 	);
 	dbg(1,
 		"The bootstrap function is a convenient way to load software onto\n"
