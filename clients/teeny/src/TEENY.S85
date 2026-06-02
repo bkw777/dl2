@@ -1,0 +1,526 @@
+; TINY/TEENY disassembly
+; TINY by Tracy Allen / Acroatix. TEENY is TINY that Ron Weisen made a bit smaller.
+; This disassembly by Brian K. White
+; 
+; build with:
+;	z88dk-z80asm -m8085 -no-synth -DMODEL_100 -b -o=TEENY.CO TEENY.S85
+;	n=$$(wc -c <TEENY.CO)
+;	z88dk-z80asm -m8085 -no-synth -DMODEL_100 -DPRGLEN=$n -b -o=TEENY.CO TEENY.S85
+
+; Currently builds for 100 only
+; $ make 100
+; or
+; $ make verify_100
+
+INCLUDE		"m100_common.S85"
+
+IF MODEL_200
+INCLUDE		"200.S85"
+ELIF MODEL_K85
+INCLUDE		"K85.S85"
+ELSE
+INCLUDE		"100.S85"
+ENDIF
+
+wFD00			EQU		ALTLCD + 0x40		; FD00
+wFD02			EQU		ALTLCD + 0x42		; FD02
+wFD04			EQU		ALTLCD + 0x44		; FD04
+wFD06			EQU		ALTLCD + 0x46		; FD06
+wFD08			EQU		ALTLCD + 0x48		; FD08
+wZZ				EQU		ALTLCD + 0X4A		; FD0A
+wFD0C			EQU		ALTLCD + 0x4C		; FD0C
+wFD0D			EQU		ALTLCD + 0x4D		; FD0D
+wFD0E			EQU		ALTLCD + 0x4E		; FD0E
+wFD27			EQU		ALTLCD + 0x67		; FD27
+; FDFF end of ALTLCD
+
+wAA				EQU		jF36D+1
+wAB				EQU		jF35B+1
+wAC				EQU		jF35E+1
+wAD				EQU		jF361+1
+wAE				EQU		jF364+1
+wAF				EQU		jF36A+1
+wAG				EQU		jF367+1
+wAH				EQU		COMBUF+0x3A
+
+; TPDD
+ZZ				EQU		0x5A5A				; packet start / preamble, really "ZZ" or 'Z','Z' (same bytes but the drive is scanning each byte individually and looking for 2 consecutive 0x5A , not an int16)
+
+
+;------------------------------------------------------------------------------
+; ORG & CO Header works backwards from HIMEM-PRGLEN.
+; PRGLEN has to be supplied from outside via -DPRGLEN=len.
+; If no PRGLEN then build with default ORG 0 and no CO header.
+IFDEF PRGLEN
+IFNDEF HIMEM
+	HIMEM		EQU		MAXRAM
+ENDIF
+
+;ORG		0xF305 - 6
+ORG HIMEM-PRGLEN-6						; entry minus length of header
+
+;------------------------------------------------------------------------------
+; .CO HEADER
+;------------------------------------------------------------------------------
+DW PRGTOP
+DW PRGLEN
+DW PRGEXE
+ENDIF ; PRGLEN
+;------------------------------------------------------------------------------
+
+
+;------------------------------------------------------------------------------
+PRGTOP:
+PRGEXE:
+        LXI			H,0x0000
+        DAD			SP
+        SHLD		wFD06
+        LXI			H,ZZ
+        SHLD		wZZ
+jF312:
+        LHLD		wFD06
+        SPHL
+        XRA			A
+        STA			wFD08
+        LXI			H,jF312
+        PUSH		H
+        LXI			H,STR_Prompt
+        CALL		PTILL0
+        STA			KYBCNT
+        CALL		INLIN
+        LXI			H,wAA
+        SHLD		ETRAP
+        LXI			H,KYBUF+1
+        MVI			M,0x22
+        CALL		EVAL_ROS
+        CALL		RESETFPS
+        LDA			KYBUF
+        CPI			'Q'
+        JZ			MENU
+        CPI			'S'
+        JZ			jF588
+        PUSH 		PSW
+        CALL		jF45F
+        JZ			wAB
+        POP 		PSW
+        SUI			'K'
+        JZ			jF44D
+        DCR 		A
+        JZ			jF4B8
+        MVI			E,0x00
+jF35B:
+        LXI 		B, 0x021e		; [wAB]
+jF35E:
+        LXI 		B, 0x061e		; [wAC]
+jF361:
+        LXI 		B, 0x081e		; [wAD]
+jF364:
+        LXI 		B, 0x101e		; [wAE]
+jF367:
+        LXI 		B, 0x121e		; [wAG]
+jF36A:
+        LXI 		B, 0x141e		; [wAF]
+jF36D:
+        LXI 		B, 0x161e		; [wAA]
+jF370:
+        LDA 		wFD08
+        ORA 		A
+        JZ 			jF384
+        PUSH 		D
+        LHLD 		wFD02
+        MOV 		B,H
+        MOV 		C,L
+        LHLD 		wFD00
+        CALL		MASDEL
+        POP 		D
+jF384:
+        LXI			H,STR_ErrCodes
+        MVI			D,0x00
+        DAD			D
+        MOV			A,M
+        _RST		4
+        _RST		2
+        _RST		4
+        LXI			H,STR_ErrMsg
+        CALL		PTILL0
+        JMP			jF312
+
+STR_ErrCodes: ; F397
+		DB			"SNFFNRCMIOWPDFNDAEOMFLNM"
+
+STR_Prompt: ; F3AF
+		DB			"> C FFFFFF.XX (C=KLSQ)",CR,LF,"> ",0
+
+STR_ErrMsg: ; F3CA
+		DB			" Err",CR,LF,0
+
+jF3D1:
+        MVI			D,0x2e
+@l0:
+        DCX 		D
+        MOV			A,D
+        ORA			E
+        JNZ			@l0
+        RET
+
+STR_STAT: ; F3DA
+		DB			"98N1D"
+
+jF3DF:
+		LXI 		H,wFD0C
+		MOV			M,A
+		INX			H
+        MVI			M,0x00
+        RET
+
+jF3E7:
+        IN			0xbb
+        ANI			0x20
+        RZ
+        MVI			E,0x04
+        JMP			jF370
+jF3F1:
+        LXI			H,wFD0C
+        MOV			A,M
+        INX			H
+        ADD			M
+        MOV			D,A
+        MOV			A,M
+        MOV			E,A
+        MOV			B,A
+        INX			H
+        ORA			A
+        MOV			A,D
+        JZ			jF407
+jF401:
+        ADD			M
+        INX			H
+        DCR			E
+        JNZ			jF401
+jF407:
+        CMA
+        MOV			M,A
+        MVI			A,0x05
+        ADD			B
+        MOV			B,A
+        LXI			H,wZZ
+jF410:
+        MOV			A,M
+        CALL		SND232
+        JC			wAD
+        CALL		jF3E7
+        INX			H
+        DCR			B
+        JNZ			jF410
+        LXI			H,wFD0C
+        CALL		INT1D
+        CALL		jF43E
+        CALL		jF43E
+        MOV			C,A
+        INR			C
+jF42D:
+        CALL		jF43E
+        DCR			C
+        JNZ			jF42D
+        XRA			A
+        SIM
+        LXI			H,wFD0D
+        MOV			C,M
+        INX			H
+        MOV			A,M
+        ORA			A
+        RET
+
+jF43E:
+        CALL		jF3E7
+        CALL		RCV232
+        JC			wAD
+        JNZ			wAC
+        MOV			M,A
+        INX			H
+        RET
+
+jF44D:
+        MVI			A,0x05
+jF44F:
+        CALL		jF3DF
+jF452:
+        CALL		jF3F1
+        RZ
+jF456:
+        ANI			0xf0
+        RAR
+        RAR
+        RAR
+        MOV			E,A
+        JMP			jF370
+jF45F:
+        CALL		COMOFF
+        CALL		jF3D1
+        LXI			H,STR_STAT
+        STC
+        CALL		SET232
+        MVI			A,0x07
+        CALL		jF44F
+        XRA			A
+        CALL		jF3DF
+        MVI			M,0x1a
+        INX			H
+        LXI			D,KYBUF+2
+        MVI			B,0x09
+        CALL		D2H4Bup
+        MVI			B,0x0f
+jF482:
+        MVI			M,0x20
+        INX			H
+        DCR			B
+        JNZ 		jF482
+        MVI 		M,0x46
+        INX			H
+        MOV			M,B
+jF48D:
+        CALL		jF3F1
+        MOV			B,A
+        LDA			wFD0C
+        CPI			0x12
+        JZ			jF456
+        MOV			A,B
+        ORA			A
+        RET
+
+jF49C:
+        MVI			E,0x01
+jF49E:
+        MVI			A,0x01
+        CALL		jF3DF
+        MOV			M,A
+        INX			H
+        MOV			M,E
+        JMP			jF452
+jF4A9:
+        POP 		D
+jF4AA:
+        MVI			A,0x04
+        CALL		jF3DF
+        MOV			M,C
+        INX			H
+        MOV			B,C
+        CALL		D2H4Bup
+        JMP			jF452
+
+jF4B8:
+        CALL		FINDFN
+        JNZ			wAE
+        LXI			H,wAF
+        SHLD 		ETRAP
+        CALL		SCNEMP
+        PUSH		H
+        CALL		jF57F
+        LHLD		wFD27
+        MOV			B,L
+        MOV			C,H
+        MOV			L,C
+        MOV			H,B
+        SHLD		wFD04
+        DCX			B
+        MOV			E,A
+        INR			A
+jF4D8:
+        INX			B
+        DCR			A
+        JNZ			jF4D8
+        MOV			D,A
+        LXI			H,jF54C
+        DAD			D
+        DAD			D
+        DAD			D
+        DAD			D
+        DAD			D
+        MOV			A,M
+        PUSH		PSW
+        LXI			D,jF575
+        PUSH		D
+        INX			H
+        MOV			E,M
+        INX			H
+        MOV			D,M
+        PUSH		D
+        INX			H
+        MOV			E,M
+        INX			H
+        MOV			H,M
+        MOV			L,E
+        MOV			E,M
+        INX			H
+        MOV			D,M
+        MOV			H,B
+        MOV			L,C
+        SHLD		wFD02
+        XCHG
+        SHLD		wFD00
+        PUSH		H
+        CALL		MAKHOL
+        JC			wAG
+        LXI			H,wFD08
+        INR			M
+        CALL		jF534
+        LHLD		wFD04
+        XCHG
+        POP			H
+        LDA			wFD0C
+        MOV			C,A
+        MVI			B,0x00
+jF51B:
+        MOV			A,D
+        ORA			E
+        MOV			A,C
+        STA			wFD0C
+        RZ
+        ORA			A
+        CM			jF539
+        DCX			D
+        PUSH		H
+        LXI			H,wFD0E
+        DAD			B
+        MOV			A,M
+        POP			H
+        MOV			M,A
+        INX			H
+        INR			C
+        JMP			jF51B
+jF534:
+        MVI			E,0x03
+        CALL		jF49E
+jF539:
+        PUSH		H
+        PUSH		D
+        MVI			A,0x03
+        CALL		jF3DF
+        CALL		jF48D
+        XRA			A
+        MOV			B,A
+        MOV			C,A
+        STA			wFD0C
+        POP			D
+        POP			H
+        RET
+
+jF54C:
+        ANA			B
+        MOV			L,M
+        PUSH		PSW
+        ORA			B
+        EI
+        RNZ
+        MOV			E,E
+        PUSH		PSW
+        XRA			M
+        EI
+        ADD			B
+        MOV			E,M
+        PUSH		PSW
+        SBB			D
+        SPHL
+        MVI			M,0x1a
+        RET
+
+;jF55E:	; no explicit jumps here, how do we ever get here?  0x0259 from start
+        XRA			A
+        MOV			M,A
+        INX			H
+        MOV			M,A
+        LHLD		wFD02
+        XCHG
+        LHLD		DOFILES
+        DAD			D
+        SHLD		DOFILES
+        RET
+
+;jF56E: ; no explicit jumps here, how do we ever get here?  0x0269 from start
+        LHLD		wFD00
+        SHLD		COFILES
+        RET
+
+jF575:
+        POP			PSW
+        LHLD		wFD00
+        XCHG
+        DCX			D
+        POP			H
+        JMP			MKDIRENT
+
+jF57F:
+        LDA 		FX1
+        SUI			0x43
+        RP
+        MVI			A,0x02
+        RET
+
+jF588:
+        CALL		jF45F
+        JNZ			wAE
+        LDA			FX1
+        CPI			0x42
+        JC			wAA
+        CPI			0x45
+        JNC			wAA
+        CALL		FINDFN
+        JZ			wAB
+        CALL		jF57F
+        MOV			C,A
+        MVI			A,0x02
+        SUB			C
+        PUSH		B
+        PUSH		D
+        XCHG
+        CALL		AFTEREOF
+        POP			D
+        MOV			A,L
+        SUB			E
+        MOV			L,A
+        MOV			A,H
+        SBB			D
+        MOV			H,A
+        POP			B
+        INR			C
+        INX			H
+jF5B8:
+        DCX			H
+        DCR			C
+        JNZ			jF5B8
+        MOV			A,L
+        ORA			H
+        RZ
+        PUSH		D
+        PUSH		H
+        CALL		jF49C
+        POP			D
+        POP			H
+        CALL		jF5CF
+        MVI			A,0x02
+        JMP			jF44F
+
+jF5CF:
+        PUSH		H
+        PUSH		H
+        LXI			H,0x0080
+        _RST		3
+        JNC			@l0
+        MOV			C,L
+        MOV			B,H
+        POP			H
+        DAD			B
+        XTHL
+        XCHG
+        LXI			B,wAH
+        DAD			B
+        PUSH		H
+        CALL		jF4AA
+        POP			D
+        POP			H
+        JMP			jF5CF
+@l0:
+        MOV			C,E
+        POP			H
+        JMP			jF4A9
+PRGEND:

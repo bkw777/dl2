@@ -1,0 +1,58 @@
+; 200.S85
+; TANDY model 200 header for RAMDSK.S85
+; Brian K. White
+
+; system rom routines
+PRTSP		EQU		0x001E		; write space to console, directed by LCDLPT
+UBLNAS		EQU		0x061B		; update in-memory line addresses for the current BASIC program lines
+LC2UCA		EQU		0x1014		; convert the character in A to uppercase
+PTILL0		EQU		0x11CC		; print null-terminated string at HL to screen
+CHGET		EQU		0x12F7		; wait for a key from the keyboard
+POPALL		EQU		0x1604		; pop all registers
+FILES		EQU		0x2A2A+2	; FILES statement
+KILASC		EQU		0x2AB5		; delete a .DO file
+KILCOM		EQU		0x2ACE		; delete a .CO file
+KILBAS		EQU		0x2B0C		; delete a .BA file
+KILLFILE	EQU		0x2B2C		; delete a file - 200 only
+FINDFN		EQU		0x2BCC		; search dir for filename matching FNAME
+FINDFN1		EQU		0x2BE9		; almost the the end of FINDFN
+SCNEMP		EQU		0x2C09		; scan for an empty directory entry
+UPDOFILES	EQU		0x2C5A		; update DOFILES with BC
+RESETFPS	EQU		0x2C62		; reset file pointers
+MKDIRENT	EQU		0x2DAC		; insert entry into directory
+INR_A_RET	EQU		0x2459		; INR A; RET;
+D2H4Bup		EQU		0x41BA		; move the memory pointed to by DE to the memory pointed to by HL
+PRTASC		EQU		0x470B		; print 16bit value in HL as ascii
+;BEEP_MENU	EQU		0x32D2		; CALL BEEP; JMP MENU; (not used in RAMDSK v2)
+BEEP		EQU		0x4F45		; make a beep sound
+ESCB		EQU		0x519D		; ESC+B - move cursor down one line
+INLIN		EQU		0x54F6		; input line
+CKFN		EQU		0x5ACA		; format filename and check validity
+MENU		EQU		0x67A4		; go to main menu
+CMPARE		EQU		0x6E11		; compare the buffer pointed to by DE to the buffer pointed to by HL
+GETEOF		EQU		0x8268		; search for EOF (0x1A)
+MAKHOL		EQU		0x82A8		; insert BC number of spaces in memory
+KYREAD		EQU		0x8B03		; read keyboard
+
+; addresses
+CSRY		EQU		0xEF06		; cursor row position [poking changes cursor position]
+ETRAP		EQU		0xEF34		; error trap
+CURBAS		EQU		0xEF67		; pointer to start of BA files / current running BASIC program
+UNSAVBA		EQU		0xF295		; address of current BASIC program not saved
+DOFILES		EQU		0xF661		; pointer to start of DO files
+COFILES		EQU		0xF663		; pointer to start of CO files
+FNAME		EQU		0xF746		; 8 (9?) bytes padded fname, prog name if not run from menu nor typed on select line
+FX1			EQU		0xF74C		; unknown, possibly file size or other metadata
+CFNAME		EQU		0xF74F		; 6 bytes filename of last program loaded from tape
+FX2			EQU		0xF755		; unknown, possibly file size or other metadata
+KC7			EQU		0xFD0B		; keyboard column 7 / PA6 status bits 0-7: SPACE,DEL,TAB,ESC,PASTE,LABEL,PRINT,ENTER
+MAXRAM		EQU		0xEEB0
+
+BAFILES		EQU		CURBAS		; start of BA files - RAM100 uses UNSAVBA, RAM200 uses CURBAS
+NROWS		EQU		16			; LCD screen rows
+CDNCT		EQU		26			; counter in j03->j05 - maybe cursor-down n times?
+LEGACY_HIMEM	EQU		0xEEAE	; 0xEEAE matches the original RAM200.CO v2
+
+MACRO	DeleteRamFile
+	JMP		KILLFILE
+ENDM

@@ -1,0 +1,50 @@
+; cpu opcodes
+opcode_IN	EQU		0xDB
+opcode_OUT	EQU		0xD3
+
+; ascii
+ETX			EQU		0x03
+LF			EQU		0x0A
+FF			EQU		0x0C
+CR			EQU		0x0D
+ESC 		EQU		0x1B
+SPACE		EQU		0x20
+
+; vt52/screen control sequences
+MACRO clr_eol
+	DB ESC,'K'
+ENDM
+MACRO cursor_address row,col
+	DB ESC,'Y',row+31,col+31
+ENDM
+MACRO disable_automatic_scroll
+	DB ESC,'V'
+ENDM
+MACRO cursor_normal
+	DB ESC,'P'
+ENDM
+MACRO cursor_invisible
+	DB ESC,'Q'
+ENDM
+MACRO enter_reverse_mode
+	DB ESC,'p'
+ENDM
+MACRO exit_attribute_mode
+	DB ESC,'q'
+ENDM
+
+; file types, attribute byte A for MKDIRENT
+FattrBA		EQU		0x80		; .BA files
+FattrDO		EQU		0xC0		; .DO files
+FattrCO		EQU		0xA0		; .CO files
+
+; rst
+; z88dk-z80asm rejects "RST 4" as "error: integer range: 4"
+; z88dkdis -m8085 disassembles RST 4 (0xE7) to "rst 0x20"
+; so we have to say RST 0x20 when we want RST 4
+MACRO _RST n
+	RST n*0x08
+ENDM
+MACRO Print_A
+	_RST 4
+ENDM

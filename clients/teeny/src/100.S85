@@ -1,0 +1,80 @@
+; 100.S85
+; TRS-80 model 100 header for TEENY.S85 (from bkw777/NODE_DATAPAC/software/RAMDSK/src/)
+; Brian K. White
+
+
+; TEENY not yet matched in 200/others
+SET232			EQU		0x17E6		; set RS232 parameters to STAT string pointed to by HL
+AFTEREOF		EQU		0x219A+3	; Advance HL past end of current file based on type
+EVAL_ROS		EQU		0x4C0F		; BASIC evaluate argument to RUN/OPEN/SAVE
+MASDEL			EQU		0x6B9F		; delete BC chars at M (in a DO file)
+RCV232			EQU		0x6D7E		; get A from the RS232 with XON/XOFF
+SND232			EQU		0x6E32		; send A out serial port with XON/XOFF
+COMOFF			EQU		0x6ECB		; deactivate RS232 or Modem
+INT1D			EQU		0x765C		; set interrupt to 0x1D
+KYBUF			EQU		0xF685		; keyboard buffer
+COMBUF			EQU		0xFF46		; COM buffer 0x40 bytes
+KYBCNT			EQU		0xFFAA		; number of characters in keyboard buffer
+ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
+ALTLCD_LEN		EQU		0x013F		; length of ALT LCD buffer
+
+
+
+
+; system rom routines
+PRTSP		EQU		0x001E		; write space to console, directed by LCDLPT
+UBLNAS		EQU		0x05F0		; update in-memory line addresses for the current BASIC program lines
+LC2UCA		EQU		0x0FE9		; convert the character in A to uppercase
+PTILL0		EQU		0x11A2		; print null-terminated string at HL to screen
+CHGET		EQU		0x12CB		; wait for a key from the keyboard
+POPALL		EQU		0x14ED		; pop all registers
+FILES		EQU		0x1F3A		; FILES statement
+KILASC		EQU		0x1FBF		; delete a .DO file
+KILCOM		EQU		0x1FD9		; delete a .CO file
+KILBAS		EQU		0x2017		; delete a .BA file
+FINDFN		EQU		0x20AF		; search dir for filename matching FNAME
+FINDFN1		EQU		0x20CC		; almost the the end of FINDFN
+SCNEMP		EQU		0x20E4		; scan for an empty directory entry
+SCNEMP_b	EQU		0x20EC		; scan for an empty directory entry (alt entry)
+UPDOFILES	EQU		0x213E		; update DOFILES with BC
+RESETFPS	EQU		0x2146		; reset file pointers
+MKDIRENT	EQU		0x2239		; insert entry into directory
+INR_A_RET	EQU		0x2AB5		; INR A; RET;
+D2H4Bup		EQU		0x3469		; move the memory pointed to by DE to the memory pointed to by HL
+PRTASC		EQU		0x39D4		; print 16bit value in HL as ascii
+BEEP		EQU		0x4229		; make a beep sound
+ESCB		EQU		0x446E		; ESC+B - move cursor down one line
+INLIN		EQU		0x4644		; input line
+CKFN		EQU		0x4C0B		; format filename and check validity
+MENU		EQU		0x5797		; go to main menu
+CMPARE		EQU		0x5A6D		; compare the buffer pointed to by DE to the buffer pointed to by HL
+GETEOF		EQU		0x6B2D		; search for EOF (0x1A)
+MAKHOL		EQU		0x6B6D		; insert BC number of spaces in memory
+KYREAD		EQU		0x7242		; read keyboard
+
+; addresses
+CSRY		EQU		0xF639		; cursor row position [poking changes cursor position]
+ETRAP		EQU		0xF652		; error trap
+CURBAS		EQU		0xF67C		; pointer to start of BA files / current running BASIC program
+UNSAVBA		EQU		0xF99A		; address of current BASIC program not saved
+DOFILES		EQU		0xFBAE		; pointer to start of DO files
+COFILES		EQU		0xFBB0		; pointer to start of CO files
+FNAME		EQU		0xFC93		; 8 (9?) bytes padded fname, prog name if not run from menu nor typed on select line
+FX1			EQU		0xFC99		; unknown, possibly file size or other metadata
+CFNAME		EQU		0xFC9C		; 6 bytes filename of last program loaded from tape
+FX2			EQU		0xFCA2		; unknown, possibly file size or other metadata
+KC7			EQU		0xFF97		; keyboard column 7 / PA6 status bits 0-7: SPACE,DEL,TAB,ESC,PASTE,LABEL,PRINT,ENTER
+
+MAXRAM		EQU		0xF5F0
+
+BAFILES		EQU		UNSAVBA		; start of BA files - RAM100 uses UNSAVBA, RAM200 uses CURBAS
+NROWS		EQU		8			; LCD screen rows
+
+MACRO	DeleteRamFile
+	CALL	FINDFN1					; tail end of FINDFN
+	CPI		FattrDO
+	JZ		KILASC					; if it's a .DO file
+	CPI		FattrCO
+	JZ		KILCOM					; if it's a .CO file
+	JMP		KILBAS					; if it's anything else
+ENDM
