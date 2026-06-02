@@ -7,6 +7,9 @@
 ;	n=$$(wc -c <TEENY.CO)
 ;	z88dk-z80asm -m8085 -no-synth -DMODEL_100 -DPRGLEN=$n -b -o=TEENY.CO TEENY.S85
 
+; 8085 asm syntax highlighting for Geany https://www.geany.org/
+; https://gist.github.com/bkw777/632c0a390b0fd0bd4e2f31544528d6d5
+
 ; Currently builds for 100 only
 ; $ make 100
 ; or
@@ -25,9 +28,9 @@ ENDIF
 wFD00			EQU		ALTLCD + 0x40		; FD00
 wFD02			EQU		ALTLCD + 0x42		; FD02
 wFD04			EQU		ALTLCD + 0x44		; FD04
-wFD06			EQU		ALTLCD + 0x46		; FD06
-wFD08			EQU		ALTLCD + 0x48		; FD08
-wZZ				EQU		ALTLCD + 0X4A		; FD0A
+wSP				EQU		ALTLCD + 0x46		; FD06  stack pointer
+wFD08			EQU		ALTLCD + 0x48		; FD08  word but only ever stores a byte
+wZZ				EQU		ALTLCD + 0X4A		; FD0A  "ZZ" tpdd packet preamble
 wFD0C			EQU		ALTLCD + 0x4C		; FD0C
 wFD0D			EQU		ALTLCD + 0x4D		; FD0D
 wFD0E			EQU		ALTLCD + 0x4E		; FD0E
@@ -74,14 +77,14 @@ PRGTOP:
 PRGEXE:
         LXI			H,0x0000
         DAD			SP
-        SHLD		wFD06
+        SHLD		wSP				; store stack pointer
         LXI			H,ZZ
-        SHLD		wZZ
+        SHLD		wZZ				; wZZ="ZZ" tpdd packet preamble
 jF312:
-        LHLD		wFD06
-        SPHL
-        XRA			A
-        STA			wFD08
+        LHLD		wSP				; load saved stack pointer into HL
+        SPHL						; load saved stack pointer to SP
+        XRA			A				; A=0
+        STA			wFD08			; store 0 (byte into word)
         LXI			H,jF312
         PUSH		H
         LXI			H,STR_Prompt
@@ -123,7 +126,7 @@ jF36A:
 jF36D:
         LXI 		B, 0x161e		; [wAA]
 jF370:
-        LDA 		wFD08
+        LDA 		wFD08			; (byte from word)
         ORA 		A
         JZ 			jF384
         PUSH 		D
@@ -361,7 +364,7 @@ jF4D8:
         PUSH		H
         CALL		MAKHOL
         JC			wAG
-        LXI			H,wFD08
+        LXI			H,wFD08			; loading a word from where we elswhere only ever stored a byte
         INR			M
         CALL		jF534
         LHLD		wFD04
