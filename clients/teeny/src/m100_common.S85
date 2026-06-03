@@ -13,7 +13,7 @@ SPACE		EQU		0x20
 ; vt52/screen control sequences
 ; the macro names match the terminfo field names
 clr_eol MACRO
-	DB ESC,'K'
+		DB ESC,'K'
 	ENDM
 cursor_address MACRO row,col
 		DB ESC,'Y',row+31,col+31

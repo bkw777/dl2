@@ -15,16 +15,17 @@
 ; or
 ; $ make verify_100
 
-INCLUDE		"m100_common.S85"
+	INCLUDE		"m100_common.S85"
 
-IF MODEL_200
-INCLUDE		"200.S85"
-ELIF MODEL_K85
-INCLUDE		"K85.S85"
-ELSE
-INCLUDE		"100.S85"
-ENDIF
+	IF MODEL_200
+		INCLUDE		"200.S85"
+	ELIF MODEL_K85
+		INCLUDE		"K85.S85"
+	ELSE
+		INCLUDE		"100.S85"
+	ENDIF
 
+; FCC0 start of ALTLCD
 wFD00			EQU		ALTLCD + 0x40		; FD00
 wFD02			EQU		ALTLCD + 0x42		; FD02
 wFD04			EQU		ALTLCD + 0x44		; FD04
@@ -47,28 +48,27 @@ wAG				EQU		jF367+1
 wAH				EQU		COMBUF+0x3A
 
 ; TPDD
-ZZ				EQU		0x5A5A				; packet start / preamble, really "ZZ" or 'Z','Z' (same bytes but the drive is scanning each byte individually and looking for 2 consecutive 0x5A , not an int16)
+ZZ				EQU		0x5A5A				; packet start / preamble, really 2 consecutive 'Z', not a int16 number
 
 
 ;------------------------------------------------------------------------------
 ; ORG & CO Header works backwards from HIMEM-PRGLEN.
 ; PRGLEN has to be supplied from outside via -DPRGLEN=len.
 ; If no PRGLEN then build with default ORG 0 and no CO header.
-IFDEF PRGLEN
-IFNDEF HIMEM
-	HIMEM		EQU		MAXRAM
-ENDIF
+	IFDEF PRGLEN
+		IFNDEF HIMEM
+			HIMEM		EQU		MAXRAM
+		ENDIF
 
-;ORG		0xF305 - 6
-ORG HIMEM-PRGLEN-6						; entry minus length of header
+		ORG HIMEM-PRGLEN-6			; entry minus length of header
 
 ;------------------------------------------------------------------------------
 ; .CO HEADER
 ;------------------------------------------------------------------------------
-DW PRGTOP
-DW PRGLEN
-DW PRGEXE
-ENDIF ; PRGLEN
+		DW PRGTOP
+		DW PRGLEN
+		DW PRGEXE
+	ENDIF ; PRGLEN
 ;------------------------------------------------------------------------------
 
 

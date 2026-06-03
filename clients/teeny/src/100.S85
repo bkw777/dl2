@@ -70,11 +70,11 @@ MAXRAM		EQU		0xF5F0
 BAFILES		EQU		UNSAVBA		; start of BA files - RAM100 uses UNSAVBA, RAM200 uses CURBAS
 NROWS		EQU		8			; LCD screen rows
 
-MACRO	DeleteRamFile
-	CALL	FINDFN1					; tail end of FINDFN
-	CPI		FattrDO
-	JZ		KILASC					; if it's a .DO file
-	CPI		FattrCO
-	JZ		KILCOM					; if it's a .CO file
-	JMP		KILBAS					; if it's anything else
-ENDM
+DeleteRamFile MACRO
+		CALL	FINDFN1					; tail end of FINDFN
+		CPI		FattrDO
+		JZ		KILASC					; if it's a .DO file
+		CPI		FattrCO
+		JZ		KILCOM					; if it's a .CO file
+		JMP		KILBAS					; if it's anything else
+	ENDM
