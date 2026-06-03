@@ -35,18 +35,13 @@ wFD08			EQU		ALTLCD + 0x48		; FD08  word but only ever stores a byte
 wZZ				EQU		ALTLCD + 0X4A		; FD0A  "ZZ" tpdd packet preamble
 pktCMD			EQU		ALTLCD + 0x4C		; FD0C  tpdd packet cmd
 pktLEN			EQU		ALTLCD + 0x4D		; FD0D  tpdd packet len
-pktDATA			EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data (length varies 0-64)
+pktDATA			EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data (length varies 0-?? 64? up to 252 is possible & legal but idk yet what TEENY does)
+; position varies but CKSUM (single byte) comes after pktDATA, is the final byte of the packet
 
 wFD27			EQU		ALTLCD + 0x67		; FD27
 ; FDFF end of ALTLCD
 
 ptr_err_trap	EQU		load_ptr_err_trap+1
-wAB				EQU		jF35B+1
-wAC				EQU		jF35E+1
-wAD				EQU		jF361+1
-wAE				EQU		jF364+1
-wAF				EQU		jF36A+1
-wAG				EQU		jF367+1
 wAH				EQU		COMBUF+0x3A
 
 ; TPDD
@@ -118,7 +113,7 @@ MAIN:
         JZ			SAVE			; then jump to SAVE
         PUSH 		PSW				; push A & flags
         CALL		jF45F
-        JZ			wAB				; incomprehensible evil
+        JZ			jX01				; incomprehensible evil
         POP 		PSW
         SUI			'K'
         JZ			KILL
@@ -127,20 +122,51 @@ MAIN:
         MVI			E,0x00
 
 ; good god what the holy hell is going on here?
-; we jump to execute 
+;
+; We do fall through from above and execute these
+; instructions just as written (which is mostly pointless
+; in that case since we just overwrite B a bunch of times
+; and only the last one matters). So it's not simply an incorrect disassembly.
+;
+; I tried rewriting with the initial LXI B just as raw data DB so jX01 becomes
+; a normal jump target to a STAX B instruction. but it just breaks a few bytes
+; later when you need the next byte to be an operand but it's the next jump target.
+; In the end it's no easier to read or follow.
+;
+; But everywhere else we only ever jump to execute on the operand bytes???
+;
+; And then the LXI B opcode bytes end up becoming
+; operands?
+;
+; Is this just some asshole way to save a few bytes by having 7 or 8
+; wildly different routines all in the same 20 byte space?
+;
+
+jX01				EQU		jF35B+1
 jF35B:
-        LXI 		B, 0x021e		; [wAB]
-jF35E:
-        LXI 		B, 0x061e		; [wAC]
+        LXI 		B, 0x021e		; [jX01]  / STAX B ; MVI E,
+
+jX02				EQU		jF35E+1
+jF35E:								;                         0x01
+        LXI 		B, 0x061e		; [jX02]  / MVI B,0x1E
+
+jX03				EQU		jF361+1
 jF361:
-        LXI 		B, 0x081e		; [wAD]
-jF364:
-        LXI 		B, 0x101e		; [wAE]
-jF367:
-        LXI 		B, 0x121e		; [wAG]
-jF36A:
-        LXI 		B, 0x141e		; [wAF]
-load_ptr_err_trap:
+        LXI 		B, 0x081e		; [jX03]  / DSUB ; MVI E,
+
+jX04				EQU		jF364+1
+jF364:								;                       0x01
+        LXI 		B, 0x101e		; [jX04]  / ARHL ; MVI E,
+
+jX05				EQU		jF367+1
+jF367:								;                       0x01
+        LXI 		B, 0x121e		; [jX05]  / STAX D ; MVI E,
+
+jX06				EQU		jF36A+1
+jF36A:								;                         0x01
+        LXI 		B, 0x141e		; [jX06]  / INR_D ; MVI E,
+
+load_ptr_err_trap:					;                        0x01
         LXI 		B, 0x161e		; [ptr_err_trap]
 jF370:
         LDA 		wFD08			; first byte of wFD08 into A 
@@ -253,7 +279,7 @@ SendPacket:
 @send_byte:
         MOV			A,M				; A = byte from packet
         CALL		SND232			; send byte out rs232
-        JC			wAD				; if shift+break then jump to wAD (wow that looks evil)
+        JC			jX03				; if shift+break then jump to jX03 (wow that looks evil)
         CALL		CheckDSR
         INX			H				; advance HL to next byte in packet
         DCR			B				; B--
@@ -280,8 +306,8 @@ jF42D:
 jF43E:
         CALL		CheckDSR
         CALL		RCV232
-        JC			wAD
-        JNZ			wAC
+        JC			jX03
+        JNZ			jX02
         MOV			M,A
         INX			H
         RET
@@ -376,8 +402,8 @@ jF4AA:
 
 jF4B8:
         CALL		FINDFN
-        JNZ			wAE
-        LXI			H,wAF
+        JNZ			jX04
+        LXI			H,jX06
         SHLD 		ETRAP
         CALL		SCNEMP
         PUSH		H
@@ -426,7 +452,7 @@ jF4D8:
         SHLD		wFD00
         PUSH		H
         CALL		MAKHOL
-        JC			wAG
+        JC			jX05
         LXI			H,wFD08			; loading a word from where we elswhere only ever stored a byte
         INR			M
         CALL		jF534
@@ -525,14 +551,14 @@ jF57F:
 
 SAVE:
         CALL		jF45F
-        JNZ			wAE
+        JNZ			jX04
         LDA			FX1
         CPI			0x42
         JC			ptr_err_trap
         CPI			0x45
         JNC			ptr_err_trap
         CALL		FINDFN
-        JZ			wAB
+        JZ			jX01
         CALL		jF57F
         MOV			C,A
         MVI			A,0x02
