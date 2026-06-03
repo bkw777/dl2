@@ -39,13 +39,18 @@ FattrBA		EQU		0x80		; .BA files
 FattrDO		EQU		0xC0		; .DO files
 FattrCO		EQU		0xA0		; .CO files
 
-; z88dk-z80asm <= 24602 only accepts the zilog syntax for RST
+; z88dk-z80asm < db5c165 (20260602) only accepts the zilog syntax for RST
 _RST MACRO n
-	IF Z88DK>0 && Z88DK<=24602
+	IF Z88DK>0 && Z88DK<25000
 		RST n*0x08
 	ELSE
 		RST n
 	ENDIF
 	ENDM
 
-rst_Print_A		EQU		4		; RST 4 = print A to LCD/LPT
+rst_NextNonSpace	EQU		2		; RST 2 = get next non-whitespace char from M to A
+rst_CompareDEHL		EQU		3		; RST 3 = compare DE and HL
+rst_Print_A			EQU		4		; RST 4 = print A to LCD/LPT
+
+; i/o
+PIO_PORT_C			EQU		0xBB	; bits: 7:- 6:- 5:!DSR 4:!CTS 3:BCR 2:LPTBUSY 1:!LPTBUSY 0:CLK
