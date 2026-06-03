@@ -141,9 +141,9 @@ jF384:
         MVI			D,0x00
         DAD			D
         MOV			A,M
-        _RST		4
+        _RST		rst_Print_A			; print A
         _RST		2
-        _RST		4
+        _RST		rst_Print_A			; print A
         LXI			H,STR_ErrMsg
         CALL		PTILL0
         JMP			jF312
