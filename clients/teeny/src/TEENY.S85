@@ -32,20 +32,20 @@ wFD04			EQU		ALTLCD + 0x44		; FD04
 wSP				EQU		ALTLCD + 0x46		; FD06  stack pointer
 wFD08			EQU		ALTLCD + 0x48		; FD08  word but only ever stores a byte
 ; TPDD packet
-wZZ				EQU		ALTLCD + 0X4A		; FD0A  "ZZ" tpdd packet preamble
-pktCMD			EQU		ALTLCD + 0x4C		; FD0C  tpdd packet cmd
-pktLEN			EQU		ALTLCD + 0x4D		; FD0D  tpdd packet len
+pktZZ			EQU		ALTLCD + 0X4A		; FD0A  tpdd packet preamble "ZZ"
+pktTYPE			EQU		ALTLCD + 0x4C		; FD0C  tpdd packet command or return type
+pktDLEN			EQU		ALTLCD + 0x4D		; FD0D  tpdd packet data length
 pktDATA			EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data (length varies 0-?? 64? up to 252 is possible & legal but idk yet what TEENY does)
-; position varies but CKSUM (single byte) comes after pktDATA, is the final byte of the packet
+; position varies but also a single byte checksum comes after pktDATA, and is the final byte of the packet
 
 wFD27			EQU		ALTLCD + 0x67		; FD27
 ; FDFF end of ALTLCD
 
-ptr_err_trap	EQU		load_ptr_err_trap+1
 wAH				EQU		COMBUF+0x3A
 
 ; TPDD
 ZZ				EQU		0x5A5A				; packet start / preamble, really 2 consecutive 'Z', not a int16 number
+
 req_dirent		EQU		0x00
 req_open		EQU		0x01
 req_close		EQU		0x02
@@ -53,6 +53,10 @@ req_read		EQU		0x03
 req_write		EQU		0x04
 req_delete		EQU		0x05
 req_status		EQU		0x07
+
+ret_read		EQU		0x10
+ret_dirent		EQU		0x11
+ret_normal		EQU		0x12
 
 ; RS232
 COM_STAT_STRING MACRO
@@ -88,7 +92,7 @@ PRGEXE:
         DAD			SP				; add stack pointer to HL
         SHLD		wSP				; save stack pointer to ram wSP
         LXI			H,ZZ			; HL = "ZZ" = tpdd packet preamble
-        SHLD		wZZ				; save HL to ram wZZ
+        SHLD		pktZZ				; save HL to ram pktZZ
 MAIN:
         LHLD		wSP				; copy saved stack pointer from ram to HL
         SPHL						; copy saved stack pointer from HL to SP
@@ -100,8 +104,8 @@ MAIN:
         CALL		PTILL0			; print HL
         STA			KYBCNT			; write 0 to keyboard pending keystrokes count
         CALL		INLIN			; get a line of input from keyboard
-        LXI			H,ptr_err_trap	; load the address of ptr_err_trap to HL
-        SHLD		ETRAP			; set ptr_err_trap as ON ERROR handler
+        LXI			H,errNM			; load the address of errNM to HL
+        SHLD		ETRAP			; set errNM as ON ERROR handler
         LXI			H,KYBUF+1		; load addr to 2nd byte of keyboard buffer to HL
         MVI			M,'"'			; write " to 2nd byte of keyboard buffer
         CALL		EVAL_ROS		; BASIC evaluate RUN/OPEN/SAVE arg
@@ -110,68 +114,67 @@ MAIN:
         CPI			'Q'				; is it 'Q' ?
         JZ			MENU			; then exit to OS (main menu)
         CPI			'S'				; is it 'S' ?
-        JZ			SAVE			; then jump to SAVE
+        JZ			SAVE			; then jump to SAVE		FIXME rename SAVE, it's common init code for most commands
         PUSH 		PSW				; push A & flags
         CALL		jF45F
-        JZ			jX01				; incomprehensible evil
+        JZ			errFF			; if Z print FF error
         POP 		PSW
         SUI			'K'
         JZ			KILL
         DCR 		A
         JZ			jF4B8
-        MVI			E,0x00
 
-; good god what the holy hell is going on here?
+; ERROR CODES
+; Is this Tracy Allen insanity or Ron Wiesen insanity?
 ;
-; We do fall through from above and execute these
-; instructions just as written (which is mostly pointless
-; in that case since we just overwrite B a bunch of times
-; and only the last one matters). So it's not simply an incorrect disassembly.
+; Either we fall through from above or jump to one of these targets,
+; but one way or another we always start on one of these MVI E's.
 ;
-; I tried rewriting with the initial LXI B just as raw data DB so jX01 becomes
-; a normal jump target to a STAX B instruction. but it just breaks a few bytes
-; later when you need the next byte to be an operand but it's the next jump target.
-; In the end it's no easier to read or follow.
+; Whichever MVI E we start on, that is the only one that actually does anything.
 ;
-; But everywhere else we only ever jump to execute on the operand bytes???
+; The DB 0x01's get executed as LXI B,word which consumes the next 2 bytes as data.
+; The next 2 bytes are exactly the entire next MVI E,byte instruction.
 ;
-; And then the LXI B opcode bytes end up becoming
-; operands?
+; So instead of executing MVI E,0x02, we executed LXI B,0x021E,
+; and are left ready to execute the next byte as an opcode,
+; which is the next DB 0x01, repeat...
 ;
-; Is this just some asshole way to save a few bytes by having 7 or 8
-; wildly different routines all in the same 20 byte space?
+; The DB's essentially turn the rest of the stack into no-ops.
+; We just overwrite B a bunch of times and never use B.
 ;
+; The final result that we care about is we set E to something.
+;
+; E is used as an offset into the string of all error codes.
 
-jX01				EQU		jF35B+1
-jF35B:
-        LXI 		B, 0x021e		; [jX01]  / STAX B ; MVI E,
+; fell through from above is syntax error
+		MVI			E,eSN
+		DB			0x01
+errFF:
+		MVI			E,eFF
+		DB			0x01
+errCM:
+		MVI			E,eCM
+		DB			0x01
+errIO:
+		MVI			E,eIO
+		DB			0x01
+errAE:
+		MVI			E,eAE
+		DB			0x01
+errOM:
+		MVI			E,eOM
+		DB			0x01
+errFL:
+		MVI			E,eFL
+		DB			0x01
+errNM:
+        MVI			E,eNM
 
-jX02				EQU		jF35E+1
-jF35E:								;                         0x01
-        LXI 		B, 0x061e		; [jX02]  / MVI B,0x1E
 
-jX03				EQU		jF361+1
-jF361:
-        LXI 		B, 0x081e		; [jX03]  / DSUB ; MVI E,
-
-jX04				EQU		jF364+1
-jF364:								;                       0x01
-        LXI 		B, 0x101e		; [jX04]  / ARHL ; MVI E,
-
-jX05				EQU		jF367+1
-jF367:								;                       0x01
-        LXI 		B, 0x121e		; [jX05]  / STAX D ; MVI E,
-
-jX06				EQU		jF36A+1
-jF36A:								;                         0x01
-        LXI 		B, 0x141e		; [jX06]  / INR_D ; MVI E,
-
-load_ptr_err_trap:					;                        0x01
-        LXI 		B, 0x161e		; [ptr_err_trap]
-jF370:
+ERROR:
         LDA 		wFD08			; first byte of wFD08 into A 
         ORA 		A				; set flags about A
-        JZ 			@err			; if A is 0 skip to @err
+        JZ 			@show			; if A is 0 skip to @err
         PUSH 		D
         LHLD 		wFD02
         MOV 		B,H
@@ -179,20 +182,45 @@ jF370:
         LHLD 		wFD00
         CALL		MASDEL
         POP 		D
-@err:
-        LXI			H,STR_ErrCodes	; load string of all 2-char err codes
-        MVI			D,0x00			; DE = 0
-        DAD			D				; add 0 to HL?  ???why???
-        MOV			A,M				; load one byte from M (first byte of one of the error codes)
+@show:
+        LXI			H,STR_ErrCodes	; point to start of string of all 2-char err codes
+        MVI			D,0x00			; D = 0. E = something from above
+        DAD			D				; add DE to HL, E = offset into STR_Errcodes
+        ; HL @ STR_Errcodes+E
+        MOV			A,M				; read first byte of error code
         _RST		rst_Print_A			; print it
-        _RST		rst_NextNonSpace	; get next char from M
+        _RST		rst_NextNonSpace	; get next byte of err code
         _RST		rst_Print_A			; print it
-        LXI			H,STR_ErrMsg	; address of error message into HL
+        LXI			H,STR_ErrMsg	; address of error message
         CALL		PTILL0			; print error message
         JMP			MAIN			; restart at main
 
+
 STR_ErrCodes:
-		DB			"SNFFNRCMIOWPDFNDAEOMFLNM"
+eSN		EQU			0x00
+		DB			"SN"
+eFF		EQU			0x02
+		DB			"FF"
+eNR		EQU			0x04
+		DB			"NR"
+eCM		EQU			0x06
+		DB			"CM"
+eIO		EQU			0x08
+		DB			"IO"
+eWP		EQU			0x0A
+		DB			"WP"
+eDF		EQU			0x0C
+		DB			"DF"
+eND		EQU			0x0E
+		DB			"ND"
+eAE		EQU			0x10
+		DB			"AE"
+eOM		EQU			0x12
+		DB			"OM"
+eFL		EQU			0x14
+		DB			"FL"
+eNM		EQU			0x16
+		DB			"NM"
 
 STR_Prompt:
 		DB			"> C FFFFFF.XX (C=KLSQ)",CR,LF,"> ",0
@@ -216,18 +244,18 @@ STR_STAT:
 		COM_STAT_STRING
 
 InitPacket:
-		LXI 		H,pktCMD			; HL = addr pktCMD
-		MOV			M,A				; write A to pktCMD
-		INX			H				; HL = addr pktLEN
-		MVI			M,0x00			; write 0 to pktLEN
+		LXI 		H,pktTYPE		; HL = addr pktTYPE
+		MOV			M,A				; write A to pktTYPE
+		INX			H				; HL = addr pktDLEN
+		MVI			M,0x00			; write 0 to pktDLEN
 		RET
 
 CheckDSR:
         IN			PIO_PORT_C		; read RS232 flow control pins
         ANI			DSR_BITMASK		; check !DSR
         RZ							; if !DSR then return
-        MVI			E,0x04			; E = 4  ???
-        JMP			jF370
+        MVI			E,eNR			; set NR error
+        JMP			ERROR
 
 
 SendPacket:
@@ -237,77 +265,81 @@ SendPacket:
 ; Invert all the bits in that byte.
 ; The checksummed range is cmd field through data field.
 
-; start at pktCMD
-        LXI			H,pktCMD		; HL @ pktCMD
-        MOV			A,M				; A = pktCMD
-        INX			H				; HL @ pktLEN 
-        ADD			M				; A = A + pktLEN
+; start at pktTYPE
+        LXI			H,pktTYPE		; HL @ pktTYPE
+        MOV			A,M				; A = pktTYPE
+        INX			H				; HL @ pktDLEN 
+        ADD			M				; A = A + pktDLEN
         MOV			D,A				; D = A (cmd+len)
-        MOV			A,M				; A = pktLEN
-        MOV			E,A				; E = pktLEN
-        MOV			B,A				; B = pktLEN
+        MOV			A,M				; A = pktDLEN
+        MOV			E,A				; E = pktDLEN
+        MOV			B,A				; B = pktDLEN
         INX			H				; HL @ pktDATA+0
-        ORA			A				; is pktLEN 0?
+        ORA			A				; is pktDLEN 0?
         MOV			A,D				; A = sum from D
-        JZ			@endpkt			; if pktLEN = 0 then jump to finish checksum
-        ; pktLEN>0, sum pktLEN bytes from pktDATA 
+        JZ			@endpkt			; if pktDLEN = 0 then jump to finish checksum
+        ; pktDLEN>0, sum pktDLEN bytes from pktDATA 
 @l0:
 		ADD			M				; add data byte to sum (rolls over at 0xFF) 
 		INX			H				; next data byte
 		DCR			E				; E--
-		JNZ			@l0				; repeat for E (pktLEN) bytes
-		; HL @ pktLEN+(pktLEN)
+		JNZ			@l0				; repeat for E (pktDLEN) bytes
+		; HL @ pktDLEN+(pktDLEN)
 @endpkt:
 		; A = sum
 		CMA							; complement A, A = tpdd checksum now
 		; A = CheckSum
 		MOV			M,A				; append checksum to packet
 
-		; add 5 to pktLEN for the full packet length
-		; (bad name, pktLEN is not packet length, it's tpdd packet LEN field,
-		; which holds the length of the DATA field not the whole packet)
-		; B = pktLEN + 5:
-		; B =  2   + 1   + 1   + pktLEN + 1
-		;     "ZZ"   CMD   LEN   DATA     CKSUM
+		; Set B counter to pktDLEN+5 for the full packet length
+		; B =  2   + 1    + 1    + pktDLEN + 1
+		;     "ZZ"   TYPE   DLEN   DATA      CHK
 
 		MVI			A,0x05			; A = 5
-		ADD			B				; add pktLEN from B to A, A = pktLEN+5
-		MOV			B,A				; B = pktLEN+5
+		ADD			B				; add pktDLEN from B to A, A = pktDLEN+5
+		MOV			B,A				; B = pktDLEN+5
 		; B = loop counter for all bytes in packet, ZZ to CKSUM
-		; start HL at wZZ
-		LXI			H,wZZ			; HL @ wZZ (0x5A5A aka "ZZ")
+		; start HL at pktZZ
+		LXI			H,pktZZ			; HL @ pktZZ (0x5A5A aka "ZZ")
 @send_byte:
         MOV			A,M				; A = byte from packet
         CALL		SND232			; send byte out rs232
-        JC			jX03				; if shift+break then jump to jX03 (wow that looks evil)
+        JC			errIO			; if shift+break then jump to errIO
         CALL		CheckDSR
         INX			H				; advance HL to next byte in packet
         DCR			B				; B--
         JNZ			@send_byte		; send bytes until B=0
-        LXI			H,pktCMD
+        ; done sending packet
+        LXI			H,pktTYPE		; move to pkTYPE
         CALL		INT1D
-        CALL		jF43E
-        CALL		jF43E
-        MOV			C,A
-        INR			C
-jF42D:
-        CALL		jF43E
-        DCR			C
-        JNZ			jF42D
+        CALL		ReadSerialByteAppendM
+        ; pktTYPE now contains the packet return type sent back by the drive
+        ; HL @ pktDLEN
+        CALL		ReadSerialByteAppendM
+        ; pktDLEN now contains the packet return data length sent back by the drive
+        ; HL @ pktDATA
+        MOV			C,A				; save return DLEN in C
+        INR			C				; C++
+        ; read C+1 (DLEN+CHK) more bytes from serial 
+@read_byte:
+        CALL		ReadSerialByteAppendM
+        DCR			C				; C--
+        JNZ			@read_byte		; repeat until C = 0
+        ; pktDATA now contains the return DATA and the checksum byte after that
         XRA			A
         SIM
-        LXI			H,pktLEN
-        MOV			C,M
-        INX			H
-        MOV			A,M
-        ORA			A
+        LXI			H,pktDLEN		; move to return pktDLEN
+        MOV			C,M				; copy to C
+        INX			H				; advance HL to pktDATA
+        MOV			A,M				; read 1st byte of return pktDATA
+        ORA			A				; set Z if pktDLEN 0
         RET
 
-jF43E:
+ReadSerialByteAppendM:
         CALL		CheckDSR
         CALL		RCV232
-        JC			jX03
-        JNZ			jX02
+        JC			errIO
+        JNZ			errCM
         MOV			M,A
         INX			H
         RET
@@ -319,26 +351,29 @@ ShortPacket:
         CALL		InitPacket
 jSendPacket:
         CALL		SendPacket
-        RZ
-jF456:
+        RZ			; return if return packet DLEN is 0 (normal delete file return packet has 0 data len)
+        ; otherwise, it's some error
+        ; A contains the 1st (and in this case only) byte of pktDATA
+ParseErrorReturn:
+		; A has the error code sent in the data field of the return packet
         ANI			0xf0
         RAR
         RAR
         RAR
-        MOV			E,A
-        JMP			jF370
+        MOV			E,A			; E = eXX error code offset
+        JMP			ERROR
 
 ; activate rs232
 jF45F:
-        CALL		COMOFF			; disable MDM/COM
-        CALL		PAUSE_100ms		; burn cpu for 100ms
-        LXI			H,STR_STAT		; load a STAT string ("98N1D")
-        STC							; set carry flag - tells SET232 to apply to the RS232 port
-        CALL		SET232			; configure uart per the stat string
+        CALL		COMOFF				; disable MDM/COM
+        CALL		PAUSE_100ms			; burn cpu for 100ms
+        LXI			H,STR_STAT			; load a STAT string ("98N1D")
+        STC								; set carry flag - tells SET232 to apply to the RS232 port
+        CALL		SET232				; configure uart per the stat string
 
 ; build a STATUS cmd packet
-        MVI			A,req_status	; load A with the tpdd command for drive status
-        CALL		ShortPacket			; write 0x07 (req_status) to pktCMD then call SendPacket (skips the usual packet-building becasue this command has no data payload)
+        MVI			A,req_status		; load A with the tpdd command for drive status
+        CALL		ShortPacket			; write 0x07 (req_status) to pktTYPE then call SendPacket (skips the usual packet-building becasue this command has no data payload)
 
 ; build a DIRENT packet
 ; CMD 00 - Directory Reference
@@ -349,9 +384,9 @@ jF45F:
 
 ; start building a DIRENT(set_name) cmd packet        
         XRA			A					; A = 0
-        CALL		InitPacket			; write 0x00 (req_dirent) to pktCMD (cmd)
-        ; HL @ pktLEN (len)
-        MVI			M,0x1A				; write 0x1A (26 bytes data len) to pktLEN (len)       
+        CALL		InitPacket			; write 0x00 (req_dirent) to pktTYPE (cmd)
+        ; HL @ pktDLEN (len)
+        MVI			M,0x1A				; write 0x1A (26 bytes data len) to pktDLEN (len)       
         INX			H					; HL = pktDATA (start of data)
         ; HL @ pktDATA (data)
         LXI			D,KYBUF+2			; DE = 3rd byte into keyboard buffer (skip over "C " cmd & space)
@@ -370,13 +405,14 @@ jF45F:
         ; HL @ pktDATA+25
         MOV			M,B					; B = 0 after the dcr loop, so writing 0 to action field (0 = set_name)
         ; action 0 = set_name the dirent command is simply telling the drive the filename for a sebsequent open/close/read/write/kill
-jF48D:
+
+SendPacket0:
         CALL		SendPacket
-        MOV			B,A
-        LDA			pktCMD
-        CPI			0x12
-        JZ			jF456
-        MOV			A,B
+        MOV			B,A					; save A returned from SendPacket
+        LDA			pktTYPE				; read return packet type
+        CPI			ret_normal			; is it a normal return packet?
+        JZ			ParseErrorReturn				; it's supposed to be a dirent return not a normal return
+        MOV			A,B					; restore A retult from SendPacket
         ORA			A
         RET
 
@@ -384,7 +420,7 @@ jF49C:
         MVI			E,0x01
 jF49E:
         MVI			A,req_open
-        CALL		InitPacket		; write 1 to pktCMD
+        CALL		InitPacket			; write 0x01 to pktTYPE
         MOV			M,A
         INX			H
         MOV			M,E
@@ -393,7 +429,7 @@ jF4A9:
         POP 		D
 jF4AA:
         MVI			A,req_write
-        CALL		InitPacket		; write 4 to pktCMD
+        CALL		InitPacket			; write 4 to pktTYPE
         MOV			M,C
         INX			H
         MOV			B,C
@@ -402,8 +438,8 @@ jF4AA:
 
 jF4B8:
         CALL		FINDFN
-        JNZ			jX04
-        LXI			H,jX06
+        JNZ			errAE
+        LXI			H,errFL
         SHLD 		ETRAP
         CALL		SCNEMP
         PUSH		H
@@ -452,21 +488,21 @@ jF4D8:
         SHLD		wFD00
         PUSH		H
         CALL		MAKHOL
-        JC			jX05
-        LXI			H,wFD08			; loading a word from where we elswhere only ever stored a byte
+        JC			errOM
+        LXI			H,wFD08				; loading a word from where we elswhere only ever stored a byte
         INR			M
         CALL		jF534
         LHLD		wFD04
         XCHG
         POP			H
-        LDA			pktCMD
+        LDA			pktTYPE
         MOV			C,A
         MVI			B,0x00
 jF51B:
         MOV			A,D
         ORA			E
         MOV			A,C
-        STA			pktCMD
+        STA			pktTYPE
         RZ
         ORA			A
         CM			jF539
@@ -488,12 +524,12 @@ jF539:
         PUSH		D
 ; start READ cmd packet
         MVI			A,req_read
-        CALL		InitPacket		; write 3 to pktCMD
-        CALL		jF48D
-        XRA			A
-        MOV			B,A
-        MOV			C,A
-        STA			pktCMD
+        CALL		InitPacket
+        CALL		SendPacket0
+        XRA			A					; A = 0
+        MOV			B,A					; B = 0
+        MOV			C,A					; C = 0
+        STA			pktTYPE				; A = pktTYPE
         POP			D
         POP			H
         RET
@@ -551,14 +587,14 @@ jF57F:
 
 SAVE:
         CALL		jF45F
-        JNZ			jX04
+        JNZ			errAE
         LDA			FX1
         CPI			0x42
-        JC			ptr_err_trap
+        JC			errNM
         CPI			0x45
-        JNC			ptr_err_trap
+        JNC			errNM
         CALL		FINDFN
-        JZ			jX01
+        JZ			errFF
         CALL		jF57F
         MOV			C,A
         MVI			A,0x02
