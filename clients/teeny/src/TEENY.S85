@@ -193,7 +193,7 @@ errNM:
 ERROR:
 		LDA 		wFD08			; read byte @ wFD08
 		ORA 		A				; is it 0?
-		JZ 			@show			; if 0 skip to @err
+		JZ 			@show			; if 0 skip to @show
 		PUSH 		D
 		LHLD 		wFD02
 		MOV 		B,H
