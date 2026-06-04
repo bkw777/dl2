@@ -10,10 +10,15 @@
 ; 8085 asm syntax highlighting for Geany https://www.geany.org/
 ; https://gist.github.com/bkw777/632c0a390b0fd0bd4e2f31544528d6d5
 
-; Currently builds for 100 only
+; Currently builds for 100 and K85
 ; $ make 100
 ; or
+; build & verify that the 100 build reproduces the original exactly
 ; $ make verify_100
+
+;;;;
+;;;; K85 builds but does NOT work
+;;;;
 
 	INCLUDE		"m100_common.S85"
 

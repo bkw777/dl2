@@ -5,17 +5,17 @@
 
 ; Used in TEENY & not yet mapped from 100-K85
 SET232			EQU		0x17C8		; set RS232 parameters to STAT string pointed to by HL
-;AFTEREOF		EQU		0x219A+3	; Advance HL past end of current file based on type
+AFTEREOF		EQU		0x2172+3	; Advance HL past end of current file based on type
 MASDEL			EQU		0x68A7		; delete BC chars at M (in a DO file)
-;RCV232			EQU		0x6D7E		; get A from the RS232 with XON/XOFF
-;SND232			EQU		0x6E32		; send A out serial port with XON/XOFF
-;COMOFF			EQU		0x6ECB		; deactivate RS232 or Modem
-;INT1D			EQU		0x765C		; set interrupt to 0x1D
-;KYBUF			EQU		0xF685		; keyboard buffer
-;COMBUF			EQU		0xFF46		; COM buffer 0x40 bytes
-;KYBCNT			EQU		0xFFAA		; number of characters in keyboard buffer
-;ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
-;ALTLCD_LEN		EQU		0x013F		; length of ALT LCD buffer
+RCV232			EQU		0x6A86		; get A from the RS232 with XON/XOFF
+SND232			EQU		0x6B3A		; send A out serial port with XON/XOFF
+COMOFF			EQU		0x6BE4		; deactivate RS232 or Modem
+INT1D			EQU		0x730A		; set interrupt to 0x1D
+KYBUF			EQU		0xF68C		; keyboard buffer
+COMBUF			EQU		0xFFBE		; COM buffer 0x40 bytes   ---(UNCERTAIN)---
+KYBCNT			EQU		0xFF6B		; number of characters in keyboard buffer
+ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
+ALTLCD_LEN		EQU		0x013F		; length of ALT LCD buffer
 
 
 ; system rom routines
@@ -49,6 +49,7 @@ MAKHOL		EQU		0x6875		; insert BC number of spaces in memory
 KYREAD		EQU		0x6EF2		; read keyboard
 
 ; addresses
+MAXRAM		EQU		0xF5F0
 CSRY		EQU		0xF640		; cursor row position [poking changes cursor position]
 ETRAP		EQU		0xF659		; error trap
 CURBAS		EQU		0xF683		; pointer to start of BA files / current running BASIC program
@@ -60,7 +61,6 @@ FX1			EQU		0xFCAB		; unknown, possibly file size or other metadata
 CFNAME		EQU		0xFCAE		; 6 bytes filename of last program loaded from tape
 FX2			EQU		0xFCB4		; unknown, possibly file size or other metadata
 KC7			EQU		0xFF58		; keyboard column 7 / PA6 status bits 0-7: SPACE,DEL,TAB,ESC,PASTE,LABEL,PRINT,ENTER
-MAXRAM		EQU		0xF5F0
 
 BAFILES		EQU		UNSAVBA		; start of BA files - RAM100 uses UNSAVBA, RAM200 uses CURBAS
 NROWS		EQU		8			; LCD screen rows

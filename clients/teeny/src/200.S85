@@ -50,6 +50,7 @@ MAKHOL		EQU		0x82A8		; insert BC number of spaces in memory
 KYREAD		EQU		0x8B03		; read keyboard
 
 ; addresses
+MAXRAM		EQU		0xEEB0
 CSRY		EQU		0xEF06		; cursor row position [poking changes cursor position]
 ETRAP		EQU		0xEF34		; error trap
 CURBAS		EQU		0xEF67		; pointer to start of BA files / current running BASIC program
@@ -61,7 +62,6 @@ FX1			EQU		0xF74C		; unknown, possibly file size or other metadata
 CFNAME		EQU		0xF74F		; 6 bytes filename of last program loaded from tape
 FX2			EQU		0xF755		; unknown, possibly file size or other metadata
 KC7			EQU		0xFD0B		; keyboard column 7 / PA6 status bits 0-7: SPACE,DEL,TAB,ESC,PASTE,LABEL,PRINT,ENTER
-MAXRAM		EQU		0xEEB0
 
 BAFILES		EQU		CURBAS		; start of BA files - RAM100 uses UNSAVBA, RAM200 uses CURBAS
 NROWS		EQU		16			; LCD screen rows
