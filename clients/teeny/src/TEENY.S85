@@ -125,7 +125,7 @@ MAIN:
 		JZ			jF4B8
 
 ; ERROR CODES
-; Is this Tracy Allen insanity or Ron Wiesen insanity?
+; Is this Ed Giese (Acroatix) insanity or Ron Wiesen insanity?
 ;
 ; Either we fall through from above or jump to one of these targets,
 ; but one way or another we always start on one of these MVI E's.
