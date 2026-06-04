@@ -18,11 +18,11 @@
 	INCLUDE		"m100_common.S85"
 
 	IF MODEL_200
-		INCLUDE		"200.S85"
+	INCLUDE		"200.S85"
 	ELIF MODEL_K85
-		INCLUDE		"K85.S85"
+	INCLUDE		"K85.S85"
 	ELSE
-		INCLUDE		"100.S85"
+	INCLUDE		"100.S85"
 	ENDIF
 
 ; TINY uses ALTCD for it's variables and packet buffer
@@ -65,7 +65,7 @@ open_mode_read		EQU		0x03
 
 ; RS232
 COM_STAT_STRING MACRO
-		DB "98N1D"
+	DB "98N1D"
 	ENDM
 DSR_BITMASK		EQU		0x20
 
@@ -77,18 +77,18 @@ DSR_BITMASK		EQU		0x20
 	;--------------------------------------------------------------------------
 	; ORG
 	;--------------------------------------------------------------------------
-		IFNDEF HIMEM
-			HIMEM		EQU		MAXRAM
-		ENDIF
+	IFNDEF HIMEM
+HIMEM		EQU		MAXRAM
+	ENDIF
 
-		ORG HIMEM-PRGLEN-6			; entry minus length of header
+	ORG HIMEM-PRGLEN-6			; entry minus length of header
 
 	;--------------------------------------------------------------------------
 	; .CO HEADER
 	;--------------------------------------------------------------------------
-		DW PRGTOP
-		DW PRGLEN
-		DW PRGEXE
+	DW PRGTOP
+	DW PRGLEN
+	DW PRGEXE
 	ENDIF ; PRGLEN
 ;------------------------------------------------------------------------------
 
