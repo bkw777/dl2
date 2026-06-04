@@ -2,6 +2,23 @@
 ; TANDY model 200 header for TEENY.S85
 ; Brian K. White
 
+
+; Used in TEENY & not yet mapped from 100-200
+;SET232			EQU		0x17E6		; set RS232 parameters to STAT string pointed to by HL
+;AFTEREOF		EQU		0x219A+3	; Advance HL past end of current file based on type
+;EVAL_ROS		EQU		0x4C0F		; BASIC evaluate argument to RUN/OPEN/SAVE
+;MASDEL			EQU		0x6B9F		; delete BC chars at M (in a DO file)
+;RCV232			EQU		0x6D7E		; get A from the RS232 with XON/XOFF
+;SND232			EQU		0x6E32		; send A out serial port with XON/XOFF
+;COMOFF			EQU		0x6ECB		; deactivate RS232 or Modem
+;INT1D			EQU		0x765C		; set interrupt to 0x1D
+;KYBUF			EQU		0xF685		; keyboard buffer
+;COMBUF			EQU		0xFF46		; COM buffer 0x40 bytes
+;KYBCNT			EQU		0xFFAA		; number of characters in keyboard buffer
+;ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
+;ALTLCD_LEN		EQU		0x013F		; length of ALT LCD buffer
+
+
 ; system rom routines
 PRTSP		EQU		0x001E		; write space to console, directed by LCDLPT
 UBLNAS		EQU		0x061B		; update in-memory line addresses for the current BASIC program lines

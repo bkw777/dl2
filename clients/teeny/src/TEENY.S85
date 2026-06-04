@@ -142,6 +142,7 @@ MAIN:
 
 ; ERROR CODES
 ; Is this Ed Giese (Acroatix) insanity or Ron Wiesen insanity?
+; Neither, it's B.Gates or P.Allen insanity. See the M100 system rom 0x505E
 ;
 ; Either we fall through from above or jump to one of these targets,
 ; but one way or another we always start on one of these MVI E's.

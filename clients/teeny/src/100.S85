@@ -3,7 +3,7 @@
 ; Brian K. White
 
 
-; TEENY not yet matched in 200/others
+; Used in TEENY & not yet replicated in 200.S85 etc
 SET232			EQU		0x17E6		; set RS232 parameters to STAT string pointed to by HL
 AFTEREOF		EQU		0x219A+3	; Advance HL past end of current file based on type
 EVAL_ROS		EQU		0x4C0F		; BASIC evaluate argument to RUN/OPEN/SAVE
@@ -17,8 +17,6 @@ COMBUF			EQU		0xFF46		; COM buffer 0x40 bytes
 KYBCNT			EQU		0xFFAA		; number of characters in keyboard buffer
 ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
 ALTLCD_LEN		EQU		0x013F		; length of ALT LCD buffer
-
-
 
 
 ; system rom routines
@@ -64,7 +62,6 @@ FX1			EQU		0xFC99		; unknown, possibly file size or other metadata
 CFNAME		EQU		0xFC9C		; 6 bytes filename of last program loaded from tape
 FX2			EQU		0xFCA2		; unknown, possibly file size or other metadata
 KC7			EQU		0xFF97		; keyboard column 7 / PA6 status bits 0-7: SPACE,DEL,TAB,ESC,PASTE,LABEL,PRINT,ENTER
-
 MAXRAM		EQU		0xF5F0
 
 BAFILES		EQU		UNSAVBA		; start of BA files - RAM100 uses UNSAVBA, RAM200 uses CURBAS
