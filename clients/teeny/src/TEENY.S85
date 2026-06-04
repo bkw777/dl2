@@ -191,9 +191,9 @@ errNM:
 
 
 ERROR:
-		LDA 		wFD08			; first byte of wFD08 into A 
-		ORA 		A				; set flags about A
-		JZ 			@show			; if A is 0 skip to @err
+		LDA 		wFD08			; read byte @ wFD08
+		ORA 		A				; is it 0?
+		JZ 			@show			; if 0 skip to @err
 		PUSH 		D
 		LHLD 		wFD02
 		MOV 		B,H
@@ -203,15 +203,14 @@ ERROR:
 		POP 		D
 @show:
 		LXI			H,STR_ErrCodes	; point to start of string of all 2-char err codes
-		MVI			D,0x00			; D = 0. E = something from above
-		DAD			D				; add DE to HL, E = offset into STR_Errcodes
-		; HL @ STR_Errcodes+E
-		MOV			A,M				; read first byte of error code
+		MVI			D,0x00			; D = 0. E = eXX from above
+		DAD			D				; add DE to HL, HL is now at STR_Errcodes+E
+		MOV			A,M				; get first byte of error code
 		_RST		rst_Print_A			; print it
 		_RST		rst_NextNonSpace	; get next byte of err code
 		_RST		rst_Print_A			; print it
-		LXI			H,STR_ErrMsg	; address of error message
-		CALL		PTILL0			; print error message
+		LXI			H,STR_ErrMsg	; get STR_ErrMsg
+		CALL		PTILL0			; print STR_ErrMsg
 		JMP			MAIN			; restart at main
 
 
