@@ -1,5 +1,5 @@
 ; K85.S85
-; Kyotronic KC-85 header for RAMDSK.S85
+; Kyotronic KC-85 header for TEENY.S85
 ; Brian K. White
 
 ; system rom routines
@@ -48,14 +48,3 @@ MAXRAM		EQU		0xF5F0
 
 BAFILES		EQU		UNSAVBA		; start of BA files - RAM100 uses UNSAVBA, RAM200 uses CURBAS
 NROWS		EQU		8			; LCD screen rows
-CDNCT		EQU		10			; counter in j03->j05 - maybe cursor-down n times?
-LEGACY_HIMEM	EQU		0xF5EE	; HIMEM=0xF5EE matches the original RAM100.CO
-
-MACRO	DeleteRamFile
-	CALL	FINDFN1					; tail end of FINDFN
-	CPI		FattrDO
-	JZ		KILASC					; if it's a .DO file
-	CPI		FattrCO
-	JZ		KILCOM					; if it's a .CO file
-	JMP		KILBAS					; if it's anything else
-ENDM
