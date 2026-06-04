@@ -25,11 +25,12 @@
 		INCLUDE		"100.S85"
 	ENDIF
 
+; TINY uses ALTCD for it's variables and packet buffer
 ; FCC0 start of ALTLCD
 wFD00			EQU		ALTLCD + 0x40		; FD00
 wFD02			EQU		ALTLCD + 0x42		; FD02
 wFD04			EQU		ALTLCD + 0x44		; FD04
-wSP				EQU		ALTLCD + 0x46		; FD06  stack pointer
+StackPointer	EQU		ALTLCD + 0x46		; FD06
 wFD08			EQU		ALTLCD + 0x48		; FD08  word but only ever stores a byte
 ; TPDD packet
 pktZZ			EQU		ALTLCD + 0x4A		; FD0A  tpdd packet preamble "ZZ"
@@ -58,6 +59,10 @@ ret_read		EQU		0x10
 ret_dirent		EQU		0x11
 ret_normal		EQU		0x12
 
+open_mode_write		EQU		0x01
+open_mode_append	EQU		0x02
+open_mode_read		EQU		0x03
+
 ; RS232
 COM_STAT_STRING MACRO
 		DB "98N1D"
@@ -69,15 +74,18 @@ DSR_BITMASK		EQU		0x20
 ; PRGLEN has to be supplied from outside via -DPRGLEN=len.
 ; If no PRGLEN then build with default ORG 0 and no CO header.
 	IFDEF PRGLEN
+	;--------------------------------------------------------------------------
+	; ORG
+	;--------------------------------------------------------------------------
 		IFNDEF HIMEM
 			HIMEM		EQU		MAXRAM
 		ENDIF
 
 		ORG HIMEM-PRGLEN-6			; entry minus length of header
 
-;------------------------------------------------------------------------------
-; .CO HEADER
-;------------------------------------------------------------------------------
+	;--------------------------------------------------------------------------
+	; .CO HEADER
+	;--------------------------------------------------------------------------
 		DW PRGTOP
 		DW PRGLEN
 		DW PRGEXE
@@ -90,11 +98,11 @@ PRGTOP:
 PRGEXE:
 		LXI			H,0x0000		; HL = 0
 		DAD			SP				; add stack pointer to HL
-		SHLD		wSP				; save stack pointer to ram wSP
+		SHLD		StackPointer	; save stack pointer
 		LXI			H,ZZ			; HL = "ZZ" = tpdd packet preamble
 		SHLD		pktZZ				; save HL to ram pktZZ
 MAIN:
-		LHLD		wSP				; copy saved stack pointer from ram to HL
+		LHLD		StackPointer	; copy saved stack pointer from ram to HL
 		SPHL						; copy saved stack pointer from HL to SP
 		XRA			A				; A = 0
 		STA			wFD08			; store 0 to ram wFD08
@@ -102,12 +110,20 @@ MAIN:
 		PUSH		H				; push HL
 		LXI			H,STR_Prompt	; load addr to prompt string to HL
 		CALL		PTILL0			; print HL
+		; we just printed the prompt
+		; now collect the user input
 		STA			KYBCNT			; write 0 to keyboard pending keystrokes count
 		CALL		INLIN			; get a line of input from keyboard
+		; The keyboard buffer now has a command line like |L MYPROG.BA|
 		LXI			H,errNM			; load the address of errNM to HL
 		SHLD		ETRAP			; set errNM as ON ERROR handler
 		LXI			H,KYBUF+1		; load addr to 2nd byte of keyboard buffer to HL
 		MVI			M,'"'			; write " to 2nd byte of keyboard buffer
+		; before |L MYPROG.BA|
+		; after  |L"MYPROG.BA|
+		; HL still points to the "
+		; The next call reads it the same way BASIC reads ex: |SAVE"MYPROG.BA|
+		; that's why no matching closing " needed
 		CALL		EVAL_ROS		; BASIC evaluate RUN/OPEN/SAVE arg
 		CALL		RESETFPS		; reset file pointers
 		LDA			KYBUF			; read 1st byte of keyboard buffer
@@ -168,7 +184,7 @@ errFL:
 		MVI			E,eFL
 		DB			0x01
 errNM:
-        MVI			E,eNM
+		MVI			E,eNM
 
 
 ERROR:
@@ -384,7 +400,7 @@ jF45F:
 		XRA			A					; A = 0
 		CALL		InitPacket			; write 0x00 (req_dirent) to pktTYPE (cmd)
 		; HL @ pktDLEN (len)
-		MVI			M,0x1A				; write 0x1A (26 bytes data len) to pktDLEN (len)       
+		MVI			M,0x1A				; write 0x1A (26 bytes data len) to pktDLEN (len)
 		INX			H					; HL = pktDATA (start of data)
 		; HL @ pktDATA (data)
 		LXI			D,KYBUF+2			; DE = 3rd byte into keyboard buffer (skip over "C " cmd & space)
@@ -414,15 +430,18 @@ SendPacket2:
 		ORA			A					; if A = 0 set Z
 		RET
 
-jF49C:
-		MVI			E,0x01
-jF49E:
+SendOpenCMD_write:
+		MVI			E,open_mode_write
+SendOpenCMD:
 		MVI			A,req_open
 		CALL		InitPacket
 		; HL @ pktDLEN
-		MOV			M,A					; Ugly. InitPacket left HL sitting on pktDLEN and didn't change A. Why would we write the req_open pktTYPE code there? Because it HAPPENS to be 1, and we HAPPEN to want to write a length of 1.
+		; InitPacket left HL sitting on pktDLEN and didn't change A.
+		; Why would we write the req_open pktTYPE code there?
+		; Because it HAPPENS to be 1, and we HAPPEN to want to write a length of 1.
+		MOV			M,A					; write 0x01 to pktDLEN - OPEN command has 1 byte of data
 		INX			H					; advance HL to the first byte of pktDATA
-		MOV			M,E					; write E to pktDATA
+		MOV			M,E					; write E to pktDATA - E = mode write/append/read
 		JMP			jSendPacket			; send the packet
 
 jF4A9:
@@ -489,7 +508,7 @@ jF4D8:
 		PUSH		H
 		CALL		MAKHOL
 		JC			errOM
-		LXI			H,wFD08				; loading a word from where we elswhere only ever stored a byte
+		LXI			H,wFD08
 		INR			M
 		CALL		jF534
 		LHLD		wFD04
@@ -505,7 +524,7 @@ jF51B:
 		STA			pktTYPE
 		RZ
 		ORA			A
-		CM			jF539
+		CM			SendReadCMD
 		DCX			D
 		PUSH		H
 		LXI			H,pktDATA
@@ -517,9 +536,9 @@ jF51B:
 		INR			C
 		JMP			jF51B
 jF534:
-		MVI			E,0x03
-		CALL		jF49E
-jF539:
+		MVI			E,open_mode_read
+		CALL		SendOpenCMD
+SendReadCMD:
 		PUSH		H
 		PUSH		D
 ; start READ cmd packet
@@ -550,7 +569,7 @@ jF54C:
 		PUSH		PSW
 		SBB			D
 		SPHL
-		MVI			M,0x1a
+		MVI			M,0x1A
 		RET
 
 ;jF55E:	; no explicit jumps here, how do we ever get here?  0x0259 from start
@@ -622,7 +641,7 @@ jF5B8:
 		RZ
 		PUSH		D
 		PUSH		H
-		CALL		jF49C
+		CALL		SendOpenCMD_write
 		POP			D
 		POP			H
 		CALL		jF5CF
