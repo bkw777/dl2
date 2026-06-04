@@ -377,11 +377,8 @@ jF45F:
 		CALL		ShortPacket			; write 0x07 (req_status) to pktTYPE then call SendPacket (skips the usual packet-building becasue this command has no data payload)
 
 ; build a DIRENT packet
-; CMD 00 - Directory Reference
-;  2    1  1   24            1     1        1      bytes
-; +----+--+--+--------------+-----+--------+------+
-; |5a5a|00|1a| filename     |attr | action |chksum| 
-; +----+--+--+--------------------+--------+------+
+; 2     1   1   24           1     1       1
+; 5A5A  00  1A  filename     attr  action  chk
 
 ; start building a DIRENT(set_name) cmd packet        
 		XRA			A					; A = 0
