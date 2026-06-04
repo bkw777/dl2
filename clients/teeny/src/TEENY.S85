@@ -32,7 +32,7 @@ wFD04			EQU		ALTLCD + 0x44		; FD04
 wSP				EQU		ALTLCD + 0x46		; FD06  stack pointer
 wFD08			EQU		ALTLCD + 0x48		; FD08  word but only ever stores a byte
 ; TPDD packet
-pktZZ			EQU		ALTLCD + 0X4A		; FD0A  tpdd packet preamble "ZZ"
+pktZZ			EQU		ALTLCD + 0x4A		; FD0A  tpdd packet preamble "ZZ"
 pktTYPE			EQU		ALTLCD + 0x4C		; FD0C  tpdd packet command or return type
 pktDLEN			EQU		ALTLCD + 0x4D		; FD0D  tpdd packet data length
 pktDATA			EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data (length varies 0-?? 64? up to 252 is possible & legal but idk yet what TEENY does)
