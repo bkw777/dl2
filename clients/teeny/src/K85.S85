@@ -4,9 +4,9 @@
 
 
 ; Used in TEENY & not yet mapped from 100-K85
-;SET232			EQU		0x17E6		; set RS232 parameters to STAT string pointed to by HL
+SET232			EQU		0x17C8		; set RS232 parameters to STAT string pointed to by HL
 ;AFTEREOF		EQU		0x219A+3	; Advance HL past end of current file based on type
-;EVAL_ROS		EQU		0x4C0F		; BASIC evaluate argument to RUN/OPEN/SAVE
+;EVAL_FNAME		EQU		0x4C0B+4	; evaluate & reformat filename for OPEN/SAVE/etc
 ;MASDEL			EQU		0x6B9F		; delete BC chars at M (in a DO file)
 ;RCV232			EQU		0x6D7E		; get A from the RS232 with XON/XOFF
 ;SND232			EQU		0x6E32		; send A out serial port with XON/XOFF

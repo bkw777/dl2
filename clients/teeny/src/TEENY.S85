@@ -124,7 +124,7 @@ MAIN:
 		; HL still points to the "
 		; The next call reads it the same way BASIC reads ex: |SAVE"MYPROG.BA|
 		; that's why no matching closing " needed
-		CALL		EVAL_ROS		; BASIC evaluate RUN/OPEN/SAVE arg
+		CALL		EVAL_FNAME		; evaluate & reformat filename for OPEN/SAVE/etc
 		CALL		RESETFPS		; reset file pointers
 		LDA			KYBUF			; read 1st byte of keyboard buffer
 		CPI			'Q'				; is it 'Q' ?
