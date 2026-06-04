@@ -411,7 +411,7 @@ SendPacket0:
         MOV			B,A					; save A returned from SendPacket
         LDA			pktTYPE				; read return packet type
         CPI			ret_normal			; is it a normal return packet?
-        JZ			ParseErrorReturn				; it's supposed to be a dirent return not a normal return
+        JZ			ParseErrorReturn	; it's supposed to be a DIRENT or READ return not a normal return
         MOV			A,B					; restore A retult from SendPacket
         ORA			A
         RET
