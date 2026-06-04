@@ -406,14 +406,14 @@ jF45F:
         MOV			M,B					; B = 0 after the dcr loop, so writing 0 to action field (0 = set_name)
         ; action 0 = set_name the dirent command is simply telling the drive the filename for a sebsequent open/close/read/write/kill
 
-SendPacket0:
+SendPacket2:
         CALL		SendPacket
         MOV			B,A					; save A returned from SendPacket
         LDA			pktTYPE				; read return packet type
         CPI			ret_normal			; is it a normal return packet?
         JZ			ParseErrorReturn	; it's supposed to be a DIRENT or READ return not a normal return
         MOV			A,B					; restore A retult from SendPacket
-        ORA			A
+        ORA			A					; if A = 0 set Z
         RET
 
 jF49C:
@@ -525,7 +525,7 @@ jF539:
 ; start READ cmd packet
         MVI			A,req_read
         CALL		InitPacket
-        CALL		SendPacket0
+        CALL		SendPacket2
         XRA			A					; A = 0
         MOV			B,A					; B = 0
         MOV			C,A					; C = 0
