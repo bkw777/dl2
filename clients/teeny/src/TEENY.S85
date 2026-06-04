@@ -244,10 +244,11 @@ STR_STAT:
 		COM_STAT_STRING
 
 InitPacket:
-		LXI 		H,pktTYPE		; HL = addr pktTYPE
+		LXI 		H,pktTYPE		; HL @ pktTYPE
 		MOV			M,A				; write A to pktTYPE
-		INX			H				; HL = addr pktDLEN
+		INX			H				; HL @ pktDLEN
 		MVI			M,0x00			; write 0 to pktDLEN
+		; HL @ pktDLEN
 		RET
 
 CheckDSR:
@@ -420,16 +421,18 @@ jF49C:
         MVI			E,0x01
 jF49E:
         MVI			A,req_open
-        CALL		InitPacket			; write 0x01 to pktTYPE
-        MOV			M,A
-        INX			H
-        MOV			M,E
-        JMP			jSendPacket
+        CALL		InitPacket
+        ; HL @ pktDLEN
+        MOV			M,A					; Ugly. InitPacket left HL sitting on pktDLEN and didn't change A. Why would we write the req_open pktTYPE code there? Because it HAPPENS to be 1, and we HAPPEN to want to write a length of 1.
+        INX			H					; advance HL to the first byte of pktDATA
+        MOV			M,E					; write E to pktDATA
+        JMP			jSendPacket			; send the packet
+
 jF4A9:
         POP 		D
 jF4AA:
         MVI			A,req_write
-        CALL		InitPacket			; write 4 to pktTYPE
+        CALL		InitPacket
         MOV			M,C
         INX			H
         MOV			B,C
