@@ -6,7 +6,6 @@
 ; Used in TEENY & not yet mapped from 100-200
 ;SET232			EQU		0x17E6		; set RS232 parameters to STAT string pointed to by HL
 ;AFTEREOF		EQU		0x219A+3	; Advance HL past end of current file based on type
-;EVAL_FNAME		EQU		0x4C0B+4	; evaluate & reformat filename for OPEN/SAVE/etc
 ;MASDEL			EQU		0x6B9F		; delete BC chars at M (in a DO file)
 ;RCV232			EQU		0x6D7E		; get A from the RS232 with XON/XOFF
 ;SND232			EQU		0x6E32		; send A out serial port with XON/XOFF
@@ -43,7 +42,7 @@ PRTASC		EQU		0x470B		; print 16bit value in HL as ascii
 BEEP		EQU		0x4F45		; make a beep sound
 ESCB		EQU		0x519D		; ESC+B - move cursor down one line
 INLIN		EQU		0x54F6		; input line
-CKFN		EQU		0x5ACA		; format filename and check validity
+CKFN		EQU		0x5ACA+4	; evaluate & reformat filename
 MENU		EQU		0x67A4		; go to main menu
 CMPARE		EQU		0x6E11		; compare the buffer pointed to by DE to the buffer pointed to by HL
 GETEOF		EQU		0x8268		; search for EOF (0x1A)
