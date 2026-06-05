@@ -47,7 +47,7 @@ pktDATA			EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data (length varies 0-?? 64? u
 wFD27			EQU		ALTLCD + 0x67		; FD27
 ; FDFF end of ALTLCD
 
-writeDLEN		EQU		COMBUF+0x3A			; COMBUF is 0x40 bytes, so this is 6 bytes before the end of COMBUF
+writeDLEN		EQU		COMBUF+0x3A			; FF80 COMBUF is 0x40 bytes, so this is 6 bytes before the end of COMBUF
 
 ; TPDD
 ZZ				EQU		0x5A5A				; packet start / preamble, really 2 consecutive 'Z', not a int16 number
@@ -137,60 +137,49 @@ MAIN:
 		CPI			'Q'				; is it 'Q' ?
 		JZ			MENU			; then exit to OS (main menu)
 		CPI			'S'				; is it 'S' ?
-		JZ			SAVE			; then jump to SAVE		FIXME rename SAVE, it's common init code for most commands
+		JZ			SAVE			; then jump to SAVE		maybe rename SAVE, maybe common init code for most commands
 		PUSH 		PSW				; push A & flags
 		CALL		jF45F
 		JZ			errFF			; if Z print FF error
 		POP 		PSW
 		SUI			'K'
 		JZ			KILL
-		DCR 		A
+		DCR 		A				; 
 		JZ			jF4B8
 
 ; ERROR CODES
-; Is this Ed Giese (Acroatix) insanity or Ron Wiesen insanity?
-; Neither, it's B.Gates or P.Allen insanity. See the M100 system rom 0x505E
 ;
-; Either we fall through from above or jump to one of these targets,
-; but one way or another we always start on one of these MVI E's.
-;
-; Whichever MVI E we start on, that is the only one that actually does anything.
-;
-; The DB 0x01's get executed as LXI B,word which consumes the next 2 bytes as data.
-; The next 2 bytes are exactly the entire next MVI E,byte instruction.
-;
-; So instead of executing MVI E,0x02, we executed LXI B,0x021E,
-; and are left ready to execute the next byte as an opcode,
-; which is the next DB 0x01, repeat...
+; Either we fall through from above or jump to one of these targets.
+; The MVI E we start on is the only one that actually does anything.
+; The DB's get executed as LXI B,w which consumes the next 2 bytes to fill w.
+; The next 2 bytes are exactly the entire next MVI E,b instruction.
+; Then it executes the next byte, which is the next DB aka LXI B, repeat...
 ;
 ; The DB's essentially turn the rest of the stack into no-ops.
 ; We just overwrite B a bunch of times and never use B.
 ;
 ; The final result that we care about is we set E to something.
-;
-; E is used as an offset into the string of all error codes.
 
-; fell through from above is syntax error
-		MVI			E,eSN
-		DB			0x01
+		MVI			E,eSN			; fell from above = syntax error
+		DB			opcode_LXI_B
 errFF:
 		MVI			E,eFF
-		DB			0x01
+		DB			opcode_LXI_B
 errCM:
 		MVI			E,eCM
-		DB			0x01
+		DB			opcode_LXI_B
 errIO:
 		MVI			E,eIO
-		DB			0x01
+		DB			opcode_LXI_B
 errAE:
 		MVI			E,eAE
-		DB			0x01
+		DB			opcode_LXI_B
 errOM:
 		MVI			E,eOM
-		DB			0x01
+		DB			opcode_LXI_B
 errFL:
 		MVI			E,eFL
-		DB			0x01
+		DB			opcode_LXI_B
 errNM:
 		MVI			E,eNM
 
@@ -479,10 +468,10 @@ jF4B8:
 		DCX			B
 		MOV			E,A
 		INR			A
-jF4D8:
+@l0:
 		INX			B
 		DCR			A
-		JNZ			jF4D8
+		JNZ			@l0
 		MOV			D,A
 		LXI			H,jF54C
 		DAD			D
@@ -579,7 +568,7 @@ jF54C:
 		MVI			M,0x1A
 		RET
 
-;jF55E:	; no explicit jumps here, how do we ever get here?  0x0259 from start
+;jF55E:	; no explicit jumps here, 
 		XRA			A
 		MOV			M,A
 		INX			H
@@ -639,10 +628,10 @@ SAVE:
 		POP			B
 		INR			C
 		INX			H
-jF5B8:
+@l0:
 		DCX			H
 		DCR			C
-		JNZ			jF5B8
+		JNZ			@l0
 		MOV			A,L
 		ORA			H
 		RZ

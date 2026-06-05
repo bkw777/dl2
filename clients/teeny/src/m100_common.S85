@@ -1,6 +1,7 @@
 ; cpu opcodes
 opcode_IN	EQU		0xDB
 opcode_OUT	EQU		0xD3
+opcode_LXI_B	EQU		0x01
 
 ; ascii
 ETX			EQU		0x03
