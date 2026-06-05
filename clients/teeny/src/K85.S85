@@ -12,7 +12,7 @@ SND232			EQU		0x6B3A		; send A out serial port with XON/XOFF
 COMOFF			EQU		0x6BE4		; deactivate RS232 or Modem
 INT1D			EQU		0x730A		; set interrupt to 0x1D
 KYBUF			EQU		0xF68C		; keyboard buffer
-COMBUF			EQU		0xFFBE		; COM buffer 0x40 bytes   ---(UNCERTAIN)---
+COMBUF			EQU		0xFFBE		; COM buffer 0x40 bytes
 KYBCNT			EQU		0xFF6B		; number of characters in keyboard buffer
 ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
 ALTLCD_LEN		EQU		0x013F		; length of ALT LCD buffer
