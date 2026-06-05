@@ -3,7 +3,7 @@
 ; Brian K. White
 
 
-; Used in TEENY & not yet replicated in 200.S85 etc
+; Used in TEENY & not yet fully mapped to all others
 SET232			EQU		0x17E6		; set RS232 parameters to STAT string pointed to by HL
 AFTEREOF		EQU		0x219A+3	; Advance HL past end of current file based on type
 MASDEL			EQU		0x6B9F		; delete BC chars at M (in a DO file)

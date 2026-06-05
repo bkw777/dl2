@@ -3,7 +3,7 @@
 ; Brian K. White
 
 
-; Used in TEENY & not yet mapped from 100-200
+; Used in TEENY & not yet mapped
 ;SET232			EQU		0x17E6		; set RS232 parameters to STAT string pointed to by HL
 ;AFTEREOF		EQU		0x219A+3	; Advance HL past end of current file based on type
 ;MASDEL			EQU		0x6B9F		; delete BC chars at M (in a DO file)
@@ -17,6 +17,8 @@
 ;ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
 ;ALTLCD_LEN		EQU		0x013F		; length of ALT LCD buffer
 
+
+; Eveything below here is proven by RAMDSK
 
 ; system rom routines
 PRTSP		EQU		0x001E		; write space to console, directed by LCDLPT
