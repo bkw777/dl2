@@ -17,7 +17,6 @@
 ;ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
 ;ALTLCD_LEN		EQU		0x013F		; length of ALT LCD buffer
 
-
 ; Eveything below here is proven by RAMDSK
 
 ; system rom routines
