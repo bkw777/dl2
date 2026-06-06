@@ -147,18 +147,10 @@ MAIN:
 		DCR 		A				; 
 		JZ			jF4B8
 
-; ERROR CODES
-;
-; Either we fall through from above or jump to one of these targets.
-; The MVI E we start on is the only one that actually does anything.
-; The DB's get executed as LXI B,w which consumes the next 2 bytes to fill w.
-; The next 2 bytes are exactly the entire next MVI E,b instruction.
-; Then it executes the next byte, which is the next DB aka LXI B, repeat...
-;
-; The DB's essentially turn the rest of the stack into no-ops.
-; We just overwrite B a bunch of times and never use B.
-;
-; The final result that we care about is we set E to something.
+; ERROR CODES  - uses the LXI B trick
+; The first MVI E we jump to executes normally and sets E to something.
+; The remaining stack after that becomes no-ops by the DB's being executed as
+; LXI B, which consumes the next MVI E,b as data into B which we never use.
 
 		MVI			E,eSN			; fell from above = syntax error
 		DB			opcode_LXI_B
