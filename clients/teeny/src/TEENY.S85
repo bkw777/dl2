@@ -24,8 +24,12 @@
 
 	IF MODEL_200
 	INCLUDE		"200.S85"
+	ELIF MODEL_NEC
+	INCLUDE		"NEC.S85"
 	ELIF MODEL_K85
 	INCLUDE		"K85.S85"
+	ELIF MODEL_M10
+	INCLUDE		"M10.S85"
 	ELSE
 	INCLUDE		"100.S85"
 	ENDIF
@@ -255,10 +259,15 @@ InitPacket:
 		; HL @ pktDLEN
 		RET
 
+	IFNDEF CheckDSR_RET
+CheckDSR_RET MACRO
+	RZ
+	ENDM
+	ENDIF
 CheckDSR:
 		IN			PIO_PORT_C		; read RS232 flow control pins
 		ANI			DSR_BITMASK		; check !DSR
-		RZ							; if !DSR then return
+		CheckDSR_RET				; if !DSR then return
 		MVI			E,eNR			; set NR error
 		JMP			ERROR
 
@@ -545,22 +554,35 @@ jF54C:
 		ANA			B
 		MOV			L,M
 		PUSH		PSW
+	IFDEF MOD_01
+		MOD_01
+	ELSE
 		ORA			B
+	ENDIF
 		EI
 		RNZ
 		MOV			E,E
 		PUSH		PSW
+	IFDEF MOD_02
+		MOD_02
+	ELSE
 		XRA			M
+	ENDIF
 		EI
 		ADD			B
 		MOV			E,M
 		PUSH		PSW
+	IFDEF MOD_03
+		MOD_03
+	ELSE
 		SBB			D
+	ENDIF
+
 		SPHL
 		MVI			M,0x1A
 		RET
 
-;jF55E:	; no explicit jumps here, 
+;jF55E:	; no explicit jumps here
 		XRA			A
 		MOV			M,A
 		INX			H
@@ -572,7 +594,7 @@ jF54C:
 		SHLD		DOFILES
 		RET
 
-;jF56E: ; no explicit jumps here, how do we ever get here?  0x0269 from start
+;jF56E: ; no explicit jumps here
 		LHLD		wFD00
 		SHLD		COFILES
 		RET

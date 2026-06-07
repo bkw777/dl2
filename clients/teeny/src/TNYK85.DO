@@ -1,4 +1,4 @@
-0'TNYK85 - loader: co2ba.sh b.kenyon.w@gmail.com 2026-06-05
+0'TNYK85 - loader: co2ba.sh b.kenyon.w@gmail.com 2026-06-07
 0READF:CLEAR12,F:DEFINTA-E,Q,G,K:DEFSNGF,H-J:DEFSTRL-O:READF,A,J,G,N,E,Q:M="!":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?USING"Installing \    \   0%";N
 1READL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)XORD:B=BXORQ:D=0:POKEI,B:I=I+1:K=KXORB:NEXT:?@18,USING"###%";(I-F)*100/A:IFI<=HTHEN1
 2IFK<>GTHEN?"Bad Checksum":ELSE?"Please type: NEW":SAVEMN,F,H,J

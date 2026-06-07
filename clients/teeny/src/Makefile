@@ -2,7 +2,7 @@
 # Requires https://github.com/z88dk/z88dk
 # Requires https://github.com/bkw777/dl2
 
-MODELS = 100 K85 # 200 NEC M10
+MODELS = 100 K85 M10 # 200 NEC
 NAME = TNY
 SRC = TEENY.S85
 
@@ -35,7 +35,7 @@ $(patsubst %,$(NAME)%.CO,$(MODELS)): $(NAME)%.CO : $(SRC) %.S85
 	n=$$(wc -c <$@) && \
 	$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -DPRGLEN=$$n -b -o=$@ $<
 	@rm *.o
-	@if test "$*" = "K85" ;then echo '!NOTICE!  K85 builds but does NOT work at this time' ;fi
+	@if test "$*" = "K85" ;then echo '!NOTICE!  $* does not work at this time' ;fi
 
 %.DO: %.CO
 	@which -s co2ba || echo "Please install https://github.com/bkw777/dl2 for co2ba to generate $@"
@@ -43,7 +43,7 @@ $(patsubst %,$(NAME)%.CO,$(MODELS)): $(NAME)%.CO : $(SRC) %.S85
 
 .PHONY: verify_%
 verify_%: $(NAME)%.CO
-	@cmp -l -b $< ../orig/$< && echo "Built $< is identical to reference ../orig/$<."
+	@cmp -l $< ../orig/$< && echo "Built $< is identical to reference ../orig/$<."
 
 .PHONY: load_%
 load_%: $(NAME)%.DO

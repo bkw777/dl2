@@ -36,3 +36,24 @@ ETRAP			EQU		0xF659		; error trap
 DOFILES			EQU		0xFBC0		; pointer to start of DO files
 COFILES			EQU		0xFBC2		; pointer to start of CO files
 FX1				EQU		0xFCAB		; unknown, possibly file size or other metadata
+
+
+; copied from M10
+; grasping at straws since k85 not working but I think all the addresses are right.
+; didn't help
+;CheckDSR_RET MACRO
+;	RET
+;	ENDM
+
+;MOD_01 MACRO
+;	ORA			M
+;	ENDM
+
+;MOD_02 MACRO
+;	ORA			H
+;	ENDM
+
+;MOD_03 MACRO
+;	SBB			L
+;	ENDM
+
