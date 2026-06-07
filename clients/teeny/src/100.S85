@@ -2,37 +2,33 @@
 ; TRS-80 model 100 header for TEENY.S85
 ; Brian K. White
 
-
-; Used in TEENY & not yet fully mapped to all others
-SET232			EQU		0x17E6		; set RS232 parameters to STAT string pointed to by HL
-AFTEREOF		EQU		0x219A+3	; Advance HL past end of current file based on type
-MASDEL			EQU		0x6B9F		; delete BC chars at M (in a DO file)
-RCV232			EQU		0x6D7E		; get A from the RS232 with XON/XOFF
-SND232			EQU		0x6E32		; send A out serial port with XON/XOFF
-COMOFF			EQU		0x6ECB		; deactivate RS232 or Modem
-INT1D			EQU		0x765C		; set interrupt to 0x1D
-KYBUF			EQU		0xF685		; keyboard buffer
-COMBUF			EQU		0xFF46		; COM buffer 0x40 bytes
-KYBCNT			EQU		0xFFAA		; number of characters in keyboard buffer
-ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
-;ALTLCD_LEN		EQU		0x013F		; length of ALT LCD buffer
-
-
-; system rom routines
+; routines
 PTILL0			EQU		0x11A2		; print null-terminated string at HL to screen
+SET232			EQU		0x17E6		; set RS232 parameters to STAT string pointed to by HL
 FINDFN			EQU		0x20AF		; search dir for filename matching FNAME
 SCNEMP			EQU		0x20E4		; scan for an empty directory entry
 RESETFPS		EQU		0x2146		; reset file pointers
+AFTEREOF		EQU		0x219A+3	; Advance HL past end of current file based on type
 MKDIRENT		EQU		0x2239		; insert entry into directory
 D2H4Bup			EQU		0x3469		; move the memory pointed to by DE to the memory pointed to by HL
 INLIN			EQU		0x4644		; input line
 CKFN			EQU		0x4C0B+4	; evaluate & reformat filename
 MENU			EQU		0x5797		; go to main menu
 MAKHOL			EQU		0x6B6D		; insert BC number of spaces in memory
+MASDEL			EQU		0x6B9F		; delete BC chars at M (in a DO file)
+RCV232			EQU		0x6D7E		; get A from the RS232 with XON/XOFF
+SND232			EQU		0x6E32		; send A out serial port with XON/XOFF
+COMOFF			EQU		0x6ECB		; deactivate RS232 or Modem
+INT1D			EQU		0x765C		; set interrupt to 0x1D
 
-; addresses
+; variables
 MAXRAM			EQU		0xF5F0
 ETRAP			EQU		0xF652		; error trap
+KYBUF			EQU		0xF685		; keyboard buffer
 DOFILES			EQU		0xFBAE		; pointer to start of DO files
 COFILES			EQU		0xFBB0		; pointer to start of CO files
 FX1				EQU		0xFC99		; unknown, possibly file size or other metadata
+ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
+;ALTLCD_LEN		EQU		0x0140		; length of ALT LCD buffer
+COMBUF			EQU		0xFF46		; COM buffer 0x40 bytes
+KYBCNT			EQU		0xFFAA		; number of characters in keyboard buffer

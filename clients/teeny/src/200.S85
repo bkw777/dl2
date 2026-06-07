@@ -3,7 +3,7 @@
 ; Brian K. White
 
 
-; not mapped
+; not mapped - these are the M100 values
 ;SET232			EQU		0x17E6		; set RS232 parameters to STAT string pointed to by HL
 ;AFTEREOF		EQU		0x219A+3	; Advance HL past end of current file based on type
 ;MASDEL			EQU		0x6B9F		; delete BC chars at M (in a DO file)
@@ -15,10 +15,10 @@
 ;COMBUF			EQU		0xFF46		; COM buffer 0x40 bytes
 ;KYBCNT			EQU		0xFFAA		; number of characters in keyboard buffer
 ;ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
-;ALTLCD_LEN		EQU		0x013F		; length of ALT LCD buffer
+;ALTLCD_LEN		EQU		0x0140		; length of ALT LCD buffer
 
 
-; system rom routines
+; routines
 PTILL0			EQU		0x11CC		; print null-terminated string at HL to screen
 FINDFN			EQU		0x2BCC		; search dir for filename matching FNAME
 SCNEMP			EQU		0x2C09		; scan for an empty directory entry
@@ -30,7 +30,7 @@ CKFN			EQU		0x5ACA+4	; evaluate & reformat filename
 MENU			EQU		0x67A4		; go to main menu
 MAKHOL			EQU		0x82A8		; insert BC number of spaces in memory
 
-; addresses
+; variables
 MAXRAM			EQU		0xEEB0
 ETRAP			EQU		0xEF34		; error trap
 DOFILES			EQU		0xF661		; pointer to start of DO files

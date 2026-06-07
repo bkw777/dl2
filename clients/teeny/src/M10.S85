@@ -2,40 +2,36 @@
 ; Olivetti M-10 header for TEENY.S85
 ; Brian K. White
 
-
-; not proven
-SET232			EQU		0x17F0		; set RS232 parameters to STAT string pointed to by HL
-AFTEREOF		EQU		0x21B3+3	; Advance HL past end of current file based on type
-MASDEL			EQU		0x6BA4		; delete BC chars at M (in a DO file)
-RCV232			EQU		0x6D85		; get A from the RS232 with XON/XOFF
-SND232			EQU		0x6E39		; send A out serial port with XON/XOFF
-COMOFF			EQU		0x6F63		; deactivate RS232 or Modem
-INT1D			EQU		0x769F		; set interrupt to 0x1D
-KYBUF			EQU		0xF688		; keyboard buffer
-COMBUF			EQU		0xFF46		; COM buffer 0x40 bytes
-KYBCNT			EQU		0xFF6D		; number of characters in keyboard buffer
-ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
-;ALTLCD_LEN		EQU		0x013F		; length of ALT LCD buffer
-
-
-; system rom routines
+; routines
 PTILL0			EQU		0x11A5		; print null-terminated string at HL to screen
+SET232			EQU		0x17F0		; set RS232 parameters to STAT string pointed to by HL
 FINDFN			EQU		0x20C1		; search dir for filename matching FNAME
 SCNEMP			EQU		0x20F6		; scan for an empty directory entry
 RESETFPS		EQU		0x215A		; reset file pointers
+AFTEREOF		EQU		0x21B3+3	; Advance HL past end of current file based on type
 MKDIRENT		EQU		0x2252		; insert entry into directory
 D2H4Bup			EQU		0x3483		; move the memory pointed to by DE to the memory pointed to by HL
 INLIN			EQU		0x4639		; input line
 CKFN			EQU		0x4C1A+4	; evaluate & reformat filename
 MENU			EQU		0x57A2		; go to main menu
 MAKHOL			EQU		0x6B72		; insert BC number of spaces in memory
+MASDEL			EQU		0x6BA4		; delete BC chars at M (in a DO file)
+RCV232			EQU		0x6D85		; get A from the RS232 with XON/XOFF
+SND232			EQU		0x6E39		; send A out serial port with XON/XOFF
+COMOFF			EQU		0x6F63		; deactivate RS232 or Modem
+INT1D			EQU		0x769F		; set interrupt to 0x1D
 
-; addresses
+; variables
 MAXRAM			EQU		0xF5F0
 ETRAP			EQU		0xF655		; error trap
+KYBUF			EQU		0xF688		; keyboard buffer
 DOFILES			EQU		0xFBB4		; pointer to start of DO files
 COFILES			EQU		0xFBB6		; pointer to start of CO files
 FX1				EQU		0xFC9F		; unknown, possibly file size or other metadata
+ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
+;ALTLCD_LEN		EQU		0x0140		; length of ALT LCD buffer
+COMBUF			EQU		0xFF46		; COM buffer 0x40 bytes
+KYBCNT			EQU		0xFF6D		; number of characters in keyboard buffer
 
 
 ; The original TEENY.M10 has these differences from the M100 version.
