@@ -5,6 +5,9 @@
 ; K85 is not working.
 ; Both 100 and M10 are working from the same source.
 ; Whatever is breaking K85, it has to be something in here.
+; But these addresses all check out many times over...
+; Even 3-way cross referenced between M100, K85, and M10
+; see rom_map_100_k85.txt
 
 ; installs, runs, displays prompts & errors, responds to and displays keyboard input, responds to commands, exits normally.
 ; LOAD BA looks ok but corrupts filesystem, TNYK85.CO no longer runs, LOADM says top 0, end 65535, OM err
