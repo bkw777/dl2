@@ -2,17 +2,41 @@
 ; Kyotronic KC-85 header for TEENY.S85
 ; Brian K. White
 
+; K85 is not working.
+; Both 100 and M10 are working from the same source.
+; Whatever is breaking K85, it has to be something in here.
+
+; installs, runs, displays prompts & errors, responds to and displays keyboard input, responds to commands, exits normally.
+; LOAD BA looks ok but corrupts filesystem, TNYK85.CO no longer runs, LOADM says top 0, end 65535, OM err
+; LOAD DO hangs, corrupts ram, hard resets
+; LOAD CO 
+; SAVE BA seems to work
+; SAVE DO seems to work
+; SAVE CO writes the CO correctly but then keeps writing another 18k, then ends without reporting any error.
+; KILL <any> works
+; QUIT works
+
+; K85 system rom is closer to M10 than M100 (no modem)
+
 ; routines
 PTILL0			EQU		0x11A9		; print null-terminated string at HL to screen
 SET232			EQU		0x17C8		; set RS232 parameters to STAT string pointed to by HL
 FINDFN			EQU		0x2080		; search dir for filename matching FNAME
 SCNEMP			EQU		0x20B5		; scan for an empty directory entry
-RESETFPS		EQU		0x2119		; reset file pointers
-AFTEREOF		EQU		0x2172+3	; Advance HL past end of current file based on type
+
+; On both M10 and K85, RESETFPS starts with a CALL, then AF. On 100 there is no CALL.
+; Original TEENY for M10 and RAMDSK for K85 both skip the CALL to enter on the AF.
+; But TEENY for K85 is NOT working even though TEENY for M10 and RAMDSK for K85 both work.
+; Unknown if it's this or what but it's a discrepency.
+;RESETFPS		EQU		0x2116		; reset file pointers    system rom only ever calls this
+RESETFPS		EQU		0x2116+3	; reset file pointers    working old TEENY for M10 does this
+
+AFTEREOF		EQU		0x2172		; advance HL past end of current file based on type
+AFTEREOF2		EQU		AFTEREOF+3	; AFTEREOF, A=type already set
 MKDIRENT		EQU		0x2211		; insert entry into directory
 D2H4Bup			EQU		0x3442		; move the memory pointed to by DE to the memory pointed to by HL
 INLIN			EQU		0x45F8		; input line
-CKFN			EQU		0x4BC1+4	; evaluate & reformat filename
+CKFN2			EQU		0x4BC5		; evaluate & reformat filename
 MENU			EQU		0x54A4		; go to main menu
 MAKHOL			EQU		0x6875		; insert BC number of spaces in memory
 MASDEL			EQU		0x68A7		; delete BC chars at M (in a DO file)
@@ -25,31 +49,37 @@ INT1D			EQU		0x730A		; set interrupt to 0x1D
 MAXRAM			EQU		0xF5F0
 ETRAP			EQU		0xF659		; error trap
 KYBUF			EQU		0xF68C		; keyboard buffer
-KYBCNT			EQU		0xFF6B		; number of characters in keyboard buffer
 DOFILES			EQU		0xFBC0		; pointer to start of DO files
 COFILES			EQU		0xFBC2		; pointer to start of CO files
-COMBUF			EQU		0xFFBE		; COM buffer 0x40 bytes
+
 FX1				EQU		0xFCAB		; unknown, possibly file size or other metadata
 ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
 ;ALTLCD_LEN		EQU		0x0140		; length of ALT LCD buffer
+KYBCNT			EQU		0xFF6B		; number of characters in keyboard buffer
+COMBUF			EQU		0xFFBE		; COM buffer 0x40 bytes
 
 
 ; copied from M10
 ; grasping at straws since k85 not working
 ; didn't help
-;CheckDSR_RET MACRO
-;	RET
-;	ENDM
+LIKE_M10		EQU 	1
 
-;MOD_01 MACRO
-;	ORA			M
-;	ENDM
+	IF LIKE_M10
 
-;MOD_02 MACRO
-;	ORA			H
-;	ENDM
+CheckDSR_RET MACRO
+	RET
+	ENDM
 
-;MOD_03 MACRO
-;	SBB			L
-;	ENDM
+MOD_01 MACRO
+	ORA			M
+	ENDM
 
+MOD_02 MACRO
+	ORA			H
+	ENDM
+
+MOD_03 MACRO
+	SBB			L
+	ENDM
+
+	ENDIF ; LIKE_M10

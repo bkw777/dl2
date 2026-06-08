@@ -135,7 +135,7 @@ MAIN:
 		; HL still points to the "
 		; The next call reads it the same way BASIC reads ex: |SAVE"MYPROG.BA|
 		; that's why no matching closing " needed
-		CALL		CKFN			; evaluate & reformat filename
+		CALL		CKFN2			; evaluate & reformat filename
 		CALL		RESETFPS		; reset file pointers
 		LDA			KYBUF			; read 1st byte of keyboard buffer
 		CPI			'Q'				; is it 'Q' ?
@@ -143,13 +143,16 @@ MAIN:
 		CPI			'S'				; is it 'S' ?
 		JZ			SAVE			; then jump to SAVE		maybe rename SAVE, maybe common init code for most commands
 		PUSH 		PSW				; push A & flags
-		CALL		jF45F
+		; if we got here then the command is =, L, K, or unknown
+		; if the file doesn't exist that's an error for any of those commands
+		CALL		DIRENT          ; set disk filename - test if file exists on disk
 		JZ			errFF			; if Z print FF error
+		; file exists
 		POP 		PSW
-		SUI			'K'
-		JZ			KILL
-		DCR 		A				; 
-		JZ			jF4B8
+		SUI			'K'				; if A-'K' = 0
+		JZ			KILL			; A was 'K'
+		DCR 		A				; A-1 after A-'K' == A-'L'
+		JZ			LOAD			; A was 'L'
 
 ; ERROR CODES  - uses the LXI B trick
 ; The first MVI E we jump to executes normally and sets E to something.
@@ -378,7 +381,7 @@ ParseErrorReturn:
 		JMP			ERROR
 
 ; activate rs232
-jF45F:
+DIRENT:
 		CALL		COMOFF				; disable MDM/COM
 		CALL		PAUSE_100ms			; burn cpu for 100ms
 		LXI			H,STR_STAT			; load a STAT string ("98N1D")
@@ -452,7 +455,7 @@ SendWriteCMD:
 		CALL		D2H4Bup				; copy B bytes from DE to HL
 		JMP			jSendPacket			; send the packet
 
-jF4B8:
+LOAD:
 		CALL		FINDFN
 		JNZ			errAE
 		LXI			H,errFL
@@ -615,7 +618,7 @@ jF57F:
 		RET
 
 SAVE:
-		CALL		jF45F
+		CALL		DIRENT
 		JNZ			errAE
 		LDA			FX1
 		CPI			0x42
@@ -626,12 +629,12 @@ SAVE:
 		JZ			errFF
 		CALL		jF57F
 		MOV			C,A
-		MVI			A,0x02
+		MVI			A,filetypeDO
 		SUB			C
 		PUSH		B
 		PUSH		D
 		XCHG
-		CALL		AFTEREOF
+		CALL		AFTEREOF2
 		POP			D
 		MOV			A,L
 		SUB			E
