@@ -1,0 +1,565 @@
+Model 100 to KC-85 address map
+Brian K. White
+References:
+https://github.com/LivingM100SIG/Living_M100SIG/blob/main/M100SIG/Lib-12-NEC-OLIVETTI/K85ROM.01
+https://github.com/LivingM100SIG/Living_M100SIG/blob/main/M100SIG/Lib-12-NEC-OLIVETTI/KYROM1.EQU
+https://github.com/LivingM100SIG/Living_M100SIG/blob/main/M100SIG/Lib-08-TECH-PROGRAMMING/100ROM.RC0 - RC6
+https://club100.org/memfiles/index.php?&direction=0&order=&directory=Ken%20Pettit/M100%20ROM%20Disassembly
+https://archive.org/details/Kyrotronic_KC-85_Review/
+
+But the final boss is just looking at both M100 and KC-85 roms in a hex editor
+http://tandy.wiki/File:TRS-80_Model_100.orig.bin
+http://tandy.wiki/File:KC-85.orig.bin
+
+M100 KC85 offset NAME DESCRIPTION
+
+0 to
+0396 0396  0000 (unverified, but according to KC-85_Review above)
+
+045D 0464       generate error in E
+0511 0518
+05F0 05F7  0007 UBLNAS update in-memory line addresses for the current BASIC program lines
+05F3 05FA  0007 
+0726 072D  0007 FOR
+0804 080B
+0872 0879  0007 DEF
+08DB 08E2
+08EB 08F2                convert ascii at M to binary
+091E 0925  0007 GOSUB
+0936 093D  0007 GOTO
+0966 096D  0007 RETURN
+096E 09A5  0037 DATA
+09A0 09A7  0007 REM
+09C3 09CA  0007 LET
+090F 0916       RUN
+0912 0919       RUN2
+091E 0925       GOSUB
+0935 093C       RUN4
+0936 093D       GOTO
+0A2F 0A36  0007 ON
+0AB0 0AB7  0007 RESUME
+0B0F 0B16  0007 ERROR
+0B1A 0B21  0007 IF
+0B4E 0B55  0007 LPRINT
+0B56 0B5D  0007 PRINT
+0C45 0C4C  0007 LINE
+0CA3 0CAA  0007 INPUT
+0CD9 0CE0  0007 READ
+0DAB 0DB2
+0DB7 0DBE
+0F1C 0F23       evaluate function at M
+0FE8 0FEF       TOUPPERM read M to A, upcase A
+0FE9 0FF0  0007 TOUPPERA upcase A
+10D1 10D8
+110C 1113  0007 OUT
+112E 1135
+1131 1138
+113B 1142  0007 LLIST
+1140 1147  0007 LIST
+11A2 11A9  0007 PTILL0
+11AA 11B1
+128B 1294  0009 POKE
+12CB 12D4  0009 CHGET wait for chr
+1419 1422  0009 POWER
+14E5 14F0       LCDOUT
+14E7 14F2                 CALL 431F 42F9
+14EA 14A0       
+14ED 14F8  000B POPALL    pop all & ret
+14EE 14F9       POPALL2   POPALL without PUSH PSW
+ -- CRT device control block --
+14F2 14FD                 DW 14F8 1503
+14F4 14FF                 DW 4D59 4D0F
+14F6 1501                 DW 14FA 1505
+14F8 1503                 RST_7 40 4C
+14FA 1505                 RST_7 44 50
+
+ -- RAM device control block --
+14FC 1507                 DW 1506 1511
+14FE 1509                 DW 158D 1598
+1500 150B                 DW 15AC 15B7
+1502 150D                 DW 15C4 15CF
+1504 150F                 DW 161B 1626
+1506 1511                 open RAM file
+158D 1598
+15AC 15B7
+15C4 15CF
+161B 1626
+
+
+179E 1792       CLOSECOM
+17A8 179C       COMOUT output A to com/mdm file  (wrapper & extra stuff around SND232)
+---- 17A1                 K85:JNC 14F5
+17AD 17A4                 JMP 14EA 14A0
+
+17E6 17C8 -001E SETSER com on
+
+181C 17FA
+182D 180B
+184E 182C
+
+19AB 1975 -0036 TIME$
+19BD 1987 -0036 DATE$
+19F1 19BD -0034 DAY$
+1A78 1A44 -0034 IPL
+1A9E 1A6A -0034 COM MDM
+1BB1 1B7A -0037           renew auto power off counter
+
+
+1BB8 1B81 -0037 KEY
+1C57 1C20 -0037 PSET
+1C66 1C2F -0037 PRESET
+
+1D90            CSRLIN
+
+1DC3 1D86 -003D WIDTH
+
+
+1DC5 1D8E -0037 SOUND
+1DE5 1DAE       SNDOFF
+1DEC 1DB5 -0037 MOTOR
+1DFA 1DC3 -0037 CALL
+1E22 1DEB -0037 SCREEN
+1E5E 1E29 -0035 LCOPY
+1E7B 1E46       RUN5
+1F3A 1F07 -0035 FILES
+1F91 1F63 -002E KILL
+1FBF 1F90 -002F KILASC delete a .DO file
+1FD9 1FAA -002F KILCOM delete a .CO file
+2017 1FE8 -002F KILBAS delete a .BA file
+2037 2008 -002F NAME
+20A9 207A -002F ROM7 unk
+20AF 2080 -002F FINDFN
+20CC 209D -002F almost the end of FINDFN
+20E4 20B5 -002F SCNEMP scan for an empty directory entry
+20EC 20BD -002F SCNEMP scan for an empty directory entry, alt entry
+20FE 20CF -002F NEW 
+20FF 20D0       NEW2
+2134 2104 -0030 ROM8 unk
+213E 210E -0030 UPDOFILES update DOFILES with BC
+
+
+2146 2119 -002D RESETFPS reset file pointers      <<<<< old
+
+2146 2116       RESETFPS reset file pointers      <<<<< new
+
+
+
+2190 2168
+219A 2172 -0028 AFTEREOF advance HL past end of file based on type
+21A4 217C                advance HL past end of CO file
+21C2 219A                update line addresses for BA and advance HL past end of BA file
+21AE 2186                advance HL past end of DO file
+2239 2211 -0028 MKDIRENT insert entry into directory
+2280 2258 -0028 CSAVE
+2377 234F -0028 CLOAD
+2387 235F
+2491 2469
+
+273A 2713 -0027 STR$ Function
+>                CALL FAC1ASCII
+275D 2736
+276E 2747
+27B0 2789       P-1TILL"
+27B1 2790       PTILL"
+
+27CA 27A3
+27E4 27BD
+27F4 27CD
+278D 2766
+2802 27DB
+
+281D 27F6
+2833 280C
+
+283A 2813 -0027
+285B 2834
+285C 2835
+287B 2854
+2887 2806
+2888 2861
+
+28A8 2881
+
+2904 28DD
+290D 28E6
+2916 28EF
+291C 28F5
+291D 28F6
+2933 290C
+2935 290E
+2943 291C       LEN Function
+2947 2920
+294F 2928       ASC Function
+2953 292C
+295F 2938       CHR$ Function
+
+296D 2946       STRING$ Function
+
+2987 2960
+298A 2963
+2993 296C
+
+298E 2967       SPACE$ Function
+
+2AB5 2A8E -0027 INR_A_RET INR A; RET;  middle of INSTR
+3450 3429       Reverse load single precision at M to DEBC
+3469 3442 -0027 D2H4Bup move the memory pointed to by DE to the memory pointed to by HL
+35BA 3593 -0027 DSKI$
+35D9 35B2
+3725 36FE -0027 MPYINT mpy signd int
+39D4 39AD -0027 PRTINT prt 16 bit int
+
+39E8 39C1 -0027 FAC1ASCII
+
+3EF3 3ECF
+3F28 3F04
+3F2C 3F08
+407F 405B -0024 RESTORE
+409A 4076 -0024 STOP
+409F 407B -0024 END
+40DA 40B6 -0024 CONT
+40F9 40D5 -0024 CLEAR
+4174 4150 -0024 NEXT
+421A 41F6
+4222 41FE -0024 CRLF prt crlf
+4229 4205 -0024 BEEP
+4231 420D -0024 CLS clear screen
+423F 421B -0024 LOCK scroll lock
+425D 4239 -0024 ERAEOL erase to eol
+427C 4258 -0024 SETCUR set curs posit
+
+431F 42F9
+433B 4310
+
+43A2 4382
+
+4512 44DC
+4566 4523
+4469 4449 -0020 ESC+A
+446E 444E -0020 ESC+B
+4586 4543
+459A 4557
+45A6 4562
+45AA 4566
+45C5 4581
+
+-- 100 only --
+45CB
+45D2
+---------------
+
+45D3 4587
+45E2 4596
+45ED 45A1
+
+4601 45B5              redraw screen from lcd ram
+4606 45BA
+4608 45BC
+
+4624 45D8
+4626 45DA
+463E 45F2       INLIN? INLIN with "?"
+4644 45F8 -004C INLIN get kbd line without "?"
+
+4703 46BA
+
+478B 4741 -004A DIM
+
+4790            VARPTR
+4991            USING
+4B44            RST_4
+4B55            PRTTAB
+4B92            INITLCD
+4BAB            CHRLCD print A to LCD
+4BB8            NLLCD send crlf to lcd if not CSRY 0
+4BEA            INKEY$ Function
+
+4C0B 4BC1 -004A CKFN  evaluate & reformat filename
+4C0F 4BC5       CKFN2 evaluate arguments to RUN/OPEN/SAVE commands
+4C21 4BD7
+4CBF 4C75
+4CCB 4C81 -004A OPEN
+4D12 4CC8
+4D59 4D0F                 close lcd/crt/lpt
+4D6E 4D24       RUN3
+4D70 4D26 -004A LOAD
+4D71 4D27 -004A MERGE
+4D9F 4D55
+
+4DCF 4D85 -004A SAVE
+4E1D 4DD3
+4E22 4DD8 -004A ROM12 unk
+4E28 4DDE -004A CLOSE
+
+5023 4FD2       
+5036 4FE5
+504E 4FFD
+
+506F 501E -0051 LFILES
+5071 5020 -0051 DSKO$
+507F 502E -0051 USING
+50F1 50A0 -0051 DEVICES
+
+5146 50F1 -0055 TELCOM
+
+5455 518D -02C8 TERM
+
+5797 54A4 -02F3 MENU
+58B6 55C3 -02F3 ROM1 unk
+58C3 55D0 -02F3 ROM2 unk
+58DB 55E8 -02F3 ROM3 unk
+58E2 55EF -02F3 ROM4 unk
+58EB 55F8 -02F3 ROM5 unk
+5970 567D -02F3 DSPFIL dsp fil on mnu
+59C9 56D6 -02F3 SETCRS set cursor mnu
+59E5 56F2 -02F3 ROM14 unk
+
+5A58 5763 -02F5 PRTSTR string to lcd
+5A62 576D -02F5 MOV1 DE --> HL
+5A6D 5778       CMPARE compare the buffer pointed to by DE to the buffer pointed to by HL
+5A79 5784 -02F5 CLRFNK clr f-key tbl
+5AE3 57EE -02F5 ADDR get file ads
+5AE4 57EF -02F5 ADDR2 file ads + 1
+5B1A 5825 -02F5 EMPTY '-.-' msg
+5B68 5873 -02F5 ADRS
+5B6F 587A -02FS SCHDL
+
+5D70 5A78 -02F8 SHOWTD time-date
+5DEE 5AF6 -02F8 TEXT
+5E51 5B59 -02F8 EDIT
+5F2F 5C37 -02F8 WTSPC wait space bar
+5F4B 5C53 -02F8 SPCMSG '..Space Bar.'
+63CD 60D5 -02F8
+
+
+6B2D 6835       GETEOF search for EOF (0x1A)
+6B6D 6875 -02F8 MAKHOL ins spaces
+6B9F 68A7 -02F8 DELCHR delete char
+
+
+6BDB 68E3
+
+6CE0 69E8 -02F8 WARMSTART   warm start reset entry
+
+6D17 6A1D -02FA INITDVI    perform external DVI initialization if it is present
+6D1D 6A23
+6D1E 6A24
+6D3D 6A43
+
+6D3F 6A45 -02FA LPT_A send A to printer
+6D41 6A47 -02FA            CALL CHECK_SHIFT_BREAK
+6D47 6A4D -02FA            IN PIO_PORT_C (id PIO_PORT_C)
+
+6D63 6A6A
+6D6A 6A72
+6D6D 6A75 -02FA CHECK_RS232_PENDING  Check RS232 queue for pending characters
+                        LDA XONOFF_ENFLAG
+6D71 6A79               JZ CHECK_RS232_PENDING@end
+6D74 6A7C               LDA XONOFF_CONTROL_1
+6D79 6A81       CHECK_RS232_PENDING@end   LDA COMINCNT
+
+6D7E 6A86 -02F8 RCV232 get chr fm rcv que
+6D81 6A89 -02F8         load INT_EXIT+1 (skip F1 pop PSW, do EI)
+6D85 6A8D -02F8         load COMINCNT
+
+6DAC 6AB4 -02F8 RST 6.5
+
+6DFC 6B04 -02F8 Calculate address to save next RS232 character
+
+6E04 6B0C -02F8         load COMBUF
+
+6E32 6B3A -02F8 SND232 snd w x-on-off
+
+6E3A 6B42               send character in C to serial port
+6E4A 6B52
+6E4D 6B55               handle xonoff
+6E5F 6B67
+6E65 6B6D
+6E69 6B71
+
+6E75 6B7D               SETBAUD set RS232 baud rate from H
+6E92 6B9A
+
+                        uart baud rate timer values
+6E94 6B9C               DW 0x4800
+6E96 6B9E               DW 0x456B
+6E98 6BA0               DW 0x4200
+6E9A 6BA2               DW 0x4100
+6E9C 6BA4               DW 0x4080
+6E9E 6BA6               DW 0x4040
+6EA0 6BA8               DW 0x4020
+6EA2 6BAA               DW 0x4010
+6EA4 6BAC               DW 0x4008
+
+6EA6 6BAE       INITCOM init rs232 or modem
+
+6EAA 6BB2
+
+-- only 100 --
+6EAC ----               JC 6EB3
+6EAF ----               MVI H,0x03
+6EB1 ----               MVI B,0x2D
+
+6EB3 6BB4               DI
+6EB4 6BB5               CALL SETBAUD
+6EC1 6BC2               CALL ZCOMBUFPARAMS
+6EC8 6BC9               JMP INT_EXIT
+
+6ECB 6BE4 -02E7 COMOFF
+6ED2 6BEB               STA COMINISTATUS
+6ED5 6BEE -02E7         RET
+
+6F31 6BCC -0365                 Enable XON/OFF when CTRL-S / CTRL-Q sent
+
+6F39 6BD4 -0365 ZCOMBUFPARAMS	init serial buffer params
+
+6F42 6BDE -0364					set COMINPTR
+6F46 6BEF -0357 WCASHDR			write cassette header and sync byte
+
+6F5E 6C07 -0357
+
+71F7 6EA7 -0350      INT_EXIT   POPALL plus EI before RET
+71F8 6EA8            INT_EXIT2  INT_EXIT without PUSH PSW
+
+7242 6EF2 -0350 KYREAD scn kbd
+729F 6F4E -0351 CHECK_SHIFT_BREAK       Check if SHIFT-BREAK is being pressed
+
+7383 7031
+73C5 7073
+73EE 709C
+743C 70EA
+752B 71D9              Set the display top line to zero for all LCD drivers
+7533 71E1       ENLCD  Enable LCD drivers after short delay
+
+7657 7305       PAUSE_C    Delay routine - decrement C until zero
+765C 730A -0352 SETINT set int to 0x1D  - disable background task & barcode interrupts
+7662 7310       BEEP2
+7676 7324                         click sound port
+
+767D 732B       TESTDVIW
+7682 7330       TESTDVIR
+768F 733D       DVIEXT
+7693 7341       INITDVI
+76A0 734E       QUERYDVI
+76B6 7364       BOOTDVI Copy initialization code from DVI to E000h and execute
+76DE 738C       DVISCMD send A to dvi control mailbox
+76FB 73A9       DVIREAD
+
+770B 73B9                         DVI command table (6 bytes: 02,01,00,00,01,00)
+
+7711 738F -0382 GLYPH_20 GLYPHSLO LCD char generator shape table (20H-7FH)
+7719            GLYPH_21
+...             ...
+78E1            GLYPH_7E
+78E9 7567       GLYPH_7F
+
+78F1 756F       GLYPH_80 GLYPHSHI LCD char generator shape table (80H-FFH)
+78F9            GLYPH_81
+7901            GLYPH_82
+...             ...
+7BE1            GLYPH_FE
+7BE9 7867 -0382 GLYPH_FF
+
+7BF1 
+
+7EAC 7B5C -0350 FREMEM free bytes
+7F0B 7BBB -0350 MAX
+7F98 7C48 -0350 FREMSG 'bytes free'
+7FF9 7CCC -0332 MAXROM
+
+-- variables & buffers --
+
+E000 E000  0000 DVICODE Location of init code to be copied from DVI
+F3AF F3AF
+F5F0 F5F0  0000 MAXRAM
+F639 F640  0007 CSRY Hor curs posit
+F63A F641  0007 CSRX Ver curs posit
+F652 F659  0007 ERROR Bas error trap
+F65B F662  0007 STAT Comm stat
+F678 F67F       STRBUF pointer to BASIC string buffer
+F67A F681  0007 LINENO current executing BASIC line number, FFFF if no pgm
+F67C F683  0007 CURBAS pointer to start of BASIC program
+F684 F68B
+F685 F68C  0007 LINBUF Bfr for kb lin
+
+F809 F810                 file type (1=BA, 2=DO, 3=CO)
+
+F99A F98B -000F UNSAVBA Unsaved BA addr
+F9AF F9A0 -000F EDITBA edit attr byte
+FA8F FA96
+FAAD FAB4  0007 LBLON lbl lin enable
+FACE FAD4  0006 RAM1 unknown
+FAD8 FADE  0006 RAM2 unknown
+FB35 FB47
+FB67 FB79       file buffer area pointer
+FB69 FB7B
+FB6B FB7D
+FB8A FB9C
+FB8C FB9E       STRBUFPOS position in STRBUF
+FB90 FBA2
+FBAE FBC0  0012 STDO strt DO store
+FBB0 FBC2  0012 STCO strt CO store
+FBB2 FBC4  0012 TOPFIL end of top fil  / DVI start of variable data pointer
+FBB4 FBC6  0012 STAR strt arr store
+FBB6 FBC8  0012 STUN 1st unusd byte - unused memory pointer
+FBD9 FBEB
+FBDF FBF1
+FBE2 FBF4
+FC81 FC93       DVIDATAVAIL
+FC8C FC9E
+FC93 FCA5  0012 FNAME 8 (9?) bytes padded fname / current BA pgm / prog name if not run from menu nor typed on select line
+FC99 FCAB
+FC9C FCAE       CFNAME filename of last program loaded from tape
+FCA2 FCB4
+FCA7 FCB9  0012 RAM3 unknown
+
+FC1A FC2C       FAC1 start of FAC1 for integers
+FC92 FCA4
+FC99 FCAB
+FCA7 FCB9
+FCC0 FCC0  0000 ALTLCD start of ALT LCD buffer 0x0140 bytes
+
+FCE8 FCE8            ram lcd
+
+FDA1 FDA1  0000 ALT1 BEGALT + 0x00E1
+FDD7 FDD7  0000 ALT2 BEGALT + 0x0117
+FDEE FDEE  0000 ALT3 BEGALT + 0x012E
+FDEF FDEF  0000 ALT4 BEGALT + 0x012F highest MENU directory location
+FF40 FF40  0000 XONOFF_CONTROL_0
+FF41 FF41  0000 XONOFF_CONTROL_1
+FF42 FF42  0000 XONOFF_ENFLAG
+FF43 FF43  0000 COMINISTATUS        RS323 init status
+FF44 FF44  0000 SNDFLAG
+FF45 FF46       PORT_E8             Contents of port 0xE8
+FF46 FFBE  0078 COMBUF COM buffer 0x40 bytes (k85 addr seems sus, but "load COMBUF" above is clear)
+
+F650 F657
+
+FF86 FF47 -003F COMINCNT  number of bytes waiting in serial buffer
+FF87 FF48       COMOUTPTR
+FF88 FF49       COMINPTR   RS232 buffer input pointer
+FF8A FF4B       CTRL-S Status
+FF8B FF4C               UART baud rate timer value
+FF8D FF4E               rs232 parity ctl byte
+FF97 FF58 -003F KC7 8 bits for space, del, tab, esc, paste, label, print, enter
+FF98                    8 bits for storing function key recognition
+FFA2 FF63 -003F         8 bits for storing shift, ctrl, grph, code, num, and caps lock.
+FFAA FF6B -003F KBUFN   chrs in kb buf
+FFFA FFBB               DVIMBSEL   DVI mailbox select area
+FFFB FFBC               DVIPRESENT
+FFFC FFBD               DVI Disk BASIC code initializer value
+
+-- i/o ports --
+100 K85 desc
+B8  B8
+BA  BA
+BB  BB  PIO_PORT_C
+BC  BC
+BD  BD
+C8  C8
+D8  D8
+E8  E8
+
+-- constants --
+100   K85 desc
+000F 000F LS err

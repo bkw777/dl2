@@ -17,6 +17,7 @@
 ; $ make verify_100
 
 ;;;;
+;;;; 100 & M10 both work
 ;;;; K85 builds but does NOT work
 ;;;;
 
