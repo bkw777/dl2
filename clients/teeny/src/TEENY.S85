@@ -143,7 +143,7 @@ MAIN:
 		CPI			'S'				; is it 'S' ?
 		JZ			SAVE			; then jump to SAVE		maybe rename SAVE, maybe common init code for most commands
 		PUSH 		PSW				; push A & flags
-		; if we got here then the command is =, L, K, or unknown
+		; if we got here then the command is L, K, or unknown
 		; if the file doesn't exist that's an error for any of those commands
 		CALL		DIRENT          ; set disk filename - test if file exists on disk
 		JZ			errFF			; if Z print FF error

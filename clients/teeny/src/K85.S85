@@ -19,7 +19,8 @@
 ; KILL <any> works
 ; QUIT works
 
-; K85 system rom is closer to M10 than M100 (no modem)
+; K85 system rom is closer to M10 than M100
+; 100 has many differences where k85 & m10 are the same
 
 ; routines
 PTILL0			EQU		0x11A9		; print null-terminated string at HL to screen
