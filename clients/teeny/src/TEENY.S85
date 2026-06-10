@@ -7,14 +7,16 @@
 ;	n=$$(wc -c <TEENY.CO)
 ;	z88dk-z80asm -m8085 -no-synth -DMODEL_100 -DPRGLEN=$n -b -o=TEENY.CO TEENY.S85
 
-; 8085 asm syntax highlighting for Geany https://www.geany.org/
-; https://gist.github.com/bkw777/632c0a390b0fd0bd4e2f31544528d6d5
+; rom cross reference and 8085 asm syntax for Geany
+; https://github.com/bkw777/m100_dev
 
-; Currently builds for 100 and K85
+; Currently builds for 100, K85, M10
 ; $ make 100
 ; or
-; build & verify that the 100 build reproduces the original exactly
+; build & verify that the 100 or M10 build reproduces the original exactly
 ; $ make verify_100
+; $ make verify_M10
+
 
 ;;;;
 ;;;; 100 & M10 both work

@@ -1,13 +1,14 @@
 ; M10.S85
 ; Olivetti M-10 header for TEENY.S85
+; Reference: https://github.com/bkw777/m100_dev
 ; Brian K. White
 
 ; M10 is working - reporduces the original binary which works
 
 ; see if it still works without changing the 100 code
-; TODO test the changes on 100. Does the M10 code improve on the original?
+; TODO test the M10 changes on 100. Does the M10 code improve on the original?
 ; Or are the changes needed for compatibility with the M100 main rom?
-REPRODUCE_ORIGINAL_BINARY EQU		1
+	DEFINE REPRODUCE_ORIGINAL_BINARY
 
 ; routines
 PTILL0			EQU		0x11A5		; print null-terminated string at HL to screen
@@ -44,7 +45,6 @@ COFILES			EQU		0xFBB6		; pointer to start of CO files
 
 FX1				EQU		0xFC9F		; unknown, possibly file size or other metadata
 ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
-;ALTLCD_LEN		EQU		0x0140		; length of ALT LCD buffer
 COMBUF			EQU		0xFF46		; COM buffer 0x40 bytes
 KYBCNT			EQU		0xFF6D		; number of characters in keyboard buffer
 
@@ -52,6 +52,12 @@ KYBCNT			EQU		0xFF6D		; number of characters in keyboard buffer
 ; The original TEENY for M10 has these differences from the 100 version.
 ; Other than the dsr check I don't know why. Unknown if these are required
 ; to make M10 work, or maybe improves on the 100 code or what.
+
+; Possible difference: the M100 version accepts a single 'Q' to exit.
+; M10 version requires "Q Q" because there needs to be something in the
+; filename part. This might be a difference in the main rom CKFN2 routines
+; or might be one of these.
+
 
 	IF REPRODUCE_ORIGINAL_BINARY
 CheckDSR_RET MACRO
