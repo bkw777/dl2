@@ -5,14 +5,14 @@
 
 ; not mapped - these are the M100 values
 SET232			EQU		0x191D		; set RS232 parameters to STAT string pointed to by HL
-;AFTEREOF2		EQU		0x219A+3	; Advance HL past end of current file based on type
-;MASDEL			EQU		0x6B9F		; delete BC chars at M (in a DO file)
+AFTEREOF2		EQU		0x2CCD+3	; Advance HL past end of current file based on type
+MASDEL			EQU		0x82DA		; delete BC chars at M (in a DO file)
 RCV232			EQU		0x8519		; get A from the RS232 with XON/XOFF
 SND232			EQU		0x8643		; send A out serial port with XON/XOFF
-;COMOFF			EQU		0x6ECB		; deactivate RS232 or Modem
-;INT1D			EQU		0x765C		; set interrupt to 0x1D
+COMOFF			EQU		0x87B5		; deactivate RS232 or Modem
+INT1D			EQU		0x8FA0		; set interrupt to 0x1D
 KYBUF			EQU		0xEF70		; keyboard buffer
-;COMBUF			EQU		0xFF46		; COM buffer 0x40 bytes
+COMBUF			EQU		0xFFBB		; COM buffer 0x40 bytes
 KYBCNT			EQU		0xFD1E		; number of characters in keyboard buffer
 ALTLCD			EQU		0xF7B0		; start of ALT LCD buffer
 

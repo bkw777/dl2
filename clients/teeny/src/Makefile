@@ -2,7 +2,7 @@
 # Requires https://github.com/z88dk/z88dk
 # Requires https://github.com/bkw777/dl2
 
-MODELS = 100 K85 M10 # 200 NEC
+MODELS = 100 K85 M10 # 200 # NEC
 NAME = TNY
 SRC = TEENY.S85
 
