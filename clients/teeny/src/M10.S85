@@ -43,16 +43,10 @@ ETRAP			EQU		0xF655		; error trap
 KYBUF			EQU		0xF688		; keyboard buffer
 DOFILES			EQU		0xFBB4		; pointer to start of DO files
 COFILES			EQU		0xFBB6		; pointer to start of CO files
-
 FX1				EQU		0xFC9F		; unknown, possibly file size or other metadata
 ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
 COMBUF			EQU		0xFF46		; COM buffer 0x40 bytes
 KYBCNT			EQU		0xFF6D		; number of characters in keyboard buffer
-
-; constants
-; i/o
-PIO_PORT_C		EQU		0xBB		; bits: 7:- 6:- 5:!DSR 4:!CTS 3:BCR 2:LPTBUSY 1:!LPTBUSY 0:CLK
-
 
 ; The original TEENY for M10 has these differences from the 100 version.
 ; Other than the dsr check I don't know why. Unknown if these are required

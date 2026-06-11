@@ -28,12 +28,7 @@ ETRAP			EQU		0xF652		; error trap
 KYBUF			EQU		0xF685		; keyboard buffer
 DOFILES			EQU		0xFBAE		; pointer to start of DO files
 COFILES			EQU		0xFBB0		; pointer to start of CO files
-
 FX1				EQU		0xFC99		; unknown, possibly file size or other metadata
 ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
 COMBUF			EQU		0xFF46		; COM buffer 0x40 bytes
 KYBCNT			EQU		0xFFAA		; number of characters in keyboard buffer
-
-; constants
-; i/o
-PIO_PORT_C		EQU		0xBB		; bits: 7:- 6:- 5:!DSR 4:!CTS 3:BCR 2:LPTBUSY 1:!LPTBUSY 0:CLK

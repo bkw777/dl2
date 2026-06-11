@@ -77,11 +77,18 @@ open_mode_read		EQU		0x03
 
 RW_Chunk_Size		EQU		0x80			; Read/Write chunk size. May use anything from 1 to 252.
 
-; RS232
+; constants
+	IFNDEF PIO_PORT_C
+PIO_PORT_C		EQU		0xBB				; COM & LPT flow control bits
+	ENDIF
+	IFNDEF DSR_BITMASK
+DSR_BITMASK		EQU		0x20
+	ENDIF
+	IFNDEF COM_STAT_STRING
 COM_STAT_STRING MACRO
 	DB "98N1D"
 	ENDM
-DSR_BITMASK		EQU		0x20
+	ENDIF
 
 ;------------------------------------------------------------------------------
 ; ORG & CO Header works backwards from HIMEM-PRGLEN.
