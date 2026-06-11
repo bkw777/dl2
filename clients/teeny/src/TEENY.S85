@@ -1,15 +1,13 @@
 ; TINY/TEENY disassembly
 ; TINY by Ed Giese (Acroatix). TEENY is TINY that Ron Weisen made a bit smaller.
+; platform & rom references: https://github.com/bkw777/m100_dev
 ; This disassembly by Brian K. White
-; 
+;
 ; build with:
 ;	z88dk-z80asm -m8085 -no-synth -DMODEL_100 -b -o=TEENY.CO TEENY.S85
 ;	n=$$(wc -c <TEENY.CO)
 ;	z88dk-z80asm -m8085 -no-synth -DMODEL_100 -DPRGLEN=$n -b -o=TEENY.CO TEENY.S85
-
-; rom cross reference and 8085 asm syntax for Geany
-; https://github.com/bkw777/m100_dev
-
+;
 ; Currently builds for 100, K85, M10
 ; $ make 100
 ; or
@@ -21,7 +19,7 @@
 ;;;;
 ;;;; 100 & M10 both work
 ;;;; K85 builds but does NOT work
-;;;; 200 builds but does not work (but the original 200 binary is a bit different than this)
+;;;; 200 builds but does not work (but the original 200 binary is a bit different than this anyway)
 ;;;; NEC not started
 ;;;;
 

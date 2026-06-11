@@ -1,40 +1,37 @@
 ; 200.S85
 ; TANDY model 200 header for TEENY.S85
-; Brian K. White
 
 ; 200 build doesn't work yet
 ; these addresses all check out, but the original 200 binary is slightly more
 ; different from the original 100 & M10 binaries than just the addresses
 
-; not mapped - these are the M100 values
+; routines
+PTILL0			EQU		0x11CC		; print null-terminated string at HL to screen
 SET232			EQU		0x191D		; set RS232 parameters to STAT string pointed to by HL
-AFTEREOF2		EQU		0x2CCD+3	; Advance HL past end of current file based on type
+FINDFN			EQU		0x2BCC		; search dir for filename matching FNAME
+SCNEMP			EQU		0x2C09		; scan for an empty directory entry
+RESETFPS		EQU		0x2C62		; reset file pointers
+AFTEREOF2		EQU		0x2CD0		; Advance HL past end of file, type A
+MKDIRENT		EQU		0x2DAC		; insert entry into directory
+D2H4Bup			EQU		0x41BA		; move the memory pointed to by DE to the memory pointed to by HL
+INLIN			EQU		0x54F6		; input line
+CKFN2			EQU		0x5ACE		; evaluate & reformat filename
+MENU			EQU		0x67A4		; go to main menu
+MAKHOL			EQU		0x82A8		; insert BC number of spaces in memory
 MASDEL			EQU		0x82DA		; delete BC chars at M (in a DO file)
 RCV232			EQU		0x8519		; get A from the RS232 with XON/XOFF
 SND232			EQU		0x8643		; send A out serial port with XON/XOFF
 COMOFF			EQU		0x87B5		; deactivate RS232 or Modem
 INT1D			EQU		0x8FA0		; set interrupt to 0x1D
-KYBUF			EQU		0xEF70		; keyboard buffer
-COMBUF			EQU		0xFFBB		; COM buffer 0x40 bytes
-KYBCNT			EQU		0xFD1E		; number of characters in keyboard buffer
-ALTLCD			EQU		0xF7B0		; start of ALT LCD buffer
-
-
-; routines
-PTILL0			EQU		0x11CC		; print null-terminated string at HL to screen
-FINDFN			EQU		0x2BCC		; search dir for filename matching FNAME
-SCNEMP			EQU		0x2C09		; scan for an empty directory entry
-RESETFPS		EQU		0x2C62		; reset file pointers
-MKDIRENT		EQU		0x2DAC		; insert entry into directory
-D2H4Bup			EQU		0x41BA		; move the memory pointed to by DE to the memory pointed to by HL
-INLIN			EQU		0x54F6		; input line
-CKFN2			EQU		0x5ACA+4	; evaluate & reformat filename
-MENU			EQU		0x67A4		; go to main menu
-MAKHOL			EQU		0x82A8		; insert BC number of spaces in memory
 
 ; variables
 MAXRAM			EQU		0xEEB0
 ETRAP			EQU		0xEF34		; error trap
 DOFILES			EQU		0xF661		; pointer to start of DO files
 COFILES			EQU		0xF663		; pointer to start of CO files
+KYBUF			EQU		0xEF70		; keyboard buffer
 FX1				EQU		0xF74C		; unknown, possibly file size or other metadata
+ALTLCD			EQU		0xF7B0		; start of ALT LCD buffer
+KYBCNT			EQU		0xFD1E		; number of characters in keyboard buffer
+COMBUF			EQU		0xFFBB		; COM buffer 0x40 bytes
+

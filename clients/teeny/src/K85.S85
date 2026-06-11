@@ -1,20 +1,15 @@
 ; K85.S85
 ; Kyotronic KC-85 header for TEENY.S85
-; Reference: https://github.com/bkw777/m100_dev
-; Brian K. White
 
 ; K85 is not working.
 ; Both 100 and M10 are working from the same source.
-; Whatever is breaking K85, it has to be something in here.
-; But these addresses all check out many times over...
-; Even 3-way cross referenced between M100, K85, and M10
 
 ; Installs, runs, displays prompts & errors, responds to and displays keyboard input, responds to commands, exits normally.
 ; RS232 operations all seem to be good, because some whole TPDD transactions work perfectly.
 ; LCD and keyboard operations all seem to be ok.
 ; The problems all seem to be related to ram filesystem operations.
-; KILL and QUIT don't need to do any local file work, but KILL does need to both
-; send and receive over RS232 correctly.
+; KILL and QUIT don't need to do any local file work,
+; but KILL does need to both send and receive over RS232.
 ;
 ; LOAD BA looks ok but corrupts filesystem, TNYK85.CO no longer runs, LOADM says top 0, end 65535, OM err
 ; LOAD DO hangs, corrupts ram, hard resets
@@ -25,7 +20,7 @@
 ; KILL <any> works
 ; QUIT works
 
-; K85 system rom is closer to M10 than M100
+; K85 system rom is closer to M10 than 100
 ; 100 has many differences where k85 & m10 are the same
 
 ; routines
@@ -40,8 +35,7 @@ SCNEMP			EQU		0x20B5		; scan for an empty directory entry
 ;RESETFPS		EQU		0x2116		; reset file pointers    system rom only ever calls this
 RESETFPS		EQU		0x2116+3	; reset file pointers    original TEENY for M10 does this
 
-AFTEREOF		EQU		0x2172		; advance HL past end of current file based on type
-AFTEREOF2		EQU		AFTEREOF+3	; AFTEREOF, A=type already set
+AFTEREOF2		EQU		0x2175		; advance HL past end of file, type A
 MKDIRENT		EQU		0x2211		; insert entry into directory
 D2H4Bup			EQU		0x3442		; move the memory pointed to by DE to the memory pointed to by HL
 INLIN			EQU		0x45F8		; input line

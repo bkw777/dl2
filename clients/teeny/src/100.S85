@@ -1,9 +1,7 @@
 ; 100.S85
 ; TRS-80 model 100 header for TEENY.S85
-; Reference: https://github.com/bkw777/m100_dev
-; Brian K. White
 
-; M100 is working - reporduces the original binary which works
+; 100 is working - reporduces the original binary which works
 
 ; routines
 PTILL0			EQU		0x11A2		; print null-terminated string at HL to screen
@@ -11,8 +9,7 @@ SET232			EQU		0x17E6		; set RS232 parameters to STAT string pointed to by HL
 FINDFN			EQU		0x20AF		; search dir for filename matching FNAME
 SCNEMP			EQU		0x20E4		; scan for an empty directory entry
 RESETFPS		EQU		0x2146		; reset file pointers
-AFTEREOF		EQU		0x219A		; advance HL past end of current file based on type
-AFTEREOF2		EQU		AFTEREOF+3	; AFTEREOF, A=type already set
+AFTEREOF2		EQU		0x219D		; advance HL past end of file, type A
 MKDIRENT		EQU		0x2239		; insert entry into directory
 D2H4Bup			EQU		0x3469		; move the memory pointed to by DE to the memory pointed to by HL
 INLIN			EQU		0x4644		; input line
