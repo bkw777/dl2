@@ -54,7 +54,14 @@ pktDATA			EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data (length varies 0-?? 64? u
 wFD27			EQU		ALTLCD + 0x67		; FD27
 ; FDFF end of ALTLCD
 
-writeDLEN		EQU		COMBUF+0x3A			; FF80 COMBUF is 0x40 bytes, so this is 6 bytes before the end of COMBUF
+; this location is confusing
+; both 100 and 200 use the same FF80
+; On 100 FF80 is within COMBUF: FF46-FF85
+; on 200 FF80 is before COMBUF: FFBB-FFFA
+; I think TINY started on 100, and everything else was ported lter,
+; so maybe the porter just missed it and it still worked?
+;writeDLEN		EQU		COMBUF+0x3A			; FF80 COMBUF is 0x40 bytes, so this is 6 bytes before the end of COMBUF
+writeDLEN		EQU		0xFF80
 
 ; TPDD
 ZZ				EQU		0x5A5A				; packet start / preamble, really 2 consecutive 'Z', not a int16 number

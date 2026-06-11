@@ -33,7 +33,6 @@ KYBUF			EQU		0xEF70		; keyboard buffer
 FX1				EQU		0xF74C		; unknown, possibly file size or other metadata
 ALTLCD			EQU		0xF7B0		; start of ALT LCD buffer
 KYBCNT			EQU		0xFD1E		; number of characters in keyboard buffer
-COMBUF			EQU		0xFFBB		; COM buffer 0x40 bytes
 
 ; constants
 PIO_PORT_C		EQU		0xC9		; COM & LPT flow control bits

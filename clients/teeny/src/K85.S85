@@ -57,7 +57,6 @@ COFILES			EQU		0xFBC2		; pointer to start of CO files
 FX1				EQU		0xFCAB		; unknown, possibly file size or other metadata
 ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
 KYBCNT			EQU		0xFF6B		; number of characters in keyboard buffer
-COMBUF			EQU		0xFFBE		; COM buffer 0x40 bytes
 
 ; copied from M10
 ; grasping at straws since k85 not working
