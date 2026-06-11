@@ -2,6 +2,9 @@
 ; TANDY model 200 header for TEENY.S85
 ; Brian K. White
 
+; 200 build doesn't work yet
+; these addresses all check out, but the original 200 binary is slightly more
+; different from the original 100 & M10 binaries than just the addresses
 
 ; not mapped - these are the M100 values
 SET232			EQU		0x191D		; set RS232 parameters to STAT string pointed to by HL

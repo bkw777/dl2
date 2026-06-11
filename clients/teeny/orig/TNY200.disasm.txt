@@ -1,0 +1,503 @@
+ram:ram:ebc5    210000          LXI         HL,0x0                                  
+ram:ram:ebc8    39              DAD         HL,SP                                   
+ram:ram:ebc9    22f6f7          SHLD        (StackPointer)                          
+ram:ram:ebcc    215a5a          LXI         HL,ZZ                                   
+ram:ram:ebcf    22faf7          SHLD        (pktZZ)                                 
+                            MAIN:                         ;XREF[1]:     ram:ec54(j)
+ram:ram:ebd2    2af6f7          LHLD        (StackPointer)                          
+ram:ram:ebd5    f9              SPHL                                                
+ram:ram:ebd6    af              XRA         A                                       
+ram:ram:ebd7    32f8f7          STA         (DAT_ram_f7f8)                          
+ram:ram:ebda    21d2eb          LXI         HL,0xebd2                               
+ram:ram:ebdd    e5              PUSH        HL                                      
+ram:ram:ebde    216dec          LXI         HL,STR_Prompt                           ;= "> C FFFFFF.XX (C=KLSQ)\r\n> "
+ram:ram:ebe1    cdcc11          CALL        PTILL0                                  
+ram:ram:ebe4    321efd          STA         (KYBCNT)                                
+ram:ram:ebe7    cdf654          CALL        INLIN                                   
+ram:ram:ebea    212eec          LXI         HL,0xec2e                               
+ram:ram:ebed    2234ef          SHLD        (ETRAP)                                 
+ram:ram:ebf0    2171ef          LXI         HL,KYBUF+1                              
+ram:ram:ebf3    3622            MVI         (HL=>KYBUF+1),'"'                       
+ram:ram:ebf5    cdce5a          CALL        CKFN2                                   
+ram:ram:ebf8    cd622c          CALL        RESETFPS                                
+ram:ram:ebfb    3a70ef          LDA         (KYBUF)                                 
+ram:ram:ebfe    fe51            CPI         'Q'                                     
+ram:ram:ec00    caa467          JZ          MENU                                    
+ram:ram:ec03    fe53            CPI         'S'                                     
+ram:ram:ec05    ca48ee          JZ          SAVE                                    
+ram:ram:ec08    f5              PUSH        AF                                      
+ram:ram:ec09    cd1fed          CALL        DIRENT                                  ;undefined DIRENT()
+ram:ram:ec0c    ca1cec          JZ          LAB_ram_ec1c                            
+ram:ram:ec0f    f1              POP         AF                                      
+ram:ram:ec10    d64b            SUI         'K'                                     
+ram:ram:ec12    ca0ded          JZ          KILL                                    
+ram:ram:ec15    3d              DCR         A                                       
+ram:ram:ec16    ca78ed          JZ          LOAD                                    
+ram:ram:ec19    1e03            MVI         E,0x3                                   
+ram:ram:ec1b    01              db          1h                                      
+                            LAB_ram_ec1c:                 ;XREF[2]:     ram:ec0c(j),ram:ee5e(j)
+ram:ram:ec1c    1e00            MVI         E,0x0                                   
+ram:ram:ec1e    01              db          1h                                      
+                            LAB_ram_ec1f:                 ;XREF[1]:     ram:ee0f(j)
+ram:ram:ec1f    1e06            MVI         E,0x6                                   
+ram:ram:ec21    01              db          1h                                      
+                            LAB_ram_ec22:                 ;XREF[2]:     ram:ece3(j),ram:ee0c(j)
+ram:ram:ec22    1e08            MVI         E,0x8                                   
+ram:ram:ec24    01              db          1h                                      
+                            LAB_ram_ec25:                 ;XREF[2]:     ram:ed7b(j),ram:ee4b(j)
+ram:ram:ec25    1e10            MVI         E,0x10                                  
+ram:ram:ec27    01              db          1h                                      
+                            LAB_ram_ec28:                 ;XREF[1]:     ram:edc6(j)
+ram:ram:ec28    1e12            MVI         E,0x12                                  
+ram:ram:ec2a    01              db          1h                                      
+ram:ram:ec2b    1e01            MVI         E,0x1                                   
+ram:ram:ec2d    01              db          1h                                      
+                            LAB_ram_ec2e:                 ;XREF[2]:     ram:ee53(j),ram:ee58(j)
+ram:ram:ec2e    1e14            MVI         E,0x14                                  
+                            ERROR:                        ;XREF[2]:     ram:ed1c(j),ram:ee03(j)
+ram:ram:ec30    3af8f7          LDA         (DAT_ram_f7f8)                          
+ram:ram:ec33    b7              ORA         A                                       
+ram:ram:ec34    ca44ec          JZ          @show                                   
+ram:ram:ec37    d5              PUSH        DE                                      
+ram:ram:ec38    2af2f7          LHLD        (DAT_ram_f7f2)                          
+ram:ram:ec3b    44              MOV         B,H                                     
+ram:ram:ec3c    4d              MOV         C,L                                     
+ram:ram:ec3d    2af0f7          LHLD        (DAT_ram_f7f0)                          
+ram:ram:ec40    cdda82          CALL        MASDEL                                  
+ram:ram:ec43    d1              POP         DE                                      
+                            @show:                        ;XREF[1]:     ram:ec34(j)
+ram:ram:ec44    2157ec          LXI         HL,STR_ErrCodes                         ;= "FFLSNRCMIOWPDFNDAEOMNM"
+ram:ram:ec47    1600            MVI         D,0x0                                   
+ram:ram:ec49    19              DAD         HL,DE                                   
+                                                          ; FWD[2]:     ram:ec57(*),ram:ec5a(R)
+ram:ram:ec4a    7e              MOV         A,(HL=>STR_ErrCodes)                    ;= "FFLSNRCMIOWPDFNDAEOMNM"
+                                                                                    ;= "SNRCMIOWPDFNDAEOMNM"
+ram:ram:ec4b    e7              RST         RST4                                    
+ram:ram:ec4c    d7              RST         RST2                                    
+ram:ram:ec4d    e7              RST         RST4                                    
+ram:ram:ec4e    21b9ec          LXI         HL,STR_ErrMsg                           ;= " Err\r\n"
+ram:ram:ec51    cdcc11          CALL        PTILL0                                  
+ram:ram:ec54    c3d2eb          JMP         MAIN                                    
+                            STR_ErrCodes:                 ;XREF[3,1]:   ram:ec44(*),ram:ec4a(*),ram:ec4a(R),ram:ec4a(R)
+ram:ram:ec57    46464c534...    ds          "FFLSNRCMIOWPDFNDAEOMNM"                
+                            STR_Prompt:                   ;XREF[1]:     ram:ebde(*)
+ram:ram:ec6d    3e2043204...    ds          "> C FFFFFF.XX (C=KLSQ)\r\n> "          
+                            ;************************************************************************************************
+                            ;*                                           FUNCTION                                           *
+                            ;************************************************************************************************
+                            ;undefined FUN_ram_ec88()
+                                                          ;XREF[2]:     ram:ed88(c),ram:ee61(c)
+ram:ram:ec88    3a4cf7          LDA         (DAT_ram_f74c)                          
+ram:ram:ec8b    d643            SUI         0x43                                    
+ram:ram:ec8d    f0              RP                                                  
+ram:ram:ec8e    3e02            MVI         A,0x2                                   
+ram:ram:ec90    c9              RET                                                 
+                            ;************************************************************************************************
+                            ;*                                           FUNCTION                                           *
+                            ;************************************************************************************************
+                            ;undefined PAUSE_100ms()
+                                                          ;XREF[1]:     ram:ed22(c)
+ram:ram:ec91    162e            MVI         D,0x2e                                  
+                            @l0:                          ;XREF[1]:     ram:ec96(j)
+ram:ram:ec93    1b              DCX         DE                                      
+ram:ram:ec94    7a              MOV         A,D                                     
+ram:ram:ec95    b3              ORA         E                                       
+ram:ram:ec96    c293ec          JNZ         @l0                                     
+ram:ram:ec99    c9              RET                                                 
+                            STR_STAT:                     ;XREF[5,4]:   ram:ed35(W),ram:ed42(W),ram:ed42(W),ram:ed49(W),
+                                                          ;             ram:ed4c(W),ram:ed42(W),ram:ed42(W),ram:ed49(W),
+                                                          ;             ram:ed4c(W)
+ram:ram:ec9a    39384e314...    ds          "98N1DNN"                               
+                            ;************************************************************************************************
+                            ;*                                           FUNCTION                                           *
+                            ;************************************************************************************************
+                            ;undefined FUN_ram_eca1()
+                                                          ;XREF[1]:     ram:edcd(c)
+ram:ram:eca1    1e03            MVI         E,0x3                                   
+ram:ram:eca3    cd5eed          CALL        SendOpenCMD                             ;undefined SendOpenCMD()
+                            ;************************************************************************************************
+                            ;*                                           FUNCTION                                           *
+                            ;************************************************************************************************
+                            ;undefined FUN_ram_eca6()
+                                                          ;XREF[1]:     ram:ede3(c)
+ram:ram:eca6    e5              PUSH        HL                                      
+ram:ram:eca7    d5              PUSH        DE                                      
+ram:ram:eca8    3e03            MVI         A,0x3                                   
+ram:ram:ecaa    cdf4ed          CALL        InitPacket                              ;undefined InitPacket()
+ram:ram:ecad    cd4ded          CALL        FUN_ram_ed4d                            ;undefined FUN_ram_ed4d()
+ram:ram:ecb0    af              XRA         A                                       
+ram:ram:ecb1    47              MOV         B,A                                     
+ram:ram:ecb2    4f              MOV         C,A                                     
+ram:ram:ecb3    32fcf7          STA         (DAT_ram_f7fc)                          
+ram:ram:ecb6    d1              POP         DE                                      
+ram:ram:ecb7    e1              POP         HL                                      
+ram:ram:ecb8    c9              RET                                                 
+                            STR_ErrMsg:                   ;XREF[1]:     ram:ec4e(*)
+ram:ram:ecb9    204572720...    ds          " Err\r\n"                              
+                            ;************************************************************************************************
+                            ;*                                           FUNCTION                                           *
+                            ;************************************************************************************************
+                            ;undefined FUN_ram_ecc0()
+                                                          ;XREF[2]:     ram:ed12(c),ram:ed4d(c)
+ram:ram:ecc0    21fcf7          LXI         HL,0xf7fc                               
+ram:ram:ecc3    7e              MOV         A,(HL=>DAT_ram_f7fc)                    
+ram:ram:ecc4    23              INX         HL                                      
+ram:ram:ecc5    86              ADD         (HL=>DAT_ram_f7fd)                      
+ram:ram:ecc6    57              MOV         D,A                                     
+ram:ram:ecc7    7e              MOV         A,(HL=>DAT_ram_f7fd)                    
+ram:ram:ecc8    5f              MOV         E,A                                     
+ram:ram:ecc9    47              MOV         B,A                                     
+ram:ram:ecca    23              INX         HL                                      
+ram:ram:eccb    b7              ORA         A                                       
+ram:ram:eccc    7a              MOV         A,D                                     
+ram:ram:eccd    cad6ec          JZ          LAB_ram_ecd6                            
+                            LAB_ram_ecd0:                 ;XREF[1]:     ram:ecd3(j)
+                                                          ; FWD[2]:     ram:f7fe(R),ram:f7ff(R)
+ram:ram:ecd0    86              ADD         (HL=>DAT_ram_f7fe)                      
+ram:ram:ecd1    23              INX         HL                                      
+ram:ram:ecd2    1d              DCR         E                                       
+ram:ram:ecd3    c2d0ec          JNZ         LAB_ram_ecd0                            
+                            LAB_ram_ecd6:                 ;XREF[1]:     ram:eccd(j)
+ram:ram:ecd6    2f              CMA                                                 
+                                                          ; FWD[3]:     ram:f7fe(W),ram:f7ff(W),ram:f800(W)
+ram:ram:ecd7    77              MOV         (HL=>DAT_ram_f7ff),A                    
+ram:ram:ecd8    3e05            MVI         A,0x5                                   
+ram:ram:ecda    80              ADD         B                                       
+ram:ram:ecdb    47              MOV         B,A                                     
+ram:ram:ecdc    21faf7          LXI         HL,0xf7fa                               
+                            LAB_ram_ecdf:                 ;XREF[1]:     ram:eceb(j)
+                                                          ; FWD[2]:     ram:f7fa(R),ram:f7fb(R)
+ram:ram:ecdf    7e              MOV         A,(HL=>pktZZ)                           
+ram:ram:ece0    cd4386          CALL        SUB_ram_8643                            
+ram:ram:ece3    da22ec          JC          LAB_ram_ec22                            
+ram:ram:ece6    cdfced          CALL        FUN_ram_edfc                            ;undefined FUN_ram_edfc()
+ram:ram:ece9    23              INX         HL                                      
+ram:ram:ecea    05              DCR         B                                       
+ram:ram:eceb    c2dfec          JNZ         LAB_ram_ecdf                            
+ram:ram:ecee    21fcf7          LXI         HL,0xf7fc                               
+ram:ram:ecf1    cda08f          CALL        SUB_ram_8fa0                            
+ram:ram:ecf4    cd06ee          CALL        FUN_ram_ee06                            ;undefined FUN_ram_ee06()
+ram:ram:ecf7    cd06ee          CALL        FUN_ram_ee06                            ;undefined FUN_ram_ee06()
+ram:ram:ecfa    4f              MOV         C,A                                     
+ram:ram:ecfb    0c              INR         C                                       
+                            LAB_ram_ecfc:                 ;XREF[1]:     ram:ed00(j)
+ram:ram:ecfc    cd06ee          CALL        FUN_ram_ee06                            ;undefined FUN_ram_ee06()
+ram:ram:ecff    0d              DCR         C                                       
+ram:ram:ed00    c2fcec          JNZ         LAB_ram_ecfc                            
+ram:ram:ed03    af              XRA         A                                       
+ram:ram:ed04    30              SIM                                                 
+ram:ram:ed05    21fdf7          LXI         HL,0xf7fd                               
+ram:ram:ed08    4e              MOV         C,(HL=>DAT_ram_f7fd)                    
+ram:ram:ed09    23              INX         HL                                      
+ram:ram:ed0a    7e              MOV         A,(HL=>DAT_ram_f7fe)                    
+ram:ram:ed0b    b7              ORA         A                                       
+ram:ram:ed0c    c9              RET                                                 
+                            KILL:                         ;XREF[1]:     ram:ec12(j)
+ram:ram:ed0d    3e05            MVI         A,0x5                                   
+                            ;************************************************************************************************
+                            ;*                                           FUNCTION                                           *
+                            ;************************************************************************************************
+                            ;undefined ShortPacket()
+                                                          ;XREF[2]:     ram:ed2e(c),ram:ee8c(c)
+ram:ram:ed0f    cdf4ed          CALL        InitPacket                              ;undefined InitPacket()
+                            LAB_ram_ed12:                 ;XREF[2]:     ram:ed66(j),ram:ed75(j)
+ram:ram:ed12    cdc0ec          CALL        FUN_ram_ecc0                            ;undefined FUN_ram_ecc0()
+ram:ram:ed15    c8              RZ                                                  
+                            LAB_ram_ed16:                 ;XREF[1]:     ram:ed56(j)
+ram:ram:ed16    e6f0            ANI         0xf0                                    
+ram:ram:ed18    1f              RAR                                                 
+ram:ram:ed19    1f              RAR                                                 
+ram:ram:ed1a    1f              RAR                                                 
+ram:ram:ed1b    5f              MOV         E,A                                     
+ram:ram:ed1c    c330ec          JMP         ERROR                                   
+                            ;************************************************************************************************
+                            ;*                                           FUNCTION                                           *
+                            ;************************************************************************************************
+                            ;undefined DIRENT()
+                                                          ;XREF[2]:     ram:ec09(c),ram:ee48(c)
+ram:ram:ed1f    cdb587          CALL        SUB_ram_87b5                            
+ram:ram:ed22    cd91ec          CALL        PAUSE_100ms                             ;undefined PAUSE_100ms()
+ram:ram:ed25    219aec          LXI         HL,0xec9a                               
+ram:ram:ed28    37              STC                                                 
+ram:ram:ed29    cd1d19          CALL        SUB_ram_191d                            
+ram:ram:ed2c    3e07            MVI         A,0x7                                   
+ram:ram:ed2e    cd0fed          CALL        ShortPacket                             ;undefined ShortPacket()
+ram:ram:ed31    af              XRA         A                                       
+ram:ram:ed32    cdf4ed          CALL        InitPacket                              ;undefined InitPacket()
+ram:ram:ed35    361a            MVI         (HL=>STR_STAT),0x1a                     ;= "98N1DNN"
+ram:ram:ed37    23              INX         HL                                      
+ram:ram:ed38    1172ef          LXI         DE,0xef72                               
+ram:ram:ed3b    0609            MVI         B,0x9                                   
+ram:ram:ed3d    cdba41          CALL        SUB_ram_41ba                            
+ram:ram:ed40    060f            MVI         B,0xf                                   
+                            LAB_ram_ed42:                 ;XREF[1]:     ram:ed46(j)
+                                                          ; FWD[2]:     ram:ec9b(W),ram:ec9c(W)
+ram:ram:ed42    3620            MVI         (HL=>STR_STAT+1),0x20                   ;= "8N1DNN"
+                                                                                    ;= "N1DNN"
+ram:ram:ed44    23              INX         HL                                      
+ram:ram:ed45    05              DCR         B                                       
+ram:ram:ed46    c242ed          JNZ         LAB_ram_ed42                            
+ram:ram:ed49    3646            MVI         (HL=>STR_STAT+3),0x46                   ;= "1DNN"
+ram:ram:ed4b    23              INX         HL                                      
+ram:ram:ed4c    70              MOV         (HL=>STR_STAT+4),B                      ;= "DNN"
+                            ;************************************************************************************************
+                            ;*                                           FUNCTION                                           *
+                            ;************************************************************************************************
+                            ;undefined FUN_ram_ed4d()
+                                                          ;XREF[1]:     ram:ecad(c)
+ram:ram:ed4d    cdc0ec          CALL        FUN_ram_ecc0                            ;undefined FUN_ram_ecc0()
+ram:ram:ed50    47              MOV         B,A                                     
+ram:ram:ed51    3afcf7          LDA         (DAT_ram_f7fc)                          
+ram:ram:ed54    fe12            CPI         0x12                                    
+ram:ram:ed56    ca16ed          JZ          LAB_ram_ed16                            
+ram:ram:ed59    78              MOV         A,B                                     
+ram:ram:ed5a    b7              ORA         A                                       
+ram:ram:ed5b    c9              RET                                                 
+                            ;************************************************************************************************
+                            ;*                                           FUNCTION                                           *
+                            ;************************************************************************************************
+                            ;undefined SendOpenCMD_write()
+                                                          ;XREF[1]:     ram:ee82(c)
+ram:ram:ed5c    1e01            MVI         E,0x1                                   
+                            ;************************************************************************************************
+                            ;*                                           FUNCTION                                           *
+                            ;************************************************************************************************
+                            ;undefined SendOpenCMD()
+                                                          ;XREF[1]:     ram:eca3(c)
+ram:ram:ed5e    3e01            MVI         A,0x1                                   
+ram:ram:ed60    cdf4ed          CALL        InitPacket                              ;undefined InitPacket()
+ram:ram:ed63    77              MOV         (HL),A                                  
+ram:ram:ed64    23              INX         HL                                      
+ram:ram:ed65    73              MOV         (HL),E                                  
+ram:ram:ed66    c312ed          JMP         LAB_ram_ed12                            
+                            ;************************************************************************************************
+                            ;*                                           FUNCTION                                           *
+                            ;************************************************************************************************
+                            ;undefined SendFinalWriteChunk()
+                                                          ;XREF[1]:     ram:eead(c)
+ram:ram:ed69    d1              POP         DE                                      
+                            ;************************************************************************************************
+                            ;*                                           FUNCTION                                           *
+                            ;************************************************************************************************
+                            ;undefined SendWriteCMD()
+                                                          ;XREF[1]:     ram:eea3(c)
+ram:ram:ed6a    3e04            MVI         A,0x4                                   
+ram:ram:ed6c    cdf4ed          CALL        InitPacket                              ;undefined InitPacket()
+ram:ram:ed6f    71              MOV         (HL),C                                  
+ram:ram:ed70    23              INX         HL                                      
+ram:ram:ed71    41              MOV         B,C                                     
+ram:ram:ed72    cdba41          CALL        SUB_ram_41ba                            
+ram:ram:ed75    c312ed          JMP         LAB_ram_ed12                            
+                            LOAD:                         ;XREF[1]:     ram:ec16(j)
+ram:ram:ed78    cdcc2b          CALL        SUB_ram_2bcc                            
+ram:ram:ed7b    c225ec          JNZ         LAB_ram_ec25                            
+ram:ram:ed7e    212bec          LXI         HL,0xec2b                               
+ram:ram:ed81    2234ef          SHLD        (ETRAP)                                 
+ram:ram:ed84    cd012c          CALL        SUB_ram_2c01                            
+ram:ram:ed87    e5              PUSH        HL                                      
+ram:ram:ed88    cd88ec          CALL        FUN_ram_ec88                            ;undefined FUN_ram_ec88()
+ram:ram:ed8b    2a17f8          LHLD        (DAT_ram_f817)                          
+ram:ram:ed8e    45              MOV         B,L                                     
+ram:ram:ed8f    4c              MOV         C,H                                     
+ram:ram:ed90    69              MOV         L,C                                     
+ram:ram:ed91    60              MOV         H,B                                     
+ram:ram:ed92    22f4f7          SHLD        (DAT_ram_f7f4)                          
+ram:ram:ed95    0b              DCX         BC                                      
+ram:ram:ed96    5f              MOV         E,A                                     
+ram:ram:ed97    3c              INR         A                                       
+                            @l0:                          ;XREF[1]:     ram:ed9a(j)
+ram:ram:ed98    03              INX         BC                                      
+ram:ram:ed99    3d              DCR         A                                       
+ram:ram:ed9a    c298ed          JNZ         @l0                                     
+ram:ram:ed9d    57              MOV         D,A                                     
+ram:ram:ed9e    2115ee          LXI         HL,0xee15                               
+ram:ram:eda1    19              DAD         HL,DE                                   
+ram:ram:eda2    19              DAD         HL,DE                                   
+ram:ram:eda3    19              DAD         HL,DE                                   
+ram:ram:eda4    19              DAD         HL,DE                                   
+ram:ram:eda5    19              DAD         HL,DE                                   
+ram:ram:eda6    7e              MOV         A,(HL)                                  
+ram:ram:eda7    f5              PUSH        AF                                      
+ram:ram:eda8    113eee          LXI         DE,0xee3e                               
+ram:ram:edab    d5              PUSH        DE                                      
+ram:ram:edac    23              INX         HL                                      
+ram:ram:edad    5e              MOV         E,(HL)                                  
+ram:ram:edae    23              INX         HL                                      
+ram:ram:edaf    56              MOV         D,(HL)                                  
+ram:ram:edb0    d5              PUSH        DE                                      
+ram:ram:edb1    23              INX         HL                                      
+ram:ram:edb2    5e              MOV         E,(HL)                                  
+ram:ram:edb3    23              INX         HL                                      
+ram:ram:edb4    66              MOV         H,(HL)                                  
+ram:ram:edb5    6b              MOV         L,E                                     
+ram:ram:edb6    5e              MOV         E,(HL)                                  
+ram:ram:edb7    23              INX         HL                                      
+ram:ram:edb8    56              MOV         D,(HL)                                  
+ram:ram:edb9    60              MOV         H,B                                     
+ram:ram:edba    69              MOV         L,C                                     
+ram:ram:edbb    22f2f7          SHLD        (DAT_ram_f7f2)                          
+ram:ram:edbe    eb              XCHG                                                
+ram:ram:edbf    22f0f7          SHLD        (DAT_ram_f7f0)                          
+ram:ram:edc2    e5              PUSH        HL                                      
+ram:ram:edc3    cda882          CALL        SUB_ram_82a8                            
+ram:ram:edc6    da28ec          JC          LAB_ram_ec28                            
+ram:ram:edc9    21f8f7          LXI         HL,0xf7f8                               
+ram:ram:edcc    34              INR         (HL=>DAT_ram_f7f8)                      
+ram:ram:edcd    cda1ec          CALL        FUN_ram_eca1                            ;undefined FUN_ram_eca1()
+ram:ram:edd0    2af4f7          LHLD        (DAT_ram_f7f4)                          
+ram:ram:edd3    eb              XCHG                                                
+ram:ram:edd4    e1              POP         HL                                      
+ram:ram:edd5    3afcf7          LDA         (DAT_ram_f7fc)                          
+ram:ram:edd8    4f              MOV         C,A                                     
+ram:ram:edd9    0600            MVI         B,0x0                                   
+                            LAB_ram_eddb:                 ;XREF[1]:     ram:edf1(j)
+ram:ram:eddb    7a              MOV         A,D                                     
+ram:ram:eddc    b3              ORA         E                                       
+ram:ram:eddd    79              MOV         A,C                                     
+ram:ram:edde    32fcf7          STA         (DAT_ram_f7fc)                          
+ram:ram:ede1    c8              RZ                                                  
+ram:ram:ede2    b7              ORA         A                                       
+ram:ram:ede3    fca6ec          CM          FUN_ram_eca6                            ;undefined FUN_ram_eca6()
+ram:ram:ede6    1b              DCX         DE                                      
+ram:ram:ede7    e5              PUSH        HL                                      
+ram:ram:ede8    21fef7          LXI         HL,0xf7fe                               
+ram:ram:edeb    09              DAD         HL,BC                                   
+ram:ram:edec    7e              MOV         A,(HL=>DAT_ram_f7fe)                    
+ram:ram:eded    e1              POP         HL                                      
+ram:ram:edee    77              MOV         (HL),A                                  
+ram:ram:edef    23              INX         HL                                      
+ram:ram:edf0    0c              INR         C                                       
+ram:ram:edf1    c3dbed          JMP         LAB_ram_eddb                            
+                            ;************************************************************************************************
+                            ;*                                           FUNCTION                                           *
+                            ;************************************************************************************************
+                            ;undefined InitPacket()
+                                                          ;XREF[5]:     ram:ecaa(c),ram:ed0f(c),ram:ed32(c),ram:ed60(c),
+                                                          ;             ram:ed6c(c)
+ram:ram:edf4    21fcf7          LXI         HL,0xf7fc                               
+ram:ram:edf7    77              MOV         (HL=>DAT_ram_f7fc),A                    
+ram:ram:edf8    23              INX         HL                                      
+ram:ram:edf9    3600            MVI         (HL=>DAT_ram_f7fd),0x0                  
+ram:ram:edfb    c9              RET                                                 
+                            ;************************************************************************************************
+                            ;*                                           FUNCTION                                           *
+                            ;************************************************************************************************
+                            ;undefined FUN_ram_edfc()
+                                                          ;XREF[2]:     ram:ece6(c),ram:ee06(c)
+ram:ram:edfc    dbc9            IN          (DAT_io_c9)                             
+ram:ram:edfe    e680            ANI         0x80                                    
+ram:ram:ee00    c0              RNZ                                                 
+ram:ram:ee01    1e04            MVI         E,0x4                                   
+ram:ram:ee03    c330ec          JMP         ERROR                                   
+                            ;************************************************************************************************
+                            ;*                                           FUNCTION                                           *
+                            ;************************************************************************************************
+                            ;undefined FUN_ram_ee06()
+                                                          ;XREF[3]:     ram:ecf4(c),ram:ecf7(c),ram:ecfc(c)
+ram:ram:ee06    cdfced          CALL        FUN_ram_edfc                            ;undefined FUN_ram_edfc()
+ram:ram:ee09    cd1985          CALL        SUB_ram_8519                            
+ram:ram:ee0c    da22ec          JC          LAB_ram_ec22                            
+ram:ram:ee0f    c21fec          JNZ         LAB_ram_ec1f                            
+ram:ram:ee12    77              MOV         (HL),A                                  
+ram:ram:ee13    23              INX         HL                                      
+ram:ram:ee14    c9              RET                                                 
+ram:ram:ee15    a0              ANA         B                                       
+ram:ram:ee16    37              STC                                                 
+ram:ram:ee17    ee63            XRI         0x63                                    
+ram:ram:ee19    f6c0            ORI         0xc0                                    
+ram:ram:ee1b    24              INR         H                                       
+ram:ram:ee1c    ee61            XRI         0x61                                    
+ram:ram:ee1e    f680            ORI         0x80                                    
+ram:ram:ee20    27              DAA                                                 
+ram:ram:ee21    ee95            XRI         0x95                                    
+ram:ram:ee23    f2361a          JP          LAB_ram_1a36                            
+ram:ram:ee26    c9              RET                                                 
+ram:ram:ee27    af              XRA         A                                       
+ram:ram:ee28    77              MOV         (HL),A                                  
+ram:ram:ee29    23              INX         HL                                      
+ram:ram:ee2a    77              MOV         (HL),A                                  
+ram:ram:ee2b    2af2f7          LHLD        (DAT_ram_f7f2)                          
+ram:ram:ee2e    eb              XCHG                                                
+ram:ram:ee2f    2a61f6          LHLD        (DAT_ram_f661)                          
+ram:ram:ee32    19              DAD         HL,DE                                   
+ram:ram:ee33    2261f6          SHLD        (DAT_ram_f661)                          
+ram:ram:ee36    c9              RET                                                 
+ram:ram:ee37    2af0f7          LHLD        (DAT_ram_f7f0)                          
+ram:ram:ee3a    2263f6          SHLD        (DAT_ram_f663)                          
+ram:ram:ee3d    c9              RET                                                 
+ram:ram:ee3e    f1              POP         AF                                      
+ram:ram:ee3f    2af0f7          LHLD        (DAT_ram_f7f0)                          
+ram:ram:ee42    eb              XCHG                                                
+ram:ram:ee43    1b              DCX         DE                                      
+ram:ram:ee44    e1              POP         HL                                      
+ram:ram:ee45    c3ac2d          JMP         LAB_ram_2dac                            
+                            SAVE:                         ;XREF[1]:     ram:ec05(j)
+ram:ram:ee48    cd1fed          CALL        DIRENT                                  ;undefined DIRENT()
+ram:ram:ee4b    c225ec          JNZ         LAB_ram_ec25                            
+ram:ram:ee4e    3a4cf7          LDA         (DAT_ram_f74c)                          
+ram:ram:ee51    fe42            CPI         0x42                                    
+ram:ram:ee53    da2eec          JC          LAB_ram_ec2e                            
+ram:ram:ee56    fe45            CPI         0x45                                    
+ram:ram:ee58    d22eec          JNC         LAB_ram_ec2e                            
+ram:ram:ee5b    cdcc2b          CALL        SUB_ram_2bcc                            
+ram:ram:ee5e    ca1cec          JZ          LAB_ram_ec1c                            
+ram:ram:ee61    cd88ec          CALL        FUN_ram_ec88                            ;undefined FUN_ram_ec88()
+ram:ram:ee64    4f              MOV         C,A                                     
+ram:ram:ee65    3e02            MVI         A,0x2                                   
+ram:ram:ee67    91              SUB         C                                       
+ram:ram:ee68    c5              PUSH        BC                                      
+ram:ram:ee69    d5              PUSH        DE                                      
+ram:ram:ee6a    eb              XCHG                                                
+ram:ram:ee6b    cdd02c          CALL        AFTEREOF2                               
+ram:ram:ee6e    d1              POP         DE                                      
+ram:ram:ee6f    7d              MOV         A,L                                     
+ram:ram:ee70    93              SUB         E                                       
+ram:ram:ee71    6f              MOV         L,A                                     
+ram:ram:ee72    7c              MOV         A,H                                     
+ram:ram:ee73    9a              SBB         D                                       
+ram:ram:ee74    67              MOV         H,A                                     
+ram:ram:ee75    c1              POP         BC                                      
+ram:ram:ee76    0c              INR         C                                       
+ram:ram:ee77    23              INX         HL                                      
+                            @l0:                          ;XREF[1]:     ram:ee7a(j)
+ram:ram:ee78    2b              DCX         HL                                      
+ram:ram:ee79    0d              DCR         C                                       
+ram:ram:ee7a    c278ee          JNZ         @l0                                     
+ram:ram:ee7d    7d              MOV         A,L                                     
+ram:ram:ee7e    b4              ORA         H                                       
+ram:ram:ee7f    c8              RZ                                                  
+ram:ram:ee80    d5              PUSH        DE                                      
+ram:ram:ee81    e5              PUSH        HL                                      
+ram:ram:ee82    cd5ced          CALL        SendOpenCMD_write                       ;undefined SendOpenCMD_write()
+ram:ram:ee85    d1              POP         DE                                      
+ram:ram:ee86    e1              POP         HL                                      
+ram:ram:ee87    cd8fee          CALL        WriteChunks                             ;undefined WriteChunks()
+ram:ram:ee8a    3e02            MVI         A,0x2                                   
+ram:ram:ee8c    c30fed          JMP         ShortPacket                             ;undefined ShortPacket()
+                            ;************************************************************************************************
+                            ;*                                           FUNCTION                                           *
+                            ;************************************************************************************************
+                            ;undefined WriteChunks()
+                                                          ;XREF[2]:     ram:ee87(c),ram:eea8(j)
+ram:ram:ee8f    e5              PUSH        HL                                      
+ram:ram:ee90    e5              PUSH        HL                                      
+ram:ram:ee91    218000          LXI         HL,0x80                                 
+ram:ram:ee94    df              RST         RST3                                    
+ram:ram:ee95    d2abee          JNC         @l0                                     
+ram:ram:ee98    4d              MOV         C,L                                     
+ram:ram:ee99    44              MOV         B,H                                     
+ram:ram:ee9a    e1              POP         HL                                      
+ram:ram:ee9b    09              DAD         HL,BC                                   
+ram:ram:ee9c    e3              XTHL                                                
+ram:ram:ee9d    eb              XCHG                                                
+ram:ram:ee9e    0180ff          LXI         BC,0xff80                               
+ram:ram:eea1    09              DAD         HL,BC                                   
+ram:ram:eea2    e5              PUSH        HL                                      
+ram:ram:eea3    cd6aed          CALL        SendWriteCMD                            ;undefined SendWriteCMD()
+ram:ram:eea6    d1              POP         DE                                      
+ram:ram:eea7    e1              POP         HL                                      
+ram:ram:eea8    c38fee          JMP         WriteChunks                             
+                            @l0:                          ;XREF[1]:     ram:ee95(j)
+ram:ram:eeab    4b              MOV         C,E                                     
+ram:ram:eeac    e1              POP         HL                                      
+ram:ram:eead    c369ed          JMP         SendFinalWriteChunk                     ;undefined SendFinalWriteChunk()

@@ -21,6 +21,8 @@
 ;;;;
 ;;;; 100 & M10 both work
 ;;;; K85 builds but does NOT work
+;;;; 200 builds but does not work (but the original 200 binary is a bit different than this)
+;;;; NEC not started
 ;;;;
 
 	INCLUDE		"m100_common.S85"
@@ -427,8 +429,8 @@ SendPacket2:
 		CALL		SendPacket
 		MOV			B,A					; save A returned from SendPacket
 		LDA			pktTYPE				; read return packet type
-		CPI			ret_normal			; is it a normal return packet?
-		JZ			ParseErrorReturn	; it's supposed to be a DIRENT or READ return not a normal return
+		CPI			ret_normal			; is it a standard return packet?
+		JZ			ParseErrorReturn	; it's supposed to be a DIRENT or READ return not a standard return
 		MOV			A,B					; restore A retult from SendPacket
 		ORA			A					; if A = 0 set Z
 		RET
