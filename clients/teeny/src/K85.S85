@@ -60,6 +60,9 @@ ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
 KYBCNT			EQU		0xFF6B		; number of characters in keyboard buffer
 COMBUF			EQU		0xFFBE		; COM buffer 0x40 bytes
 
+; constants
+; i/o
+PIO_PORT_C		EQU		0xBB		; bits: 7:- 6:- 5:!DSR 4:!CTS 3:BCR 2:LPTBUSY 1:!LPTBUSY 0:CLK
 
 ; copied from M10
 ; grasping at straws since k85 not working

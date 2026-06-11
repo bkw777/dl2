@@ -35,3 +35,6 @@ ALTLCD			EQU		0xF7B0		; start of ALT LCD buffer
 KYBCNT			EQU		0xFD1E		; number of characters in keyboard buffer
 COMBUF			EQU		0xFFBB		; COM buffer 0x40 bytes
 
+; constants
+; i/o
+PIO_PORT_C		EQU		0xC9		; bits: 7:- 6:- 5:!DSR 4:!CTS 3:BCR 2:LPTBUSY 1:!LPTBUSY 0:CLK

@@ -1,15 +1,15 @@
 ; cpu opcodes
-opcode_IN	EQU		0xDB
-opcode_OUT	EQU		0xD3
+opcode_IN		EQU		0xDB
+opcode_OUT		EQU		0xD3
 opcode_LXI_B	EQU		0x01
 
 ; ascii
-ETX			EQU		0x03
-LF			EQU		0x0A
-FF			EQU		0x0C
-CR			EQU		0x0D
-ESC 		EQU		0x1B
-SPACE		EQU		0x20
+ETX				EQU		0x03
+LF				EQU		0x0A
+FF				EQU		0x0C
+CR				EQU		0x0D
+ESC 			EQU		0x1B
+SPACE			EQU		0x20
 
 ; vt52/screen control sequences
 ; the macro names match the terminfo field names
@@ -36,9 +36,9 @@ exit_attribute_mode MACRO
 	ENDM
 
 ; file types, attribute byte A for MKDIRENT
-FattrBA		EQU		0x80		; .BA files
-FattrDO		EQU		0xC0		; .DO files
-FattrCO		EQU		0xA0		; .CO files
+FattrBA			EQU		0x80		; .BA files
+FattrDO			EQU		0xC0		; .DO files
+FattrCO			EQU		0xA0		; .CO files
 ; file types, reg A for AFTEREOF2
 filetypeBA		EQU		0x01
 filetypeDO		EQU		0x02
@@ -56,6 +56,3 @@ _RST MACRO n
 rst_NextNonSpace	EQU		2		; RST 2 = get next non-whitespace char from M to A
 rst_CompareDEHL		EQU		3		; RST 3 = compare DE and HL
 rst_Print_A			EQU		4		; RST 4 = print A to LCD/LPT
-
-; i/o
-PIO_PORT_C			EQU		0xBB	; bits: 7:- 6:- 5:!DSR 4:!CTS 3:BCR 2:LPTBUSY 1:!LPTBUSY 0:CLK
