@@ -5,6 +5,10 @@
 
 ; M10 is working - reporduces the original binary which works
 
+; 100 vs M10 notes
+; https://github.com/LivingM100SIG/Living_M100SIG/blob/main/M100SIG/Lib-12-NEC-OLIVETTI/M10ROM.DO
+; says the M10 rs232 routines do not ignore rts/cts the way 100 does.
+
 ; see if it still works without changing the 100 code
 ; TODO test the M10 changes on 100. Does the M10 code improve on the original?
 ; Or are the changes needed for compatibility with the M100 main rom?
@@ -52,12 +56,6 @@ KYBCNT			EQU		0xFF6D		; number of characters in keyboard buffer
 ; The original TEENY for M10 has these differences from the 100 version.
 ; Other than the dsr check I don't know why. Unknown if these are required
 ; to make M10 work, or maybe improves on the 100 code or what.
-
-; Possible difference: the M100 version accepts a single 'Q' to exit.
-; M10 version requires "Q Q" because there needs to be something in the
-; filename part. This might be a difference in the main rom CKFN2 routines
-; or might be one of these.
-
 
 	IF REPRODUCE_ORIGINAL_BINARY
 CheckDSR_RET MACRO
