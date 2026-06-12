@@ -20,6 +20,7 @@
 ;;;; 100 & M10 both work
 ;;;; K85 builds but does NOT work
 ;;;; 200 builds but does not work (but the original 200 binary is a bit different than this anyway)
+;;;; ../orig/disasm/TNY200.S85 does build and reproduce the original binary exactly
 ;;;; NEC not started
 ;;;;
 
