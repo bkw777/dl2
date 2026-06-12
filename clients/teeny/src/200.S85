@@ -7,9 +7,11 @@
 
 ; routines
 PTILL0			EQU		0x11CC		; print null-terminated string at HL to screen
+FINDEOF			EQU		0x1A36		; find eof
 SET232			EQU		0x191D		; set RS232 parameters to STAT string pointed to by HL
 FINDFN			EQU		0x2BCC		; search dir for filename matching FNAME
-SCNEMP			EQU		0x2C09		; scan for an empty directory entry
+;SCNEMP			EQU		0x2C09		; scan for an empty directory entry
+SCNEMP			EQU		0x2C01		; original teeny 200 uses this    <<< FIXUP
 RESETFPS		EQU		0x2C62		; reset file pointers
 AFTEREOF2		EQU		0x2CD0		; Advance HL past end of file, type A
 MKDIRENT		EQU		0x2DAC		; insert entry into directory
@@ -31,11 +33,11 @@ DOFILES			EQU		0xF661		; pointer to start of DO files
 COFILES			EQU		0xF663		; pointer to start of CO files
 KYBUF			EQU		0xEF70		; keyboard buffer
 FX1				EQU		0xF74C		; unknown, possibly file size or other metadata
-ALTLCD			EQU		0xF7B0		; start of ALT LCD buffer
+ALTLCD			EQU		0xF7B0		; start of ALT LCD buffer, 640 bytes
 KYBCNT			EQU		0xFD1E		; number of characters in keyboard buffer
 
 ; constants
-PIO_PORT_C		EQU		0xC9		; COM & LPT flow control bits
+FLOWCTL_PORT	EQU		0xC9		; COM & LPT flow control bits
 DSR_BITMASK		EQU		0x80
 COM_STAT_STRING MACRO
 	DB "98N1DNN"

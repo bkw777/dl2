@@ -38,7 +38,7 @@
 	ENDIF
 
 ; TINY uses ALTCD for it's variables and packet buffer
-; FCC0 start of ALTLCD
+; start of ALTLCD							; FCC0
 wFD00			EQU		ALTLCD + 0x40		; FD00
 wFD02			EQU		ALTLCD + 0x42		; FD02
 wFD04			EQU		ALTLCD + 0x44		; FD04
@@ -52,14 +52,11 @@ pktDATA			EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data (length varies 0-?? 64? u
 ; position varies but also a single byte checksum comes after pktDATA, and is the final byte of the packet
 
 wFD27			EQU		ALTLCD + 0x67		; FD27
-; FDFF end of ALTLCD
+; end of ALTLCD			ALTLCD + 0x013F		; FDFF
 
-; this location is confusing
-; both 100 and 200 use the same FF80
+; confusing location, both 100 and 200 use the same FF80
 ; On 100 FF80 is within COMBUF: FF46-FF85
 ; on 200 FF80 is before COMBUF: FFBB-FFFA
-; I think TINY started on 100, and everything else was ported lter,
-; so maybe the porter just missed it and it still worked?
 ;writeDLEN		EQU		COMBUF+0x3A			; FF80 COMBUF is 0x40 bytes, so this is 6 bytes before the end of COMBUF
 writeDLEN		EQU		0xFF80
 
@@ -85,11 +82,11 @@ open_mode_read		EQU		0x03
 RW_Chunk_Size		EQU		0x80			; Read/Write chunk size. May use anything from 1 to 252.
 
 ; constants
-	IFNDEF PIO_PORT_C
-PIO_PORT_C		EQU		0xBB				; COM & LPT flow control bits
+	IFNDEF FLOWCTL_PORT
+FLOWCTL_PORT		EQU		0xBB				; COM & LPT flow control bits
 	ENDIF
 	IFNDEF DSR_BITMASK
-DSR_BITMASK		EQU		0x20
+DSR_BITMASK			EQU		0x20
 	ENDIF
 	IFNDEF COM_STAT_STRING
 COM_STAT_STRING MACRO
@@ -209,7 +206,7 @@ ERROR:
 		MOV 		B,H
 		MOV 		C,L
 		LHLD 		wFD00
-		CALL		MASDEL
+		CALL		MASDEL			; delete BC bytes @ HL
 		POP 		D
 @show:
 		LXI			H,STR_ErrCodes	; point to start of string of all 2-char err codes
@@ -285,7 +282,7 @@ CheckDSR_RET MACRO
 	ENDM
 	ENDIF
 CheckDSR:
-		IN			PIO_PORT_C		; read RS232 flow control pins
+		IN			FLOWCTL_PORT	; read RS232 flow control pins
 		ANI			DSR_BITMASK		; check !DSR
 		CheckDSR_RET				; if !DSR then return
 		MVI			E,eNR			; set NR error
@@ -534,7 +531,7 @@ LOAD:
 		LDA			pktTYPE
 		MOV			C,A
 		MVI			B,0x00
-jF51B:
+@l1:
 		MOV			A,D
 		ORA			E
 		MOV			A,C
@@ -551,7 +548,8 @@ jF51B:
 		MOV			M,A
 		INX			H
 		INR			C
-		JMP			jF51B
+		JMP			@l1
+
 jF534:
 		MVI			E,open_mode_read
 		CALL		SendOpenCMD

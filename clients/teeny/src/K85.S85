@@ -55,7 +55,7 @@ KYBUF			EQU		0xF68C		; keyboard buffer
 DOFILES			EQU		0xFBC0		; pointer to start of DO files
 COFILES			EQU		0xFBC2		; pointer to start of CO files
 FX1				EQU		0xFCAB		; unknown, possibly file size or other metadata
-ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer
+ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer, 320 bytes
 KYBCNT			EQU		0xFF6B		; number of characters in keyboard buffer
 
 ; copied from M10

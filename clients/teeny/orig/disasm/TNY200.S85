@@ -1,0 +1,549 @@
+; disassembly of original TEENY for 200
+
+; Builds and reproduces the original binary exactly
+
+; build
+; z88dk-z80asm -m8085 -no-synth -b -o=TNY200.CO TNY200.S85 && z88dk-z80asm -m8085 -no-synth -DPRGLEN=$(wc -c <TNY200.CO) -b -o=TNY200.CO TNY200.S85
+
+; verify
+; cmp -l -b TNY200.CO ../TNY200.CO && echo SAME || echo FAIL
+
+	INCLUDE		"../../src/m100_common.S85"
+	INCLUDE		"../../src/200.S85"
+
+; TINY uses ALTCD for it's variables and packet buffer
+; F7B0 start of ALTLCD							; F7B0
+DAT_ram_f7f0		EQU		ALTLCD + 0x40		; F7F0
+DAT_ram_f7f2		EQU		ALTLCD + 0x42		; F7F2
+DAT_ram_f7f4		EQU		ALTLCD + 0x44		; F7F4
+StackPointer		EQU		ALTLCD + 0x46		; F7F6
+DAT_ram_f7f8		EQU		ALTLCD + 0x48		; F7F8  word but only ever stores a byte
+; TPDD packet
+pktZZ				EQU		ALTLCD + 0x4A		; F7FA  tpdd packet preamble "ZZ"
+pktTYPE				EQU		ALTLCD + 0x4C		; F7FC  tpdd packet command or return type
+pktDLEN				EQU		ALTLCD + 0x4D		; F7FD  tpdd packet data length
+pktDATA				EQU		ALTLCD + 0x4E		; F7FE  tpdd packet data (length varies 0-?? 64? up to 252 is possible & legal but idk yet what TEENY does)
+; position varies but also a single byte checksum comes after pktDATA, and is the final byte of the packet
+
+DAT_ram_f817		EQU		ALTLCD + 0x67		; F817
+; end of ALTLCD				ALTLCD + 0x027F		; FA2F
+
+; confusing location, both 100 and 200 use the same FF80
+; On 100 FF80 is within COMBUF: FF46-FF85
+; on 200 FF80 is before COMBUF: FFBB-FFFA
+;writeDLEN			EQU		COMBUF+0x3A			; FF80 COMBUF is 0x40 bytes, so this is 6 bytes before the end of COMBUF
+writeDLEN			EQU		0xFF80
+
+; TPDD
+ZZ					EQU		0x5A5A				; packet start / preamble, really 2 consecutive 'Z', not a int16 number
+
+req_dirent			EQU		0x00
+req_open			EQU		0x01
+req_close			EQU		0x02
+req_read			EQU		0x03
+req_write			EQU		0x04
+req_delete			EQU		0x05
+req_status			EQU		0x07
+
+ret_read			EQU		0x10
+ret_dirent			EQU		0x11
+ret_normal			EQU		0x12
+
+open_mode_write		EQU		0x01
+open_mode_append	EQU		0x02
+open_mode_read		EQU		0x03
+
+RW_Chunk_Size		EQU		0x80			; Read/Write chunk size. May use anything from 1 to 252.
+
+;------------------------------------------------------------------------------
+; ORG & CO Header works backwards from HIMEM-PRGLEN.
+; PRGLEN has to be supplied from outside via -DPRGLEN=len.
+; If no PRGLEN then build with default ORG 0 and no CO header.
+	IFDEF PRGLEN
+	;--------------------------------------------------------------------------
+	; ORG
+	;--------------------------------------------------------------------------
+	IFNDEF HIMEM
+HIMEM		EQU		MAXRAM
+	ENDIF
+
+	ORG HIMEM-PRGLEN-6			; entry minus length of header
+
+	;--------------------------------------------------------------------------
+	; .CO HEADER
+	;--------------------------------------------------------------------------
+	DW PRGTOP
+	DW PRGLEN
+	DW PRGEXE
+	ENDIF ; PRGLEN
+;------------------------------------------------------------------------------
+
+
+;------------------------------------------------------------------------------
+PRGTOP:
+PRGEXE:
+	LXI			H,0x0000
+	DAD			SP
+	SHLD		StackPointer
+	LXI			H,ZZ
+	SHLD		pktZZ
+MAIN:
+	LHLD		StackPointer
+	SPHL
+	XRA			A
+	STA			DAT_ram_f7f8
+	LXI			H,MAIN
+	PUSH		H
+	LXI			H,STR_Prompt
+	CALL		PTILL0
+	STA			KYBCNT
+	CALL		INLIN
+	LXI			H,errNM
+	SHLD		ETRAP
+	LXI			H,KYBUF+1
+	MVI			M,'"'
+	CALL		CKFN2
+	CALL		RESETFPS
+	LDA			KYBUF
+	CPI			'Q'
+	JZ			MENU
+	CPI			'S'
+	JZ			SAVE
+	PUSH		PSW
+	CALL		DIRENT
+	JZ			errFF
+	POP			PSW
+	SUI			'K'
+	JZ			KILL
+	DCR			A
+	JZ			LOAD
+
+	MVI			E,0x03
+	db			opcode_LXI_B
+errFF:
+	MVI			E,0x00
+	db			opcode_LXI_B
+errCM:
+	MVI			E,0x06
+	db			opcode_LXI_B
+errIO:
+	MVI			E,0x08
+	db			opcode_LXI_B
+errAE:
+	MVI			E,0x10
+	db			opcode_LXI_B
+errOM:
+	MVI			E,0x12
+	db			opcode_LXI_B
+errFL:
+	MVI			E,0x01
+	db			opcode_LXI_B
+errNM:
+	MVI			E,0x14
+
+ERROR:
+	LDA			DAT_ram_f7f8
+	ORA			A
+	JZ			@show
+	PUSH		D
+	LHLD		DAT_ram_f7f2
+	MOV			B,H
+	MOV			C,L
+	LHLD		DAT_ram_f7f0
+	CALL		MASDEL
+	POP			D
+@show:
+	LXI			H,STR_ErrCodes
+	MVI			D,0x0
+	DAD			D
+	MOV			A,M
+	RST			rst_Print_A
+	RST			rst_NextNonSpace
+	RST			rst_Print_A
+	LXI			H,STR_ErrMsg
+	CALL		PTILL0
+	JMP			MAIN
+
+STR_ErrCodes:
+	DB			"FFLSNRCMIOWPDFNDAEOMNM"
+
+STR_Prompt:
+	DB			"> C FFFFFF.XX (C=KLSQ)",CR,LF,"> ",0
+
+FUN_ram_ec88:
+	LDA			FX1
+	SUI			0x43
+	RP
+	MVI			A,0x2
+	RET
+
+PAUSE_100ms:
+	MVI			D,0x2e
+@l0:
+	DCX			D
+	MOV			A,D
+	ORA			E
+	JNZ			@l0
+	RET
+
+STR_STAT:
+	COM_STAT_STRING
+
+FUN_ram_eca1:
+	MVI			E,0x3
+	CALL		SendOpenCMD
+FUN_ram_eca6:
+	PUSH		H
+	PUSH		D
+	MVI			A,0x3
+	CALL		InitPacket
+	CALL		SendPacket2
+	XRA			A
+	MOV			B,A
+	MOV			C,A
+	STA			pktTYPE
+	POP			D
+	POP			H
+	RET
+
+STR_ErrMsg:
+	DB			" Err",CR,LF,0
+
+SendPacket:
+	LXI			H,pktTYPE
+	MOV			A,M
+	INX			H
+	ADD			M
+	MOV			D,A
+	MOV			A,M
+	MOV			E,A
+	MOV			B,A
+	INX			H
+	ORA			A
+	MOV			A,D
+	JZ			@endpkt
+@l0:
+	ADD			M
+	INX			H
+	DCR			E
+	JNZ			@l0
+@endpkt:
+	CMA
+	MOV			M,A
+	MVI			A,0x5
+	ADD			B
+	MOV			B,A
+	LXI			H,pktZZ
+@send_byte:
+	MOV			A,M
+	CALL		SND232
+	JC			errIO
+	CALL		CheckDSR
+	INX			H
+	DCR			B
+	JNZ			@send_byte
+	LXI			H,pktTYPE
+	CALL		INT1D
+	CALL		ReadSerialByteAppendM
+	CALL		ReadSerialByteAppendM
+	MOV			C,A
+	INR			C
+@read_byte:
+	CALL		ReadSerialByteAppendM
+	DCR			C
+	JNZ			@read_byte
+	XRA			A
+	SIM
+	LXI			H,pktDLEN
+	MOV			C,M
+	INX			H
+	MOV			A,M
+	ORA			A
+	RET
+
+KILL:
+	MVI			A,0x5
+ShortPacket:
+	CALL		InitPacket
+jSendPacket:
+	CALL		SendPacket
+	RZ
+ParseErrorReturn:
+	ANI			0xf0
+	RAR
+	RAR
+	RAR
+	MOV			E,A
+	JMP			ERROR
+
+DIRENT:
+	CALL		COMOFF
+	CALL		PAUSE_100ms
+	LXI			H,STR_STAT
+	STC
+	CALL		SET232
+	MVI			A,0x7
+	CALL		ShortPacket
+	XRA			A
+	CALL		InitPacket
+	MVI			M,0x1a
+	INX			H
+	LXI			D,KYBUF+2
+	MVI			B,0x9
+	CALL		D2H4Bup
+	MVI			B,0xf
+@l0:
+	MVI			M,0x20
+	INX			H
+	DCR			B
+	JNZ			@l0
+	MVI			M,0x46
+	INX			H
+	MOV			M,B
+SendPacket2:
+	CALL		SendPacket
+	MOV			B,A
+	LDA			pktTYPE
+	CPI			0x12
+	JZ			ParseErrorReturn
+	MOV			A,B
+	ORA			A
+	RET
+
+SendOpenCMD_write:
+	MVI			E,0x1
+SendOpenCMD:
+	MVI			A,0x1
+	CALL		InitPacket
+	MOV			M,A
+	INX			H
+	MOV			M,E
+	JMP			jSendPacket
+
+SendFinalWriteChunk:
+	POP			D
+SendWriteCMD:
+	MVI			A,0x4
+	CALL		InitPacket
+	MOV			M,C
+	INX			H
+	MOV			B,C
+	CALL		D2H4Bup
+	JMP			jSendPacket
+
+LOAD:
+	CALL		FINDFN
+	JNZ			errAE
+	LXI			H,errFL
+	SHLD		ETRAP
+	CALL		SCNEMP
+	PUSH		H
+	CALL		FUN_ram_ec88
+	LHLD		DAT_ram_f817
+	MOV			B,L
+	MOV			C,H
+	MOV			L,C
+	MOV			H,B
+	SHLD		DAT_ram_f7f4
+	DCX			B
+	MOV			E,A
+	INR			A
+@l0:
+	INX			B
+	DCR			A
+	JNZ			@l0
+	MOV			D,A
+	LXI			H,jEE15
+	DAD			D
+	DAD			D
+	DAD			D
+	DAD			D
+	DAD			D
+	MOV			A,M
+	PUSH		PSW
+	LXI			D,jEE3E
+	PUSH		D
+	INX			H
+	MOV			E,M
+	INX			H
+	MOV			D,M
+	PUSH		D
+	INX			H
+	MOV			E,M
+	INX			H
+	MOV			H,M
+	MOV			L,E
+	MOV			E,M
+	INX			H
+	MOV			D,M
+	MOV			H,B
+	MOV			L,C
+	SHLD		DAT_ram_f7f2
+	XCHG
+	SHLD		DAT_ram_f7f0
+	PUSH		H
+	CALL		MAKHOL
+	JC			errOM
+	LXI			H,DAT_ram_f7f8
+	INR			M
+	CALL		FUN_ram_eca1
+	LHLD		DAT_ram_f7f4
+	XCHG
+	POP			H
+	LDA			pktTYPE
+	MOV			C,A
+	MVI			B,0x0
+@l1:
+	MOV			A,D
+	ORA			E
+	MOV			A,C
+	STA			pktTYPE
+	RZ
+	ORA			A
+	CM			FUN_ram_eca6
+	DCX			D
+	PUSH		H
+	LXI			H,pktDATA
+	DAD			B
+	MOV			A,M
+	POP			H
+	MOV			M,A
+	INX			H
+	INR			C
+	JMP			@l1
+
+InitPacket:
+	LXI			H,pktTYPE
+	MOV			M,A
+	INX			H
+	MVI			M,0x0
+	RET
+
+CheckDSR:
+	IN			FLOWCTL_PORT
+	ANI			DSR_BITMASK
+	RNZ
+	MVI			E,0x4
+	JMP			ERROR
+
+ReadSerialByteAppendM:
+	CALL		CheckDSR
+	CALL		RCV232
+	JC			errIO
+	JNZ			errCM
+	MOV			M,A
+	INX			H
+	RET
+
+jEE15:
+	ANA			B
+	STC
+	XRI			0x63
+	ORI			0xc0
+	INR			H
+	XRI			0x61
+	ORI			0x80
+	DAA
+	XRI			0x95
+
+; yet another z88dk bug - outputs C3 (JMP) for both JP and JMP
+;	JP			FINDEOF
+opcode_JP		EQU		0xF2
+	DB opcode_JP
+	DW FINDEOF
+
+	RET
+
+jEE27:
+	XRA			A
+	MOV			M,A
+	INX			H
+	MOV			M,A
+	LHLD		DAT_ram_f7f2
+	XCHG
+	LHLD		DOFILES
+	DAD			D
+	SHLD		DOFILES
+	RET
+
+jEE37:
+	LHLD		DAT_ram_f7f0
+	SHLD		COFILES
+	RET
+
+jEE3E:
+	POP			PSW
+	LHLD		DAT_ram_f7f0
+	XCHG
+	DCX			D
+	POP			H
+	JMP			MKDIRENT
+
+SAVE:
+	CALL		DIRENT
+	JNZ			errAE
+	LDA			FX1
+	CPI			0x42
+	JC			errNM
+	CPI			0x45
+	JNC			errNM
+	CALL		FINDFN
+	JZ			errFF
+	CALL		FUN_ram_ec88
+	MOV			C,A
+	MVI			A,0x2
+	SUB			C
+	PUSH		B
+	PUSH		D
+	XCHG
+	CALL		AFTEREOF2
+	POP			D
+	MOV			A,L
+	SUB			E
+	MOV			L,A
+	MOV			A,H
+	SBB			D
+	MOV			H,A
+	POP			B
+	INR			C
+	INX			H
+@l0:
+	DCX			H
+	DCR			C
+	JNZ			@l0
+	MOV			A,L
+	ORA			H
+	RZ
+	PUSH		D
+	PUSH		H
+	CALL		SendOpenCMD_write
+	POP			D
+	POP			H
+	CALL		WriteChunks
+	MVI			A,0x2
+	JMP			ShortPacket
+
+WriteChunks:
+	PUSH		H
+	PUSH		H
+	LXI			H,RW_Chunk_Size
+	RST			rst_CompareDEHL
+	JNC			@l0
+	MOV			C,L
+	MOV			B,H
+	POP			H
+	DAD			B
+	XTHL
+	XCHG
+	LXI			B,writeDLEN
+	DAD			B
+	PUSH		H
+	CALL		SendWriteCMD
+	POP			D
+	POP			H
+	JMP			WriteChunks
+@l0:
+	MOV			C,E
+	POP			H
+	JMP			SendFinalWriteChunk
+PRGEND:
