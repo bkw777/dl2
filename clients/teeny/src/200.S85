@@ -10,8 +10,7 @@ PTILL0			EQU		0x11CC		; print null-terminated string at HL to screen
 FINDEOF			EQU		0x1A36		; find eof
 SET232			EQU		0x191D		; set RS232 parameters to STAT string pointed to by HL
 FINDFN			EQU		0x2BCC		; search dir for filename matching FNAME
-;SCNEMP			EQU		0x2C09		; scan for an empty directory entry
-SCNEMP			EQU		0x2C01		; original teeny 200 uses this    <<< FIXUP
+SCNEMP			EQU		0x2C01		; scan for an empty directory entry
 RESETFPS		EQU		0x2C62		; reset file pointers
 AFTEREOF2		EQU		0x2CD0		; Advance HL past end of file, type A
 MKDIRENT		EQU		0x2DAC		; insert entry into directory
