@@ -4,11 +4,10 @@
 ; This disassembly by Brian K. White
 ;
 ; build with:
-;	z88dk-z80asm -m8085 -no-synth -DMODEL_100 -b -o=TEENY.CO TEENY.S85
-;	n=$$(wc -c <TEENY.CO)
-;	z88dk-z80asm -m8085 -no-synth -DMODEL_100 -DPRGLEN=$n -b -o=TEENY.CO TEENY.S85
+;	z88dk-z80asm -m8085_strict -no-synth -DMODEL_100 -b -o=TEENY.CO TEENY.S85 && \
+;	z88dk-z80asm -m8085_strict -no-synth -DMODEL_100 -DPRGLEN=$(wc -c <TEENY.CO) -b -o=TEENY.CO TEENY.S85
 ;
-; Currently builds for 100, K85, M10
+; Currently builds for 100, K85, M10, 200
 ; $ make 100
 ; or
 ; build & verify that the 100 or M10 build reproduces the original exactly
@@ -16,10 +15,10 @@
 ; $ make verify_M10
 
 ;;;;
-;;;; 100 & M10 both work
-;;;; K85 builds but does NOT work
-;;;; 200 builds but does not work (but the original 200 binary is a bit different than this anyway)
-;;;; ../orig/disasm/TNY200.S85 does build and reproduce the original binary exactly
+;;;; 100 works
+;;;; M10 works
+;;;; K85 works
+;;;; 200 testing, but ../orig/disasm/TNY200.S85 works
 ;;;; NEC not started
 ;;;;
 
@@ -605,11 +604,11 @@ FtypeTable:
 	DW jBAFILE
 	DW BAFILES
 
-jDOFILE: ; F55B
+jDOFILE:
 		MVI			M,0x1A
 		RET
 
-jBAFILE: ; F55E
+jBAFILE:
 		XRA			A
 		MOV			M,A
 		INX			H
@@ -621,7 +620,7 @@ jBAFILE: ; F55E
 		SHLD		DOFILES
 		RET
 
-jCOFILE: ; F56E
+jCOFILE:
 		LHLD		wFD00
 		SHLD		COFILES
 		RET
