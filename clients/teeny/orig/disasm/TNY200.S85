@@ -1,9 +1,9 @@
-; disassembly of original TEENY for 200
+; Disassembly of original TEENY for 200
 
 ; Builds and reproduces the original binary exactly
 
 ; build
-; z88dk-z80asm -m8085 -no-synth -b -o=TNY200.CO TNY200.S85 && z88dk-z80asm -m8085 -no-synth -DPRGLEN=$(wc -c <TNY200.CO) -b -o=TNY200.CO TNY200.S85
+; z88dk-z80asm -m8085_strict -no-synth -b -o=TNY200.CO TNY200.S85 && z88dk-z80asm -m8085_strict -no-synth -DPRGLEN=$(wc -c <TNY200.CO) -b -o=TNY200.CO TNY200.S85
 
 ; verify
 ; cmp -l -b TNY200.CO ../TNY200.CO && echo SAME || echo FAIL
@@ -11,28 +11,30 @@
 	INCLUDE		"../../src/m100_common.S85"
 	INCLUDE		"../../src/200.S85"
 
-; TINY uses ALTCD for it's variables and packet buffer
+; TINY uses ALTCD for it's variables and packet buffer.
+; The location and size of ALTLCD is different on 100 vs 200,
+; but these variables are the same on both, relative offsets to ALTLCD.
+
 ; F7B0 start of ALTLCD							; F7B0
 DAT_ram_f7f0		EQU		ALTLCD + 0x40		; F7F0
 DAT_ram_f7f2		EQU		ALTLCD + 0x42		; F7F2
-DAT_ram_f7f4		EQU		ALTLCD + 0x44		; F7F4
+FileSize			EQU		ALTLCD + 0x44		; F7F4
 StackPointer		EQU		ALTLCD + 0x46		; F7F6
 DAT_ram_f7f8		EQU		ALTLCD + 0x48		; F7F8  word but only ever stores a byte
 ; TPDD packet
-pktZZ				EQU		ALTLCD + 0x4A		; F7FA  tpdd packet preamble "ZZ"
-pktTYPE				EQU		ALTLCD + 0x4C		; F7FC  tpdd packet command or return type
-pktDLEN				EQU		ALTLCD + 0x4D		; F7FD  tpdd packet data length
-pktDATA				EQU		ALTLCD + 0x4E		; F7FE  tpdd packet data (length varies 0-?? 64? up to 252 is possible & legal but idk yet what TEENY does)
-; position varies but also a single byte checksum comes after pktDATA, and is the final byte of the packet
+pktZZ				EQU		ALTLCD + 0x4A		; F7FA  2 bytes, tpdd packet preamble "ZZ"
+pktTYPE				EQU		ALTLCD + 0x4C		; F7FC  1 byte,  tpdd packet command or return type
+pktDLEN				EQU		ALTLCD + 0x4D		; F7FD  1 byte,  tpdd packet data length field
+pktDATA				EQU		ALTLCD + 0x4E		; F7FE  0 to RW_Chunk_Size bytes, tpdd packet data
+; Position varies: 1 byte, tpdd packet checksum, comes after pktDATA, and is the final byte of the packet
 
-DAT_ram_f817		EQU		ALTLCD + 0x67		; F817
+direntFSIZE			EQU		pktDATA + 0x19		; F817
 ; end of ALTLCD				ALTLCD + 0x027F		; FA2F
 
-; confusing location, both 100 and 200 use the same FF80
-; On 100 FF80 is within COMBUF: FF46-FF85
-; on 200 FF80 is before COMBUF: FFBB-FFFA
-;writeDLEN			EQU		COMBUF+0x3A			; FF80 COMBUF is 0x40 bytes, so this is 6 bytes before the end of COMBUF
-writeDLEN			EQU		0xFF80
+; Curious location, both 100 and 200 use the same FF80
+; On 100 FF80 is within COMBUF : FF46-FF85
+; on 200 FF80 is outside COMBUF: FFBB-FFFA
+writeDLEN			EQU		0xFF80				; 1 byte, DLEN field of a tpdd req_write packet (idk why not pktDLEN)
 
 ; TPDD
 ZZ					EQU		0x5A5A				; packet start / preamble, really 2 consecutive 'Z', not a int16 number
@@ -53,7 +55,7 @@ open_mode_write		EQU		0x01
 open_mode_append	EQU		0x02
 open_mode_read		EQU		0x03
 
-RW_Chunk_Size		EQU		0x80			; Read/Write chunk size. May use anything from 1 to 252.
+RW_Chunk_Size		EQU		0x80				; Read/Write chunk size. tpdd allows 0 to 252. (255-overhead)
 
 ;------------------------------------------------------------------------------
 ; ORG & CO Header works backwards from HIMEM-PRGLEN.
@@ -170,9 +172,9 @@ STR_ErrCodes:
 STR_Prompt:
 	DB			"> C FFFFFF.XX (C=KLSQ)",CR,LF,"> ",0
 
-FUN_ram_ec88:
+GetFtypeX:
 	LDA			FX1
-	SUI			0x43
+	SUI			'C'
 	RP
 	MVI			A,0x2
 	RET
@@ -338,13 +340,13 @@ LOAD:
 	SHLD		ETRAP
 	CALL		SCNEMP
 	PUSH		H
-	CALL		FUN_ram_ec88
-	LHLD		DAT_ram_f817
+	CALL		GetFtypeX
+	LHLD		direntFSIZE
 	MOV			B,L
 	MOV			C,H
 	MOV			L,C
 	MOV			H,B
-	SHLD		DAT_ram_f7f4
+	SHLD		FileSize
 	DCX			B
 	MOV			E,A
 	INR			A
@@ -353,7 +355,7 @@ LOAD:
 	DCR			A
 	JNZ			@l0
 	MOV			D,A
-	LXI			H,jEE15
+	LXI			H,FtypeTable
 	DAD			D
 	DAD			D
 	DAD			D
@@ -361,7 +363,7 @@ LOAD:
 	DAD			D
 	MOV			A,M
 	PUSH		PSW
-	LXI			D,jEE3E
+	LXI			D,MkRamDirent
 	PUSH		D
 	INX			H
 	MOV			E,M
@@ -387,7 +389,7 @@ LOAD:
 	LXI			H,DAT_ram_f7f8
 	INR			M
 	CALL		FUN_ram_eca1
-	LHLD		DAT_ram_f7f4
+	LHLD		FileSize
 	XCHG
 	POP			H
 	LDA			pktTYPE
@@ -435,26 +437,22 @@ ReadSerialByteAppendM:
 	INX			H
 	RET
 
-jEE15:
-	ANA			B
-	STC
-	XRI			0x63
-	ORI			0xc0
-	INR			H
-	XRI			0x61
-	ORI			0x80
-	DAA
-	XRI			0x95
+FtypeTable:
+	DB			FattrCO
+	DW			jCOFILE
+	DW			COFILES
+	DB			FattrDO
+	DW			jDOFILE
+	DW			DOFILES
+	DB			FattrBA
+	DW			jBAFILE
+	DW			BAFILES
 
-; yet another z88dk bug - outputs C3 (JMP) for both JP and JMP
-;	JP			FINDEOF
-opcode_JP		EQU		0xF2
-	DB opcode_JP
-	DW FINDEOF
-
+jDOFILE:
+	MVI			M,0x1A
 	RET
 
-jEE27:
+jBAFILE:
 	XRA			A
 	MOV			M,A
 	INX			H
@@ -466,12 +464,12 @@ jEE27:
 	SHLD		DOFILES
 	RET
 
-jEE37:
+jCOFILE:
 	LHLD		DAT_ram_f7f0
 	SHLD		COFILES
 	RET
 
-jEE3E:
+MkRamDirent:
 	POP			PSW
 	LHLD		DAT_ram_f7f0
 	XCHG
@@ -483,13 +481,13 @@ SAVE:
 	CALL		DIRENT
 	JNZ			errAE
 	LDA			FX1
-	CPI			0x42
+	CPI			'B'
 	JC			errNM
-	CPI			0x45
+	CPI			'E'
 	JNC			errNM
 	CALL		FINDFN
 	JZ			errFF
-	CALL		FUN_ram_ec88
+	CALL		GetFtypeX
 	MOV			C,A
 	MVI			A,0x2
 	SUB			C

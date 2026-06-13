@@ -40,9 +40,9 @@ FattrBA			EQU		0x80		; .BA files
 FattrDO			EQU		0xC0		; .DO files
 FattrCO			EQU		0xA0		; .CO files
 ; file types, reg A for AFTEREOF2
-filetypeBA		EQU		0x01
-filetypeDO		EQU		0x02
-filetypeCO		EQU		0x03
+ftypeBA		EQU		0x00
+ftypeDO		EQU		0x01
+ftypeCO		EQU		0x02
 
 ; z88dk-z80asm < db5c165 (20260602) only accepts the zilog syntax for RST
 _RST MACRO n

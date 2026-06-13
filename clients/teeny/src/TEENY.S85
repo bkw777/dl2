@@ -15,7 +15,6 @@
 ; $ make verify_100
 ; $ make verify_M10
 
-
 ;;;;
 ;;;; 100 & M10 both work
 ;;;; K85 builds but does NOT work
@@ -42,7 +41,7 @@
 ; start of ALTLCD							; FCC0
 wFD00			EQU		ALTLCD + 0x40		; FD00
 wFD02			EQU		ALTLCD + 0x42		; FD02
-wFD04			EQU		ALTLCD + 0x44		; FD04
+FileSize		EQU		ALTLCD + 0x44		; FD04  native lsb-first copy of msb-first tpdd DIRENT filesize
 StackPointer	EQU		ALTLCD + 0x46		; FD06
 wFD08			EQU		ALTLCD + 0x48		; FD08  word but only ever stores a byte
 ; TPDD packet
@@ -52,13 +51,22 @@ pktDLEN			EQU		ALTLCD + 0x4D		; FD0D  tpdd packet data length
 pktDATA			EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data (length varies 0-?? 64? up to 252 is possible & legal but idk yet what TEENY does)
 ; position varies but also a single byte checksum comes after pktDATA, and is the final byte of the packet
 
-wFD27			EQU		ALTLCD + 0x67		; FD27
+; FSIZE in a DIRENT packet
+; pktDATA +  0 : start of fname
+; pktDATA + 23 : end of fname
+; pktDATA + 24 : attr
+; pktDATA + 25 : fsize msb
+; pktDATA + 26 : fsize lsb
+direntFSIZE		EQU		pktDATA + 25		; FD27
 ; end of ALTLCD			ALTLCD + 0x013F		; FDFF
 
-; confusing location, both 100 and 200 use the same FF80
+; DLEN for WRITE packet
+; Not pktDLEN itself, used to fill pktDLEN in outgoing WRITE packet.
+; Curious location, both 100 and 200 use the same FF80
 ; On 100 FF80 is within COMBUF: FF46-FF85
-; on 200 FF80 is before COMBUF: FFBB-FFFA
-;writeDLEN		EQU		COMBUF+0x3A			; FF80 COMBUF is 0x40 bytes, so this is 6 bytes before the end of COMBUF
+; on 200 FF80 seems unrelated:  FFBB-FFFA
+;    M10                        FF46-FF85
+;    K85                        FFBE-FFFD
 writeDLEN		EQU		0xFF80
 
 ; TPDD
@@ -277,15 +285,14 @@ InitPacket:
 		; HL @ pktDLEN
 		RET
 
-	IFNDEF CheckDSR_RET
-CheckDSR_RET MACRO
-	RZ
-	ENDM
-	ENDIF
 CheckDSR:
 		IN			FLOWCTL_PORT	; read RS232 flow control pins
 		ANI			DSR_BITMASK		; check !DSR
-		CheckDSR_RET				; if !DSR then return
+	IF DISABLE_DSR
+		RET
+	ELSE
+		RZ
+	ENDIF
 		MVI			E,eNR			; set NR error
 		JMP			ERROR
 
@@ -471,39 +478,54 @@ SendWriteCMD:
 		JMP			jSendPacket			; send the packet
 
 LOAD:
+; FINDFN reads FILNM1 (FC93 on 100) which has been set up by CKFN2 in MAIN
 		CALL		FINDFN
 		JNZ			errAE
 		LXI			H,errFL
 		SHLD 		ETRAP
-		CALL		SCNEMP
+		CALL		SCNEMP				; find empty ram file direrctory entry
 		PUSH		H
-		CALL		jF57F
-		LHLD		wFD27
-		MOV			B,L
-		MOV			C,H
-		MOV			L,C
-		MOV			H,B
-		SHLD		wFD04
-		DCX			B
-		MOV			E,A
-		INR			A
+		CALL		GetFtypeX
+		; BA: A=2 F=SPC
+		; CO: A=0 F=ZP
+		; DO: A=1
+		LHLD		direntFSIZE			; read msb-first word filesize from direntFSIZE into HL
+		; H=LSB L=MSB (HL = byte-swapped filesize from a tpdd DIRENT return packet)
+		MOV			B,L					; copy msb to B
+		MOV			C,H					; copy lsb to C
+		; BC = filesize
+		MOV			L,C					; copy lsb to L
+		MOV			H,B					; copy msb to H
+		; HL = filesize
+		SHLD		FileSize			; write filesize to FileSize
+		DCX			B					; BC-- (filesize minus 1)
+		MOV			E,A					; E = ftype (CO=0 DO=1 BA=2)
+		INR			A					; A = ftype+1 (CO=1 DO=2 BA=3)
 @l0:
-		INX			B
-		DCR			A
-		JNZ			@l0
-		MOV			D,A
-		LXI			H,jF54C
-		DAD			D
-		DAD			D
-		DAD			D
-		DAD			D
-		DAD			D
-		MOV			A,M
-		PUSH		PSW
-		LXI			D,jF575
-		PUSH		D
-		INX			H
-		MOV			E,M
+		INX			B					; BC++
+		DCR			A					; A--
+		JNZ			@l0					; repeat until A=0
+		; A=0
+		; CO: BC=filesize
+		; DO: BC=filesize+1
+		; BA: BC=filesize+2
+		MOV			D,A					; D=0 E=(CO:0|DO:1|BA:2)
+		LXI			H,FtypeTable		; HL = FtypeTable  (copy bytes method A?)
+		DAD			D					; HL += DE(CO:0|DO:1|BA:2)
+		DAD			D					; HL += DE(CO:0|DO:1|BA:2)
+		DAD			D					; HL += DE(CO:0|DO:1|BA:2)
+		DAD			D					; HL += DE(CO:0|DO:1|BA:2)
+		DAD			D					; HL += DE(CO:0|DO:1|BA:2)
+		MOV			A,M					; A = byte @ HL
+		; CO: HL = FtypeTable     =  M=A0 = FattrCO for MKDIRENT
+		; DO: HL = FtypeTable+5   =  M=C0 = FattrDO
+		; BA: HL = FtypeTable+10  =  M=80 = FattrBA
+		PUSH		PSW					; save FattrXX
+		LXI			D,MkRamDirent		; DE = MkRamDirent
+		PUSH		D					; save MkRamDirent
+		INX			H					; HL++
+		MOV			E,M					; E = byte @ HL
+
 		INX			H
 		MOV			D,M
 		PUSH		D
@@ -525,22 +547,25 @@ LOAD:
 		JC			errOM
 		LXI			H,wFD08
 		INR			M
-		CALL		jF534
-		LHLD		wFD04
-		XCHG
+		CALL		SendOpenCMD_read
+		LHLD		FileSize			; read filesize to HL
+		XCHG							; swap HL:DE
 		POP			H
 		LDA			pktTYPE
 		MOV			C,A
 		MVI			B,0x00
+		; C = pktTYPE
+		; DE = filesize
+		; HL =
 @l1:
-		MOV			A,D
-		ORA			E
+		MOV			A,D					; A = D = filesize lsb
+		ORA			E					; msb OR lsb, aka set Z if DE==0
 		MOV			A,C
-		STA			pktTYPE
-		RZ
-		ORA			A
-		CM			SendReadCMD
-		DCX			D
+		STA			pktTYPE				; A = pktTYPE
+		RZ								; return when DE==0
+		ORA			A					; is just the lsb 0?
+		CM			SendReadCMD			; call if A<0
+		DCX			D					; DE--
 		PUSH		H
 		LXI			H,pktDATA
 		DAD			B
@@ -551,12 +576,12 @@ LOAD:
 		INR			C
 		JMP			@l1
 
-jF534:
+SendOpenCMD_read:
 		MVI			E,open_mode_read
 		CALL		SendOpenCMD
 SendReadCMD:
-		PUSH		H
-		PUSH		D
+		PUSH		H					; stash HL
+		PUSH		D					; stash DE
 ; start READ cmd packet
 		MVI			A,req_read
 		CALL		InitPacket
@@ -565,43 +590,26 @@ SendReadCMD:
 		MOV			B,A					; B = 0
 		MOV			C,A					; C = 0
 		STA			pktTYPE				; A = pktTYPE
-		POP			D
-		POP			H
+		POP			D					; restore DE
+		POP			H					; restore HL
 		RET
 
-jF54C:
-		ANA			B
-		MOV			L,M
-		PUSH		PSW
-	IFDEF MOD_01
-		MOD_01
-	ELSE
-		ORA			B
-	ENDIF
-		EI
-		RNZ
-		MOV			E,E
-		PUSH		PSW
-	IFDEF MOD_02
-		MOD_02
-	ELSE
-		XRA			M
-	ENDIF
-		EI
-		ADD			B
-		MOV			E,M
-		PUSH		PSW
-	IFDEF MOD_03
-		MOD_03
-	ELSE
-		SBB			D
-	ENDIF
+FtypeTable:
+	DB FattrCO				; +0
+	DW jCOFILE
+	DW COFILES
+	DB FattrDO				; +5
+	DW jDOFILE
+	DW DOFILES
+	DB FattrBA				; +10
+	DW jBAFILE
+	DW BAFILES
 
-		SPHL
+jDOFILE: ; F55B
 		MVI			M,0x1A
 		RET
 
-;jF55E:	; no explicit jumps here
+jBAFILE: ; F55E
 		XRA			A
 		MOV			M,A
 		INX			H
@@ -613,12 +621,12 @@ jF54C:
 		SHLD		DOFILES
 		RET
 
-;jF56E: ; no explicit jumps here
+jCOFILE: ; F56E
 		LHLD		wFD00
 		SHLD		COFILES
 		RET
 
-jF575:
+MkRamDirent:
 		POP			PSW
 		LHLD		wFD00
 		XCHG
@@ -626,31 +634,57 @@ jF575:
 		POP			H
 		JMP			MKDIRENT
 
-jF57F:
-		LDA 		FX1
-		SUI			0x43
-		RP
-		MVI			A,0x02
-		RET
+; read 1st byte of fname ext, return:
+; BA -> A=2 F=SPC
+; CO -> A=0 F=ZP
+; DO -> A=1
+GetFtypeX:
+		LDA 		FX1					; read 1st byte of filename extension
+		SUI			'C'					; subtract 'C'
+		; BA: A=FF F=SPC
+		; CO: A=00 F=ZP
+		; DO: A=01 F=
+		RP								; return if not S, file is not BA
+		MVI			A,0x02				; A=2
+		; BA: A=2 F=SPC
+		RET								; file is BA
 
+; copy a file from local ram to tpdd
 SAVE:
-		CALL		DIRENT
-		JNZ			errAE
-		LDA			FX1
-		CPI			0x42
-		JC			errNM
-		CPI			0x45
-		JNC			errNM
-		CALL		FINDFN
-		JZ			errFF
-		CALL		jF57F
-		MOV			C,A
-		MVI			A,filetypeDO
-		SUB			C
-		PUSH		B
-		PUSH		D
-		XCHG
-		CALL		AFTEREOF2
+		CALL		DIRENT				; tell the drive our filename
+		JNZ			errAE				; DIRENT returned an error
+		LDA			FX1					; read 1st byte of filename ext
+		CPI			'B'					; compare to 'B'
+		JC			errNM				; reject if less than 'B'
+		CPI			'E'					; compare to 'E'
+		JNC			errNM				; reject if not less than 'E'
+		CALL		FINDFN				; find the start of the file in ram
+		; Z = not found, NZ = found
+		; HL - Pointer to file's dir entry
+		; DE - Points to start of file in RAM
+		; A - Contains file attribute
+		; BC - Unchanged
+		JZ			errFF				; file not found in RAM
+		CALL		GetFtypeX			; get ftype for AFTEREOF2
+		; BA -> A=2 F=SPC
+		; CO -> A=0 F=ZP
+		; DO -> A=1
+		MOV			C,A					; C = ftypeX
+		MVI			A,ftypeCO			; A = ftypeCO
+		SUB			C					; A -= ftypeX
+		; BA: A=FF F=SPC C=2  (aka A=-1)
+		; CO: A=1 F= C=0
+		; DO: A=0 F=ZP C=1
+		PUSH		B					; stash BC (B=0? C=ftypeX)
+		PUSH		D					; stash DE (start of file in ram)
+		; DE = start of file data
+		; HL = start of file dirent
+		XCHG							; swap HL:DE
+		; DE = start of file dirent
+		; HL = start of file data
+		; I'm clearly not understanding this correctly.
+		; The values for A we're left with from above shouldn't work according the the M100 rom disassembly at 219D (AFTEREOF2)
+		CALL		AFTEREOF2			; Advance HL past end of current file based on type in A: 0=BA, 1=DO, 2=CO
 		POP			D
 		MOV			A,L
 		SUB			E

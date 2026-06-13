@@ -7,8 +7,8 @@ NAME = TNY
 SRC = TEENY.S85
 
 AS = z88dk-z80asm
-ASFLAGS := -m8085 -no-synth # -v
-# z88dk-z80asm <= 24602 has a bug that it only accepts the zilog syntax for RST.
+ASFLAGS := -m8085_strict -no-synth # -v
+# z88dk-z80asm < 25000 has a bug that it only accepts the zilog syntax for RST.
 # If $(AS) is z88dk then add -DZ88DK=ver to flags. Used in m100_common.S85
 # fixed as of https://github.com/z88dk/z88dk/commit/db5c165
 ASFLAGS += $(shell $(AS) |awk '/^Z80 Macro Assembler /{split($$4,a,"-");if (a[1]>0) print "-DZ88DK="a[1]}')
@@ -16,7 +16,7 @@ ASFLAGS += $(shell $(AS) |awk '/^Z80 Macro Assembler /{split($$4,a,"-");if (a[1]
 # -DHIMEM=addr         # generate a relocated binary with specified HIMEM/END address
 XFLAGS :=
 
-# don't delete .CO when building .DO etc.
+# don't delete .CO when building .DO
 .SECONDARY:
 
 .PHONY: all
@@ -35,8 +35,7 @@ $(patsubst %,$(NAME)%.CO,$(MODELS)): $(NAME)%.CO : $(SRC) %.S85
 	n=$$(wc -c <$@) && \
 	$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -DPRGLEN=$$n -b -o=$@ $<
 	@rm *.o
-	@if test "$*" = "K85" ;then echo '!NOTICE!  $* does not work at this time' ;fi
-	@if test "$*" = "200" ;then echo '!NOTICE!  $* does not work at this time. See ../orig/disasm for working 200 source' ;fi
+	@if test "$*" = "200" ;then echo '!NOTICE!  $* is experimental. See ../orig/disasm for working 200 source' ;fi
 
 %.DO: %.CO
 	@which -s co2ba || echo "Please install https://github.com/bkw777/dl2 for co2ba to generate $@"

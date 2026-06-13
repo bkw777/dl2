@@ -1,45 +1,19 @@
 ; K85.S85
 ; Kyotronic KC-85 header for TEENY.S85
-
-; K85 is not working.
-; Both 100 and M10 are working from the same source.
-
-; Installs, runs, displays prompts & errors, responds to and displays keyboard input, responds to commands, exits normally.
-; RS232 operations all seem to be good, because some whole TPDD transactions work perfectly.
-; LCD and keyboard operations all seem to be ok.
-; The problems all seem to be related to ram filesystem operations.
-; KILL and QUIT don't need to do any local file work,
-; but KILL does need to both send and receive over RS232.
-;
-; LOAD BA looks ok but corrupts filesystem, TNYK85.CO no longer runs, LOADM says top 0, end 65535, OM err
-; LOAD DO hangs, corrupts ram, hard resets
-; LOAD CO 
-; SAVE BA seems to work
-; SAVE DO seems to work
-; SAVE CO writes the CO correctly but then keeps writing another 18k, then ends without reporting any error.
-; KILL <any> works
-; QUIT works
-
-; K85 system rom is closer to M10 than 100
-; 100 has many differences where k85 & m10 are the same
+; https://github.com/bkw777/m100_dev/blob/main/rom_cross_map.ods
+; https://github.com/bkw777/m100_dev/tree/main/platforms/K85
 
 ; routines
 PTILL0			EQU		0x11A9		; print null-terminated string at HL to screen
 SET232			EQU		0x17C8		; set RS232 parameters to STAT string pointed to by HL
-FINDFN			EQU		0x2080		; search dir for filename matching FNAME
+FINDFN			EQU		0x2080		; search dir for filename matching FILNM1
 SCNEMP			EQU		0x20B5		; scan for an empty directory entry
-
-; On both M10 and K85, RESETFPS starts with a CALL, then AF. On 100 there is no CALL.
-; Original TEENY for M10, and RAMDSK for K85, both skip the CALL to enter on the AF, and both work.
-; But TEENY for K85 is NOT working, so all possible discrepencies are suspect.
-;RESETFPS		EQU		0x2116		; reset file pointers    system rom only ever calls this
-RESETFPS		EQU		0x2116+3	; reset file pointers    original TEENY for M10 does this
-
+RESETFPS		EQU		0x2116+3	; reset file pointers (skip initial CALL)
 AFTEREOF2		EQU		0x2175		; advance HL past end of file, type A
 MKDIRENT		EQU		0x2211		; insert entry into directory
 D2H4Bup			EQU		0x3442		; move the memory pointed to by DE to the memory pointed to by HL
 INLIN			EQU		0x45F8		; input line
-CKFN2			EQU		0x4BC5		; evaluate & reformat filename (skips a call to find the next free ram dirent?)
+CKFN2			EQU		0x4BC5		; evaluate & reformat filename, write FILNM1
 MENU			EQU		0x54A4		; go to main menu
 MAKHOL			EQU		0x6875		; insert BC number of spaces in memory
 MASDEL			EQU		0x68A7		; delete BC chars at M (in a DO file)
@@ -52,34 +26,10 @@ INT1D			EQU		0x730A		; set interrupt to 0x1D
 MAXRAM			EQU		0xF5F0
 ETRAP			EQU		0xF659		; error trap
 KYBUF			EQU		0xF68C		; keyboard buffer
+BAFILES			EQU		0xF98B		; pointer to start of BA files
 DOFILES			EQU		0xFBC0		; pointer to start of DO files
 COFILES			EQU		0xFBC2		; pointer to start of CO files
-FX1				EQU		0xFCAB		; unknown, possibly file size or other metadata
+FILNM1			EQU		0xFCA5		; 9 bytes, padded fname for save/open/etc
+FX1				EQU		FILNM1+6	; EXT of FILNM1 after CKFN2 (“CO”, “DO”, “BA”)
 ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer, 320 bytes
 KYBCNT			EQU		0xFF6B		; number of characters in keyboard buffer
-
-; copied from M10
-; grasping at straws since k85 not working
-; and the k85 rom is most like the m10 rom
-; didn't help
-	;DEFINE	LIKE_M10
-
-	IF LIKE_M10
-
-CheckDSR_RET MACRO
-	RET
-	ENDM
-
-MOD_01 MACRO
-	ORA			M
-	ENDM
-
-MOD_02 MACRO
-	ORA			H
-	ENDM
-
-MOD_03 MACRO
-	SBB			L
-	ENDM
-
-	ENDIF ; LIKE_M10
