@@ -16,8 +16,8 @@
 ; but these variables are the same on both, relative offsets to ALTLCD.
 
 ; F7B0 start of ALTLCD							; F7B0
-DAT_ram_f7f0		EQU		ALTLCD + 0x40		; F7F0
-DAT_ram_f7f2		EQU		ALTLCD + 0x42		; F7F2
+RamFileStart		EQU		ALTLCD + 0x40		; F7F0
+RamFileSize			EQU		ALTLCD + 0x42		; F7F2
 FileSize			EQU		ALTLCD + 0x44		; F7F4
 StackPointer		EQU		ALTLCD + 0x46		; F7F6
 DAT_ram_f7f8		EQU		ALTLCD + 0x48		; F7F8  word but only ever stores a byte
@@ -148,10 +148,10 @@ ERROR:
 	ORA			A
 	JZ			@show
 	PUSH		D
-	LHLD		DAT_ram_f7f2
+	LHLD		RamFileSize
 	MOV			B,H
 	MOV			C,L
-	LHLD		DAT_ram_f7f0
+	LHLD		RamFileStart
 	CALL		MASDEL
 	POP			D
 @show:
@@ -159,9 +159,9 @@ ERROR:
 	MVI			D,0x0
 	DAD			D
 	MOV			A,M
-	RST			rst_Print_A
-	RST			rst_NextNonSpace
-	RST			rst_Print_A
+	_RST		rst_Print_A
+	_RST		rst_NextNonSpace
+	_RST		rst_Print_A
 	LXI			H,STR_ErrMsg
 	CALL		PTILL0
 	JMP			MAIN
@@ -180,7 +180,7 @@ GetFtypeX:
 	RET
 
 PAUSE_100ms:
-	MVI			D,0x2e
+	MVI			D,0x2E
 @l0:
 	DCX			D
 	MOV			A,D
@@ -380,9 +380,9 @@ LOAD:
 	MOV			D,M
 	MOV			H,B
 	MOV			L,C
-	SHLD		DAT_ram_f7f2
+	SHLD		RamFileSize
 	XCHG
-	SHLD		DAT_ram_f7f0
+	SHLD		RamFileStart
 	PUSH		H
 	CALL		MAKHOL
 	JC			errOM
@@ -457,7 +457,7 @@ jBAFILE:
 	MOV			M,A
 	INX			H
 	MOV			M,A
-	LHLD		DAT_ram_f7f2
+	LHLD		RamFileSize
 	XCHG
 	LHLD		DOFILES
 	DAD			D
@@ -465,13 +465,13 @@ jBAFILE:
 	RET
 
 jCOFILE:
-	LHLD		DAT_ram_f7f0
+	LHLD		RamFileStart
 	SHLD		COFILES
 	RET
 
 MkRamDirent:
 	POP			PSW
-	LHLD		DAT_ram_f7f0
+	LHLD		RamFileStart
 	XCHG
 	DCX			D
 	POP			H
@@ -525,7 +525,7 @@ WriteChunks:
 	PUSH		H
 	PUSH		H
 	LXI			H,RW_Chunk_Size
-	RST			rst_CompareDEHL
+	_RST		rst_CompareDEHL
 	JNC			@l0
 	MOV			C,L
 	MOV			B,H

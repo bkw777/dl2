@@ -38,9 +38,9 @@
 
 ; TINY uses ALTCD for it's variables and packet buffer
 ; start of ALTLCD							; FCC0
-wFD00			EQU		ALTLCD + 0x40		; FD00
-wFD02			EQU		ALTLCD + 0x42		; FD02
-FileSize		EQU		ALTLCD + 0x44		; FD04  native lsb-first copy of msb-first tpdd DIRENT filesize
+RamFileStart	EQU		ALTLCD + 0x40		; FD00
+RamFileSize		EQU		ALTLCD + 0x42		; FD02
+FileSize		EQU		ALTLCD + 0x44		; FD04  native lsb-first copy of tpdd msb-first filesize
 StackPointer	EQU		ALTLCD + 0x46		; FD06
 wFD08			EQU		ALTLCD + 0x48		; FD08  word but only ever stores a byte
 ; TPDD packet
@@ -210,10 +210,11 @@ ERROR:
 		ORA 		A				; is it 0?
 		JZ 			@show			; if 0 skip to @show
 		PUSH 		D
-		LHLD 		wFD02
+		LHLD 		RamFileSize		; HL=RamFileSize
 		MOV 		B,H
 		MOV 		C,L
-		LHLD 		wFD00
+		; BC = HL = RamFileSize
+		LHLD 		RamFileStart	; HL=RamFileStart
 		CALL		MASDEL			; delete BC bytes @ HL
 		POP 		D
 @show:
@@ -505,42 +506,53 @@ LOAD:
 		DCR			A					; A--
 		JNZ			@l0					; repeat until A=0
 		; A=0
-		; CO: BC=filesize
-		; DO: BC=filesize+1
-		; BA: BC=filesize+2
+		; CO: BC=filesize+0  ?
+		; DO: BC=filesize+1  ?
+		; BA: BC=filesize+2  ?
+		; I don't know why we're adding 0, 1, or 2 to the filesize
+		;
+		; FtypeTable is a router table with 3 entries, one each for CO, DO, & BA files
+		; Each entry is 5 bytes in 3 fields:
+		; 1 byte:  attribute for MKDIRENT   FattrCO FattrDO FattrBA
+		; 2 bytes: jump address             jCOFILE jDOFILE jBAFILE
+		; 2 bytes: start of XXfiles in ram  COFILES DOFILES BAFILES
+		; Select the correct entry by adding ftype(0/1/2) 5 times
+		; which will end up being FtypeTable+0/+5/+10
 		MOV			D,A					; D=0 E=(CO:0|DO:1|BA:2)
-		LXI			H,FtypeTable		; HL = FtypeTable  (copy bytes method A?)
+		LXI			H,FtypeTable		; HL = FtypeTable
 		DAD			D					; HL += DE(CO:0|DO:1|BA:2)
 		DAD			D					; HL += DE(CO:0|DO:1|BA:2)
 		DAD			D					; HL += DE(CO:0|DO:1|BA:2)
 		DAD			D					; HL += DE(CO:0|DO:1|BA:2)
 		DAD			D					; HL += DE(CO:0|DO:1|BA:2)
-		MOV			A,M					; A = byte @ HL
 		; CO: HL = FtypeTable     =  M=A0 = FattrCO for MKDIRENT
 		; DO: HL = FtypeTable+5   =  M=C0 = FattrDO
 		; BA: HL = FtypeTable+10  =  M=80 = FattrBA
+		MOV			A,M					; A = byte @ HL
+		; CO: M = FattrCO
+		; DO: M = FattrDO
+		; BA: M = FattrBA
 		PUSH		PSW					; save FattrXX
 		LXI			D,MkRamDirent		; DE = MkRamDirent
 		PUSH		D					; save MkRamDirent
+		INX			H					; HL++ advance HL to the jump addr
+		MOV			E,M					; E = lsb of jump addr
+		INX			H					; HL++ advance HL to the msb of the jump addr 
+		MOV			D,M					; D = msb of jump addr
+		PUSH		D					; save jump addr
+		INX			H					; HL++ advance HL to the XXFILES pointer
+		MOV			E,M					; E = lsb of XXFILES
+		INX			H					; HL++ advance HL to the msb of XXFILES
+		MOV			H,M					; H = msb of XXFILES
+		MOV			L,E					; L = lsb of XXFILES
+		MOV			E,M					; E = byte @ start of COFILES/DOFILES/BAFILES
 		INX			H					; HL++
-		MOV			E,M					; E = byte @ HL
-
-		INX			H
-		MOV			D,M
-		PUSH		D
-		INX			H
-		MOV			E,M
-		INX			H
-		MOV			H,M
-		MOV			L,E
-		MOV			E,M
-		INX			H
-		MOV			D,M
-		MOV			H,B
-		MOV			L,C
-		SHLD		wFD02
+		MOV			D,M					; D = byte @ XXFILES+1
+		MOV			H,B					; H = msb of filesize+0/1/2  ?
+		MOV			L,C					; L = lsb of filesize+0/1/2  ?
+		SHLD		RamFileSize			; save filesize+X
 		XCHG
-		SHLD		wFD00
+		SHLD		RamFileStart
 		PUSH		H
 		CALL		MAKHOL
 		JC			errOM
@@ -609,25 +621,29 @@ jDOFILE:
 		RET
 
 jBAFILE:
-		XRA			A
-		MOV			M,A
-		INX			H
-		MOV			M,A
-		LHLD		wFD02
-		XCHG
-		LHLD		DOFILES
-		DAD			D
-		SHLD		DOFILES
+		XRA			A					; A=0
+		MOV			M,A					; write 0 @ HL (start of file data?)
+		INX			H					; HL++
+		MOV			M,A					; write 0 @ HL
+		LHLD		RamFileSize			; HL = RamFileSize
+		XCHG							; DE = RamFileSize
+		; DOFILES area starts immediately after BAFILES area ends
+		; Make room to add a new BA file by moving DOFILES forward fsizeX bytes
+		LHLD		DOFILES				; HL = DOFILES
+		DAD			D					; add RamFileSize to DOFILES
+		SHLD		DOFILES				; write updated DOFILES
+		; now DOFILES starts RamFileSize after the end of the last BA file
+		; we can now write a new BA file into that gap
 		RET
 
 jCOFILE:
-		LHLD		wFD00
+		LHLD		RamFileStart
 		SHLD		COFILES
 		RET
 
 MkRamDirent:
 		POP			PSW
-		LHLD		wFD00
+		LHLD		RamFileStart
 		XCHG
 		DCX			D
 		POP			H
