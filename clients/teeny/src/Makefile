@@ -13,7 +13,8 @@ ASFLAGS := -m8085_strict -no-synth # -v
 # fixed as of https://github.com/z88dk/z88dk/commit/db5c165
 ASFLAGS += $(shell $(AS) |awk '/^Z80 Macro Assembler /{split($$4,a,"-");if (a[1]>0) print "-DZ88DK="a[1]}')
 
-# -DHIMEM=addr         # generate a relocated binary with specified HIMEM/END address
+# -DHIMEM=addr		# generate a relocated binary with specified HIMEM/END address
+# -DDISABLE_DSR		# disable the DSR check. M10 sets this by default
 XFLAGS :=
 
 # don't delete .CO when building .DO
