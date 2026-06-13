@@ -18,7 +18,7 @@
 ;;;; 100 works
 ;;;; M10 works
 ;;;; K85 works
-;;;; 200 testing, but ../orig/disasm/TNY200.S85 works
+;;;; 200 does not work, but ../orig/disasm/TNY200.S85 does
 ;;;; NEC not started
 ;;;;
 

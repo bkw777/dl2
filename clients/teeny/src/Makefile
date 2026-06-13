@@ -35,7 +35,7 @@ $(patsubst %,$(NAME)%.CO,$(MODELS)): $(NAME)%.CO : $(SRC) %.S85
 	n=$$(wc -c <$@) && \
 	$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -DPRGLEN=$$n -b -o=$@ $<
 	@rm *.o
-	@if test "$*" = "200" ;then echo '!NOTICE!  $* is experimental. See ../orig/disasm for working 200 source' ;fi
+	@if test "$*" = "200" ;then echo '!NOTICE!  $* does not work. See ../orig/disasm for working 200 source' ;fi
 
 %.DO: %.CO
 	@which -s co2ba || echo "Please install https://github.com/bkw777/dl2 for co2ba to generate $@"
