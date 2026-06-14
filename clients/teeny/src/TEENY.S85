@@ -40,9 +40,9 @@
 ; start of ALTLCD							; FCC0
 RamFileStart	EQU		ALTLCD + 0x40		; FD00
 RamFileSize		EQU		ALTLCD + 0x42		; FD02
-FileSize		EQU		ALTLCD + 0x44		; FD04  native lsb-first copy of tpdd msb-first filesize
+DskFileSize		EQU		ALTLCD + 0x44		; FD04  native lsb-first copy of tpdd msb-first filesize
 StackPointer	EQU		ALTLCD + 0x46		; FD06
-wFD08			EQU		ALTLCD + 0x48		; FD08  word but only ever stores a byte
+wFD08			EQU		ALTLCD + 0x48		; FD08
 ; TPDD packet
 pktZZ			EQU		ALTLCD + 0x4A		; FD0A  tpdd packet preamble "ZZ"
 pktTYPE			EQU		ALTLCD + 0x4C		; FD0C  tpdd packet command or return type
@@ -59,11 +59,11 @@ pktDATA			EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data (length varies 0-?? 64? u
 direntFSIZE		EQU		pktDATA + 25		; FD27
 ; end of ALTLCD			ALTLCD + 0x013F		; FDFF
 
-; DLEN for WRITE packet
+; DLEN for a WRITE packet
 ; Not pktDLEN itself, used to fill pktDLEN in outgoing WRITE packet.
-; Curious location, both 100 and 200 use the same FF80
+; Curious location, both 100 and 200 use the same FF80.
 ; On 100 FF80 is within COMBUF: FF46-FF85
-; on 200 FF80 seems unrelated:  FFBB-FFFA
+; On 200 FF80 seems unrelated:  FFBB-FFFA
 ;    M10                        FF46-FF85
 ;    K85                        FFBE-FFFD
 writeDLEN		EQU		0xFF80
@@ -138,7 +138,7 @@ MAIN:
 		LHLD		StackPointer	; copy saved stack pointer from ram to HL
 		SPHL						; copy saved stack pointer from HL to SP
 		XRA			A				; A = 0
-		STA			wFD08			; store 0 to ram wFD08
+		STA			wFD08			; just lsb of wFD08 = 0     ???
 		LXI			H,MAIN			; load MAIN addr to HL
 		PUSH		H				; push HL
 		LXI			H,STR_Prompt	; load addr to prompt string to HL
@@ -164,24 +164,26 @@ MAIN:
 		JZ			MENU			; then exit to OS (main menu)
 		CPI			'S'				; is it 'S' ?
 		JZ			SAVE			; then jump to SAVE		maybe rename SAVE, maybe common init code for most commands
-		PUSH 		PSW				; push A & flags
+		PUSH 		PSW				; stash A=cmd
 		; if we got here then the command is K, L, or unknown
-		; if the file doesn't exist that's an error for any of those commands
-		CALL		DIRENT          ; set disk filename - test if file exists on disk
-		JZ			errFF			; if Z print FF error
-		; file exists
-		POP 		PSW
+		; KILL or LOAD both start with telling the drive the filename
+		CALL		DIRENT          ; set disk filename and ask drive if file exists on disk
+		JZ			errFF			; Z = file not found on disk, abort with FF error
+		; file found on disk
+		POP 		PSW				; restore A=cmd
 		SUI			'K'				; if A-'K' = 0
-		JZ			KILL			; A was 'K'
+		JZ			KILL			; cmd is 'K', jump to KILL
 		DCR 		A				; A-1 after A-'K' == A-'L'
-		JZ			LOAD			; A was 'L'
+		JZ			LOAD			; if A-'L' = 0, then cmd is 'L', jump to LOAD
+
+		; if we got here, cmd is unknown
 
 ; ERROR CODES  - uses the LXI B trick
 ; The first MVI E we jump to executes normally and sets E to something.
 ; The remaining stack after that becomes no-ops by the DB's being executed as
 ; LXI B, which consumes the next MVI E,b as data into B which we never use.
 
-		MVI			E,eSN			; fell from above = syntax error
+		MVI			E,eSN			; fell from above = unknown cmd = syntax error
 		DB			opcode_LXI_B
 errFF:
 		MVI			E,eFF
@@ -206,27 +208,26 @@ errNM:
 
 
 ERROR:
-		LDA 		wFD08			; read byte @ wFD08
+		LDA 		wFD08			; A = just lsb of wFD08  ???
 		ORA 		A				; is it 0?
 		JZ 			@show			; if 0 skip to @show
-		PUSH 		D
+		PUSH 		D				; stash DE (D doesn't matter, E=eXX from above)
 		LHLD 		RamFileSize		; HL=RamFileSize
-		MOV 		B,H
-		MOV 		C,L
-		; BC = HL = RamFileSize
+		MOV 		B,H				; B=H
+		MOV 		C,L				; C=L  BC=RamFileSize
 		LHLD 		RamFileStart	; HL=RamFileStart
 		CALL		MASDEL			; delete BC bytes @ HL
-		POP 		D
+		POP 		D				; restore DE (only care about E)
 @show:
-		LXI			H,STR_ErrCodes	; point to start of string of all 2-char err codes
-		MVI			D,0x00			; D = 0. E = eXX from above
-		DAD			D				; add DE to HL, HL is now at STR_Errcodes+E
+		LXI			H,STR_ErrCodes	; HL = start of string of err codes
+		MVI			D,0x00			; D=0 E=eXX from above
+		DAD			D				; HL=STR_Errcodes+eXX
 		MOV			A,M				; get first byte of error code
 		_RST		rst_Print_A			; print it
 		_RST		rst_NextNonSpace	; get next byte of err code
 		_RST		rst_Print_A			; print it
 		LXI			H,STR_ErrMsg	; get STR_ErrMsg
-		CALL		PTILL0			; print STR_ErrMsg
+		CALL		PTILL0			; print it
 		JMP			MAIN			; restart at main
 
 
@@ -270,8 +271,8 @@ PAUSE_100ms:
 @l0:
 		DCX 		D				; DE--
 		MOV			A,D				; A = D
-		ORA			E				; E vs A (D)
-		JNZ			@l0				; repeats until both D and E = 0
+		ORA			E				; D V E sets Z only when both D and E == 0
+		JNZ			@l0				; repeat until DE=0
 		RET
 
 STR_STAT:
@@ -444,12 +445,15 @@ DIRENT:
 
 SendPacket2:
 		CALL		SendPacket
-		MOV			B,A					; save A returned from SendPacket
-		LDA			pktTYPE				; read return packet type
-		CPI			ret_normal			; is it a standard return packet?
+		MOV			B,A					; B = A returned from SendPacket   (why bother? see Q01)
+		LDA			pktTYPE				; A = packet type that the drive returned
+		CPI			ret_normal			; is it a STANDARD return packet?
 		JZ			ParseErrorReturn	; it's supposed to be a DIRENT or READ return not a standard return
-		MOV			A,B					; restore A retult from SendPacket
-		ORA			A					; if A = 0 set Z
+		MOV			A,B					; A = saved result from SendPacket (why bother? see Q01)
+		ORA			A					; if A = 0 set Z (why bother? see Q01)
+		; where are we returning to?
+		; A we CALLed here from SendOpenCMD:
+		; B we fell in from DIRENT:
 		RET
 
 SendOpenCMD_write:
@@ -497,7 +501,7 @@ LOAD:
 		MOV			L,C					; copy lsb to L
 		MOV			H,B					; copy msb to H
 		; HL = filesize
-		SHLD		FileSize			; write filesize to FileSize
+		SHLD		DskFileSize			; write filesize to DskFileSize
 		DCX			B					; BC-- (filesize minus 1)
 		MOV			E,A					; E = ftype (CO=0 DO=1 BA=2)
 		INR			A					; A = ftype+1 (CO=1 DO=2 BA=3)
@@ -506,86 +510,95 @@ LOAD:
 		DCR			A					; A--
 		JNZ			@l0					; repeat until A=0
 		; A=0
-		; CO: BC=filesize+0  ?
-		; DO: BC=filesize+1  ?
-		; BA: BC=filesize+2  ?
-		; I don't know why we're adding 0, 1, or 2 to the filesize
+		; not sure why we're adding 0, 1, or 2 to filesize but the EOFs match up
+		; CO: BC=filesize+0  CO files end is defined in the CO header, no eof marker bytes
+		; DO: BC=filesize+1  DO files end with 1 EOF byte (0x1A)
+		; BA: BC=filesize+2  BA files end with 2 NUL bytes (3 consecutive NUL but the 1st is part of the last line, 2 NULs come after that)
 		;
 		; FtypeTable is a router table with 3 entries, one each for CO, DO, & BA files
 		; Each entry is 5 bytes in 3 fields:
 		; 1 byte:  attribute for MKDIRENT   FattrCO FattrDO FattrBA
 		; 2 bytes: jump address             jCOFILE jDOFILE jBAFILE
-		; 2 bytes: start of XXfiles in ram  COFILES DOFILES BAFILES
+		; 2 bytes: start of filetype area   COFILES DOFILES BAFILES
 		; Select the correct entry by adding ftype(0/1/2) 5 times
 		; which will end up being FtypeTable+0/+5/+10
-		MOV			D,A					; D=0 E=(CO:0|DO:1|BA:2)
+		MOV			D,A					; DE=(CO:0000|DO:0001|BA:0002)
 		LXI			H,FtypeTable		; HL = FtypeTable
-		DAD			D					; HL += DE(CO:0|DO:1|BA:2)
-		DAD			D					; HL += DE(CO:0|DO:1|BA:2)
-		DAD			D					; HL += DE(CO:0|DO:1|BA:2)
-		DAD			D					; HL += DE(CO:0|DO:1|BA:2)
-		DAD			D					; HL += DE(CO:0|DO:1|BA:2)
-		; CO: HL = FtypeTable     =  M=A0 = FattrCO for MKDIRENT
-		; DO: HL = FtypeTable+5   =  M=C0 = FattrDO
-		; BA: HL = FtypeTable+10  =  M=80 = FattrBA
+		DAD			D					; HL += DE
+		DAD			D					; HL += DE
+		DAD			D					; HL += DE
+		DAD			D					; HL += DE
+		DAD			D					; HL += DE
+		; CO: HL = FtypeTable+0
+		; DO: HL = FtypeTable+5
+		; BA: HL = FtypeTable+10
 		MOV			A,M					; A = byte @ HL
-		; CO: M = FattrCO
-		; DO: M = FattrDO
-		; BA: M = FattrBA
-		PUSH		PSW					; save FattrXX
+		; CO: A = FattrCO
+		; DO: A = FattrDO
+		; BA: A = FattrBA
+		PUSH		PSW					; stash FattrXX
 		LXI			D,MkRamDirent		; DE = MkRamDirent
-		PUSH		D					; save MkRamDirent
-		INX			H					; HL++ advance HL to the jump addr
-		MOV			E,M					; E = lsb of jump addr
-		INX			H					; HL++ advance HL to the msb of the jump addr 
-		MOV			D,M					; D = msb of jump addr
+		PUSH		D					; stash MkRamDirent
+		INX			H					; HL++ to jump addr lsb
+		MOV			E,M					; E = jump addr lsb
+		INX			H					; HL++ to jump addr msb 
+		MOV			D,M					; D = jump addr msb
 		PUSH		D					; save jump addr
-		INX			H					; HL++ advance HL to the XXFILES pointer
-		MOV			E,M					; E = lsb of XXFILES
-		INX			H					; HL++ advance HL to the msb of XXFILES
-		MOV			H,M					; H = msb of XXFILES
-		MOV			L,E					; L = lsb of XXFILES
+		INX			H					; HL++ to XXFILES area pointer
+		MOV			E,M					; E = XXFILES lsb
+		INX			H					; HL++ to XXFILES msb
+		MOV			H,M					; H = XXFILES msb
+		MOV			L,E					; L = XXFILES lsb   HL=XXFILES
 		MOV			E,M					; E = byte @ start of COFILES/DOFILES/BAFILES
 		INX			H					; HL++
 		MOV			D,M					; D = byte @ XXFILES+1
-		MOV			H,B					; H = msb of filesize+0/1/2  ?
-		MOV			L,C					; L = lsb of filesize+0/1/2  ?
-		SHLD		RamFileSize			; save filesize+X
-		XCHG
-		SHLD		RamFileStart
-		PUSH		H
-		CALL		MAKHOL
-		JC			errOM
-		LXI			H,wFD08
-		INR			M
-		CALL		SendOpenCMD_read
-		LHLD		FileSize			; read filesize to HL
+		; DE = 16 bit value from 1st 2 bytes of CO/DO/BA file area ???
+		MOV			H,B					; H = msb of filesize+0/1/2
+		MOV			L,C					; L = lsb of filesize+0/1/2
+		; HL = filesize+X
+		SHLD		RamFileSize			; RamFileSize = filesize+X
 		XCHG							; swap HL:DE
-		POP			H
-		LDA			pktTYPE
-		MOV			C,A
-		MVI			B,0x00
-		; C = pktTYPE
-		; DE = filesize
-		; HL =
+		; DE = filesize+X
+		; HL = 16 bit value from 1st 2 bytes of CO/DO/BA file area ???
+		SHLD		RamFileStart		; write HL to RamFileStart ?
+		PUSH		H					; stash HL=RamFileStart
+		CALL		MAKHOL				; create space for new file
+		JC			errOM				; abort if MAKHOL failed from not enough memory
+		LXI			H,wFD08				; read a WORD from wFD08 ???
+		INR			M					; incriment just the LSB at wFD08  ???
+		CALL		SendOpenCMD_read	; open the tpdd file for reading
+		LHLD		DskFileSize			; HL = DskFileSize
+		XCHG							; swap HL:DE  DE = DskFileSize
+		POP			H					; HL = RamFileStart
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+		LDA			pktTYPE				; A = packet type  (should be 0x10 for read return?)
+		MOV			C,A					; C = packet type  ????????
+		MVI			B,0x00				; B = 0	 BC = packet type  ???????
+		; C/BC = pktTYPE ????????
+		; DE = tpdd file size
+		; HL = ram file start
 @l1:
-		MOV			A,D					; A = D = filesize lsb
-		ORA			E					; msb OR lsb, aka set Z if DE==0
-		MOV			A,C
-		STA			pktTYPE				; A = pktTYPE
-		RZ								; return when DE==0
-		ORA			A					; is just the lsb 0?
-		CM			SendReadCMD			; call if A<0
+		MOV			A,D					; A = D (filesize lsb)
+		ORA			E					; A=D=lsb OR E=msb , aka set Z when DE==0
+		MOV			A,C					; A = packet type from C
+		STA			pktTYPE				; pktTYPE = packet type from C
+		RZ								; exit loop when DE==0
+		ORA			A					; is packet type 0?
+		CM			SendReadCMD			; call if packet type <0 ???
 		DCX			D					; DE--
-		PUSH		H
-		LXI			H,pktDATA
-		DAD			B
-		MOV			A,M
-		POP			H
-		MOV			M,A
-		INX			H
-		INR			C
-		JMP			@l1
+		PUSH		H					; stash HL = current byte position in ram file
+		LXI			H,pktDATA			; HL = start of packet data
+		DAD			B					; HL += BC, BC = packet type ???????
+		MOV			A,M					; A = byte @ HL
+		POP			H					; retore HL = byte position in file
+		MOV			M,A					; write byte from packet to ram
+		INX			H					; HL++ (advance to next byte of file)
+		; Packet len including all overhead cannot exceed 256, DLEN only 252
+		; so the packet data position counter only needs C not BC
+		INR			C					; C++ (advance to next byte of packet)
+		JMP			@l1					; repeat
 
 SendOpenCMD_read:
 		MVI			E,open_mode_read
@@ -594,13 +607,13 @@ SendReadCMD:
 		PUSH		H					; stash HL
 		PUSH		D					; stash DE
 ; start READ cmd packet
-		MVI			A,req_read
-		CALL		InitPacket
-		CALL		SendPacket2
-		XRA			A					; A = 0
+		MVI			A,req_read			; A = READ packet fmt code
+		CALL		InitPacket			; Construct a tpdd packet
+		CALL		SendPacket2			; send the packet to the drive, read a return packet from the drive
+		XRA			A					; A = 0		; Q01 why did we bother saving & restoring A? 
 		MOV			B,A					; B = 0
 		MOV			C,A					; C = 0
-		STA			pktTYPE				; A = pktTYPE
+		STA			pktTYPE				; A = pktTYPE (return packet fmt)
 		POP			D					; restore DE
 		POP			H					; restore HL
 		RET
@@ -681,15 +694,25 @@ SAVE:
 		; BC - Unchanged
 		JZ			errFF				; file not found in RAM
 		CALL		GetFtypeX			; get ftype for AFTEREOF2
-		; BA -> A=2 F=SPC
-		; CO -> A=0 F=ZP
-		; DO -> A=1
+		; CO: A=0 F=ZP
+		; DO: A=1
+		; BA: A=2 F=SPC
+
+; This ftype 0/1/2 stuff is confusing because there are 2 different things going on
+; with almost the same numbers.
+; 1: AFTEREOF2 needs to bet told the type of file: A=0 for BA, 1 for DO, 2 for CO
+; 2: We need to add 0, 1, or 2 bytes to the local ram file size for eof marker bytes:
+; CO=0 (sof/eof defined by the CO header), DO=1 (0x1A), BA=2 (0x00 0x00)
+
 		MOV			C,A					; C = ftypeX
-		MVI			A,ftypeCO			; A = ftypeCO
-		SUB			C					; A -= ftypeX
-		; BA: A=FF F=SPC C=2  (aka A=-1)
-		; CO: A=1 F= C=0
-		; DO: A=0 F=ZP C=1
+		; CO: C=0
+		; DO: C=1
+		; BA: C=2
+		MVI			A,ftypeCO			; A = ftypeCO = 2
+		SUB			C					; A = 2 - ftypeX
+		; CO: A = 2-0 = 2
+		; DO: A = 2-1 = 1
+		; BA: A = 2-2 = 0
 		PUSH		B					; stash BC (B=0? C=ftypeX)
 		PUSH		D					; stash DE (start of file in ram)
 		; DE = start of file data
@@ -697,22 +720,25 @@ SAVE:
 		XCHG							; swap HL:DE
 		; DE = start of file dirent
 		; HL = start of file data
-		; I'm clearly not understanding this correctly.
-		; The values for A we're left with from above shouldn't work according the the M100 rom disassembly at 219D (AFTEREOF2)
+		; BA: A = 0
+		; DO: A = 1
+		; CO: A = 2
 		CALL		AFTEREOF2			; Advance HL past end of current file based on type in A: 0=BA, 1=DO, 2=CO
-		POP			D
-		MOV			A,L
-		SUB			E
-		MOV			L,A
-		MOV			A,H
-		SBB			D
-		MOV			H,A
-		POP			B
-		INR			C
-		INX			H
+		POP			D					; restore DE = start of file data
+		MOV			A,L					; A = eof lsb
+		SUB			E					; A = eof lsb - sof lsb
+		MOV			L,A					; L = A
+		MOV			A,H					; A = eof msb
+		SBB			D					; A = eof msb - sof msb
+		MOV			H,A					; H = A
+		; HL = eof-sof = file length
+		POP			B					; retore B=0 C=ftypeX  CO:0  DO:1  BA:2
+		INR			C					; C++   absorb the initial C-- in the following loop
+		INX			H					; HL++  absorb the initial HL-- in the following loop
+		; This loop removes the EOF marker bytes from the local ram file length to get the true file length
 @l0:
-		DCX			H
-		DCR			C
+		DCX			H					; HL-- = length--
+		DCR			C					; C-- = 
 		JNZ			@l0
 		MOV			A,L
 		ORA			H
@@ -723,20 +749,22 @@ SAVE:
 		POP			D
 		POP			H
 		CALL		WriteChunks
-
-; start CLOSE cmd packet
+; send a CLOSE cmd packet
 		MVI			A,req_close
 		JMP			ShortPacket
 
 WriteChunks:
-		PUSH		H
-		PUSH		H
-		LXI			H,RW_Chunk_Size
-		_RST		rst_CompareDEHL		; is remaining data <= one chunk?
-		JNC			@l0					; exit loop if current chunk contains all remeining data
+		PUSH		H					; stash HL
+		PUSH		H					; stash another HL
+		LXI			H,RW_Chunk_Size		; HL = RW_Chunk_Size
+		; DE = remaining file data
+		_RST		rst_CompareDEHL		; compare DE(remaining_data) to HL(chunk_size)
+		; flags: C means HL<DE, Z means HL=DE
+		JNC			@l0					; jump if not C, exit loop when chunk_size >= remaining_data
 		MOV			C,L
 		MOV			B,H
-		POP			H
+		; BC = chunk size
+		POP			H					; HL = 
 		DAD			B
 		XTHL
 		XCHG
