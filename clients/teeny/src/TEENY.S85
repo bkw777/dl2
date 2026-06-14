@@ -320,7 +320,7 @@ SendPacket:
 		JZ			@endpkt			; if pktDLEN = 0 then jump to finish checksum
 		; pktDLEN>0, sum pktDLEN bytes from pktDATA 
 @l0:
-		ADD			M				; add data byte to sum (rolls over at 0xFF) 
+		ADD			M				; add data byte to sum (rolls over every 0xFF) 
 		INX			H				; next data byte
 		DCR			E				; E--
 		JNZ			@l0				; repeat for E (pktDLEN) bytes
@@ -475,11 +475,11 @@ SendFinalWriteChunk:
 SendWriteCMD:
 		MVI			A,req_write
 		CALL		InitPacket
-		MOV			M,C					; write numbytes to pktDLEN
+		MOV			M,C					; write C=chunk_size to pktDLEN
 		INX			H					; advance HL to pktDATA
 		MOV			B,C					; tell D2H4Bup how many bytes to copy
 		CALL		D2H4Bup				; copy B bytes from DE to HL
-		JMP			jSendPacket			; send the packet
+		JMP			jSendPacket			; send the packet, read it's return packet
 
 LOAD:
 ; FINDFN reads FILNM1 (FC93 on 100) which has been set up by CKFN2 in MAIN
@@ -740,37 +740,41 @@ SAVE:
 		DCX			H					; HL-- = length--
 		DCR			C					; C-- = 
 		JNZ			@l0
-		MOV			A,L
-		ORA			H
-		RZ
-		PUSH		D
-		PUSH		H
-		CALL		SendOpenCMD_write
-		POP			D
-		POP			H
-		CALL		WriteChunks
-; send a CLOSE cmd packet
+		MOV			A,L					; A = len lsb
+		ORA			H					; len msbVlsb, aka set Z if len=0
+		RZ								; if file len=0 then there's nothing to do
+		PUSH		D					; stash DE = sof
+		PUSH		H					; stash HL = true len
+		CALL		SendOpenCMD_write	; tell drive to open the file for write
+		POP			D					; DE = true len
+		POP			H					; HL = sof
+		CALL		WriteChunks			; send WRITE packets
 		MVI			A,req_close
-		JMP			ShortPacket
+		JMP			ShortPacket			; send CLOSE packet
 
+; initial:
+; HL = current position = sof
+; DE = remaining file data = len
+; BC = idk i lost the plot
 WriteChunks:
-		PUSH		H					; stash HL
-		PUSH		H					; stash another HL
+		PUSH		H
+		PUSH		H
 		LXI			H,RW_Chunk_Size		; HL = RW_Chunk_Size
-		; DE = remaining file data
 		_RST		rst_CompareDEHL		; compare DE(remaining_data) to HL(chunk_size)
 		; flags: C means HL<DE, Z means HL=DE
 		JNC			@l0					; jump if not C, exit loop when chunk_size >= remaining_data
-		MOV			C,L
-		MOV			B,H
+		MOV			C,L					; C = chunk_size
+		MOV			B,H					; B=0 (should always be 0 here since HL=chunk_size above cannot exceed 252?)
 		; BC = chunk size
-		POP			H					; HL = 
-		DAD			B
-		XTHL
-		XCHG
-		LXI			B,writeDLEN			; B = writeDLEN
-		DAD			B					; HL = HL + B
-		PUSH		H
+		POP			H					; restore HL=position
+		DAD			B					; advance HL by one chunk_size
+		XTHL							; replace TS with HL=new_position, HL=old_position   ?
+		XCHG							; swap HL:DE, DE=old_position, HL=remaining_data     ?
+		LXI			B,writeDLEN			; BC = writeDLEN
+		DAD			B					; HL = remeining_data + writeDLEN ???  I've lost the plot
+		PUSH		H					; push HL=remaining_data+DLEN ????
+		; BC = writeDLEN
+		; HL = remaining_data+writeDLEN   this must be wrong
 		CALL		SendWriteCMD
 		POP			D
 		POP			H
