@@ -41,6 +41,9 @@ KYBCNT			EQU		0xFD1E		; number of characters in keyboard buffer
 ; constants
 FLOWCTL_PORT	EQU		0xC9		; COM & LPT flow control bits
 DSR_BITMASK		EQU		0x80
-COM_STAT_STRING MACRO
-	DB "98N1DNN"
+
+; COM "STAT" string, not including the speed
+; TPDD protocol is raw binary data, so must be 8 bit and no xon/xoff
+COM_PARAMS MACRO
+	DB "8N1DNN"
 	ENDM

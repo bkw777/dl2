@@ -3,15 +3,9 @@
 ; https://github.com/bkw777/m100_dev/blob/main/rom_cross_map.ods
 ; https://github.com/bkw777/m100_dev/tree/main/platforms/M10
 
-; M10 is working - reporduces the original binary and works
-
 ; 100 vs M10 notes
 ; https://github.com/LivingM100SIG/Living_M100SIG/blob/main/M100SIG/Lib-12-NEC-OLIVETTI/M10ROM.DO
 ; says the M10 rs232 routines do not ignore rts/cts the way 100 does.
-
-; TODO test if the 100 code works on M10 or vice versa. Is one or the other
-; an improvement, or are the M10 changes needed for the M10 system rom?
-	DEFINE REPRODUCE_ORIGINAL_BINARY
 
 ; routines
 PTILL0			EQU		0x11A5		; print null-terminated string at HL to screen
@@ -43,8 +37,3 @@ FILNM1			EQU		0xFC99		; 9 bytes, padded fname for save/open/etc
 FX1				EQU		FILNM1+6	; EXT of FILNM1 after CKFN2 (“CO”, “DO”, “BA”)
 ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer, 320 bytes
 KYBCNT			EQU		0xFF6D		; number of characters in keyboard buffer
-
-
-	IF REPRODUCE_ORIGINAL_BINARY
-	DEFINE DISABLE_DSR
-	ENDIF

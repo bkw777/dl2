@@ -3,8 +3,6 @@
 ; https://github.com/bkw777/m100_dev/blob/main/rom_cross_map.ods
 ; https://github.com/bkw777/m100_dev/tree/main/platforms/100
 
-; 100 is working - reporduces the original binary which works
-
 ; routines
 PTILL0			EQU		0x11A2		; print null-terminated string at HL to screen
 SET232			EQU		0x17E6		; set RS232 parameters to STAT string pointed to by HL

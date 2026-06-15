@@ -22,7 +22,59 @@
 ;;;; NEC not started
 ;;;;
 
-	INCLUDE		"m100_common.S85"
+; -----------------------------------------------------------------------------
+; CONFIGURATION
+; -----------------------------------------------------------------------------
+
+; TPDD1 & TPDD2 have dip switches that can set the drive to several speeds
+; from 150 to 76k, They both ship set to 19200 by default.
+; The highest speed that the M100 can do is 19200.
+; (using the normal rom routines and a STAT string)
+; Brother, KnitKing, and Purple Computing drives are all hard-wired to 9600
+; by solder jumpers. They can only be changed by desoldering a solder blob.
+; Default is 19200 here because that's what the original TEENY had, and we
+; are still verifying builds against that as a reference to prove correctness
+; while rearranging and annotating the code.
+; Also today most users are only using a tpdd emulator not a real drive.
+	IFNDEF BAUD
+BAUD 				EQU		19200
+	ENDIF
+
+; The DSR check makes it so we gracefully detect when the drive is not
+; connected or not ready. It's better to have it but it was always an
+; install-time config option. TEENY.EXE for MS-DOS generates whichever you want.
+	;DEFINE DISABLE_DSR
+
+; A tpdd WRITE packet may specify any payload data length from 0 to 251
+; (256 minus 5 bytes of packet overhead: Z Z cmd len chk)
+; M100/KC85 platform only has a 64 byte com buffer and TEENY does not
+; use any flow control other than the cmd<>ack sync nature of the tpdd
+; packet protocol itself, so large chunks are not wise at 19,200 baud.
+; Also it's better if the size is the same or some even division or multiple
+; of the loigical sector size of the disk formatting, and for a normal
+; filesystem disk that is 64 bytes. Most (probably all) other tpdd clients
+; including TANDY's Floppy itself use 128. But you can actually use anything
+; up to 251.
+	IFNDEF CHUNK_LEN
+CHUNK_LEN		EQU		0x80
+	ENDIF
+
+; -----------------------------------------------------------------------------
+; ASSEMBLER
+; -----------------------------------------------------------------------------
+
+; z88dk before db5c165 (20260602) doesn't recognize the intel syntax for RST
+_RST MACRO n
+	IF Z88DK && Z88DK<25000
+		RST n*8
+	ELSE
+		RST n
+	ENDIF
+	ENDM
+
+; -----------------------------------------------------------------------------
+; TARGET PLATFORM
+; -----------------------------------------------------------------------------
 
 	IF MODEL_200
 	INCLUDE		"200.S85"
@@ -36,18 +88,111 @@
 	INCLUDE		"100.S85"
 	ENDIF
 
+	IFNDEF FLOWCTL_PORT
+FLOWCTL_PORT		EQU		0xBB				; COM & LPT flow control bits
+	ENDIF
+	IFNDEF DSR_BITMASK
+DSR_BITMASK			EQU		0x20
+	ENDIF
+
+; COM "STAT" string, not including the speed (speed is configurable)
+; TPDD protocol is raw binary data, so must be 8 bit and no xon/xoff
+	IFNDEF COM_PARAMS
+COM_PARAMS MACRO
+	DB "8N1D"
+	ENDM
+	ENDIF
+
+; complete COM STAT string ex: "98N1D"
+COM_STAT MACRO
+	IF BAUD = 19200
+	COM_SPEED EQU '9'
+	ELIF BAUD = 9600
+	COM_SPEED EQU '8'
+	ELIF BAUD = 4800
+	COM_SPEED EQU '7'
+	ELIF BAUD = 2400
+	COM_SPEED EQU '6'
+	ELIF BAUD = 1200
+	COM_SPEED EQU '5'
+	ELIF BAUD = 600
+	COM_SPEED EQU '4'
+	ELIF BAUD = 300
+	COM_SPEED EQU '3'
+	ELIF BAUD = 110
+	COM_SPEED EQU '2'
+	ELIF BAUD = 75
+	COM_SPEED EQU '1'
+	ELSE
+	COM_SPEED EQU '8'	; only some drives can do 19200 but all can do 9600
+	ENDIF
+
+	DB COM_SPEED
+	COM_PARAMS
+	ENDM
+
+; cpu opcodes
+opcode_LXI_B		EQU		0x01
+
+; ascii
+ETX					EQU		0x03
+LF					EQU		0x0A
+FF					EQU		0x0C
+CR					EQU		0x0D
+ESC 				EQU		0x1B
+SPACE				EQU		0x20
+
+; file types, attribute byte A for MKDIRENT
+FattrBA				EQU		0x80		; .BA files
+FattrDO				EQU		0xC0		; .DO files
+FattrCO				EQU		0xA0		; .CO files
+; file types, reg A for AFTEREOF2
+ftypeBA				EQU		0x00
+ftypeDO				EQU		0x01
+ftypeCO				EQU		0x02
+
+rst_NextNonSpace	EQU		2		; RST 2 = get next non-whitespace char from M to A
+rst_CompareDEHL		EQU		3		; RST 3 = compare DE and HL
+rst_Print_A			EQU		4		; RST 4 = print A to LCD/LPT
+
+; -----------------------------------------------------------------------------
+; TPDD
+; -----------------------------------------------------------------------------
+
+ZZ					EQU		0x5A5A				; packet start / preamble, really 2 consecutive 'Z', not a int16 number
+
+req_dirent			EQU		0x00
+req_open			EQU		0x01
+req_close			EQU		0x02
+req_read			EQU		0x03
+req_write			EQU		0x04
+req_delete			EQU		0x05
+req_status			EQU		0x07
+
+ret_read			EQU		0x10
+ret_dirent			EQU		0x11
+ret_normal			EQU		0x12
+
+open_mode_write		EQU		0x01
+open_mode_append	EQU		0x02
+open_mode_read		EQU		0x03
+
+; -----------------------------------------------------------------------------
+; APPLICATION
+; -----------------------------------------------------------------------------
+
 ; TINY uses ALTCD for it's variables and packet buffer
 ; start of ALTLCD							; FCC0
-RamFileStart	EQU		ALTLCD + 0x40		; FD00
-RamFileSize		EQU		ALTLCD + 0x42		; FD02
-DskFileSize		EQU		ALTLCD + 0x44		; FD04  native lsb-first copy of tpdd msb-first filesize
-StackPointer	EQU		ALTLCD + 0x46		; FD06
-wFD08			EQU		ALTLCD + 0x48		; FD08
+RamFileStart		EQU		ALTLCD + 0x40		; FD00
+RamFileSize			EQU		ALTLCD + 0x42		; FD02
+DskFileSize			EQU		ALTLCD + 0x44		; FD04  native lsb-first copy of tpdd msb-first filesize
+StackPointer		EQU		ALTLCD + 0x46		; FD06
+LoadingFlag			EQU		ALTLCD + 0x48		; FD08
 ; TPDD packet
-pktZZ			EQU		ALTLCD + 0x4A		; FD0A  tpdd packet preamble "ZZ"
-pktTYPE			EQU		ALTLCD + 0x4C		; FD0C  tpdd packet command or return type
-pktDLEN			EQU		ALTLCD + 0x4D		; FD0D  tpdd packet data length
-pktDATA			EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data (length varies 0-?? 64? up to 252 is possible & legal but idk yet what TEENY does)
+pktZZ				EQU		ALTLCD + 0x4A		; FD0A  tpdd packet preamble "ZZ"
+pktTYPE				EQU		ALTLCD + 0x4C		; FD0C  tpdd packet command or return type
+pktDLEN				EQU		ALTLCD + 0x4D		; FD0D  tpdd packet data length
+pktDATA				EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data (length varies 0-?? 64? up to 252 is possible & legal but idk yet what TEENY does)
 ; position varies but also a single byte checksum comes after pktDATA, and is the final byte of the packet
 
 ; FSIZE in a DIRENT packet
@@ -56,8 +201,8 @@ pktDATA			EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data (length varies 0-?? 64? u
 ; pktDATA + 24 : attr
 ; pktDATA + 25 : fsize msb
 ; pktDATA + 26 : fsize lsb
-direntFSIZE		EQU		pktDATA + 25		; FD27
-; end of ALTLCD			ALTLCD + 0x013F		; FDFF
+direntFSIZE			EQU		pktDATA + 25		; FD27
+; end of ALTLCD				ALTLCD + 0x013F		; FDFF
 
 ; DLEN for a WRITE packet
 ; Not pktDLEN itself, used to fill pktDLEN in outgoing WRITE packet.
@@ -66,43 +211,14 @@ direntFSIZE		EQU		pktDATA + 25		; FD27
 ; On 200 FF80 seems unrelated:  FFBB-FFFA
 ;    M10                        FF46-FF85
 ;    K85                        FFBE-FFFD
-writeDLEN		EQU		0xFF80
+writeDLEN			EQU		0xFF80
 
-; TPDD
-ZZ				EQU		0x5A5A				; packet start / preamble, really 2 consecutive 'Z', not a int16 number
 
-req_dirent		EQU		0x00
-req_open		EQU		0x01
-req_close		EQU		0x02
-req_read		EQU		0x03
-req_write		EQU		0x04
-req_delete		EQU		0x05
-req_status		EQU		0x07
 
-ret_read		EQU		0x10
-ret_dirent		EQU		0x11
-ret_normal		EQU		0x12
+; -----------------------------------------------------------------------------
+; ORG
+; -----------------------------------------------------------------------------
 
-open_mode_write		EQU		0x01
-open_mode_append	EQU		0x02
-open_mode_read		EQU		0x03
-
-RW_Chunk_Size		EQU		0x80			; Read/Write chunk size. May use anything from 1 to 252.
-
-; constants
-	IFNDEF FLOWCTL_PORT
-FLOWCTL_PORT		EQU		0xBB				; COM & LPT flow control bits
-	ENDIF
-	IFNDEF DSR_BITMASK
-DSR_BITMASK			EQU		0x20
-	ENDIF
-	IFNDEF COM_STAT_STRING
-COM_STAT_STRING MACRO
-	DB "98N1D"
-	ENDM
-	ENDIF
-
-;------------------------------------------------------------------------------
 ; ORG & CO Header works backwards from HIMEM-PRGLEN.
 ; PRGLEN has to be supplied from outside via -DPRGLEN=len.
 ; If no PRGLEN then build with default ORG 0 and no CO header.
@@ -111,7 +227,7 @@ COM_STAT_STRING MACRO
 	; ORG
 	;--------------------------------------------------------------------------
 	IFNDEF HIMEM
-HIMEM		EQU		MAXRAM
+HIMEM				EQU		MAXRAM
 	ENDIF
 
 	ORG HIMEM-PRGLEN-6			; entry minus length of header
@@ -126,6 +242,10 @@ HIMEM		EQU		MAXRAM
 ;------------------------------------------------------------------------------
 
 
+; -----------------------------------------------------------------------------
+; START
+; -----------------------------------------------------------------------------
+
 ;------------------------------------------------------------------------------
 PRGTOP:
 PRGEXE:
@@ -138,7 +258,7 @@ MAIN:
 		LHLD		StackPointer	; copy saved stack pointer from ram to HL
 		SPHL						; copy saved stack pointer from HL to SP
 		XRA			A				; A = 0
-		STA			wFD08			; just lsb of wFD08 = 0     ???
+		STA			LoadingFlag		; LoadingFlag = 0
 		LXI			H,MAIN			; load MAIN addr to HL
 		PUSH		H				; push HL
 		LXI			H,STR_Prompt	; load addr to prompt string to HL
@@ -208,8 +328,8 @@ errNM:
 
 
 ERROR:
-		LDA 		wFD08			; A = just lsb of wFD08  ???
-		ORA 		A				; is it 0?
+		LDA 		LoadingFlag		; A = LoadingFlag
+		ORA 		A				; does LoadingFlag == 0?
 		JZ 			@show			; if 0 skip to @show
 		PUSH 		D				; stash DE (D doesn't matter, E=eXX from above)
 		LHLD 		RamFileSize		; HL=RamFileSize
@@ -276,7 +396,7 @@ PAUSE_100ms:
 		RET
 
 STR_STAT:
-		COM_STAT_STRING
+		COM_STAT
 
 InitPacket:
 		LXI 		H,pktTYPE		; HL @ pktTYPE
@@ -286,25 +406,25 @@ InitPacket:
 		; HL @ pktDLEN
 		RET
 
+	IFNDEF DISABLE_DSR
 CheckDSR:
 		IN			FLOWCTL_PORT	; read RS232 flow control pins
 		ANI			DSR_BITMASK		; check !DSR
-	IF DISABLE_DSR
-		RET
-	ELSE
 		RZ
-	ENDIF
 		MVI			E,eNR			; set NR error
 		JMP			ERROR
+	ENDIF
 
 
+; * Calculate & append checksum to packet
+; * Send the REQuest packet
+; * Receive the RETurn packet
 SendPacket:
 ; Calculate Packet Checksum
 ; Sum all the bytes in the specified range.
 ; Take the least significant byte of that sum.
 ; Invert all the bits in that byte.
-; The checksummed range is cmd field through data field.
-
+; The checksummed range is the start of cmd through end of data.
 ; start at pktTYPE
 		LXI			H,pktTYPE		; HL @ pktTYPE
 		MOV			A,M				; A = pktTYPE
@@ -345,38 +465,49 @@ SendPacket:
 		MOV			A,M				; A = byte from packet
 		CALL		SND232			; send byte out rs232
 		JC			errIO			; if shift+break then jump to errIO
+	IFNDEF DISABLE_DSR
 		CALL		CheckDSR
+	ENDIF
 		INX			H				; advance HL to next byte in packet
 		DCR			B				; B--
 		JNZ			@send_byte		; send bytes until B=0
-		; done sending packet
-		LXI			H,pktTYPE		; move to pkTYPE
-		CALL		INT1D
-		CALL		ReadSerialByteAppendM
-		; pktTYPE now contains the packet return type sent back by the drive
-		; HL @ pktDLEN
-		CALL		ReadSerialByteAppendM
-		; pktDLEN now contains the packet return data length sent back by the drive
-		; HL @ pktDATA
-		MOV			C,A				; save return DLEN in C
-		INR			C				; C++
-		; read C+1 (DLEN+CHK) more bytes from serial 
+
+		; DONE SENDING COMMAND PACKET
+
+		; NOW READ RETURN PACKET
+
+		; tpdd return packet starts with pktTYPE, no ZZ
+		LXI			H,pktTYPE		; HL @ pkTYPE
+		CALL		INT1D			; disable interrupts
+		CALL		ReadSerialByteIncHL	; read byte from serial to pktTYPE, HL @ pktDLEN
+		CALL		ReadSerialByteIncHL	; read byte from serial to pktDLEN, HL @ pktDATA
+		MOV			C,A				; C = return packet DLEN
+		INR			C				; C = DLEN + 1 (data length & 1 byte checksum)
+		; read C more bytes from serial
 @read_byte:
-		CALL		ReadSerialByteAppendM
+		CALL		ReadSerialByteIncHL	; read a byte from serial to pktDATA
 		DCR			C				; C--
 		JNZ			@read_byte		; repeat until C = 0
-		; pktDATA now contains the return DATA and the checksum byte after that
-		XRA			A
-		SIM
-		LXI			H,pktDLEN		; move to return pktDLEN
-		MOV			C,M				; copy to C
-		INX			H				; advance HL to pktDATA
-		MOV			A,M				; read 1st byte of return pktDATA
-		ORA			A				; set Z if pktDLEN 0
+		; pktDATA now contains the return DATA and the checksum byte
+		; we never use the checksum but we must consume the entire packet
+		XRA			A				; A = 0
+		SIM							; IM = 0 -> enable all interrupts
+		LXI			H,pktDLEN		; HL @ pktDLEN
+		MOV			C,M				; C = DLEN
+		INX			H				; HL @ pktDATA
+		MOV			A,M				; read 1st byte @ pktDATA
+		ORA			A				; set Z if first byte of data is 0
+		; All return packet types have at least 1 byte of data.
+		; A standard type has exactly 1 byte of data, an error code.
+		; pktDATA=0x00 means no error.
+		; So we are returning Z = success, anything else = error.
 		RET
 
-ReadSerialByteAppendM:
+; read 1 byte from rs232 to M, advance HL
+ReadSerialByteIncHL:
+	IFNDEF DISABLE_DSR
 		CALL		CheckDSR
+	ENDIF
 		CALL		RCV232
 		JC			errIO
 		JNZ			errCM
@@ -445,15 +576,15 @@ DIRENT:
 
 SendPacket2:
 		CALL		SendPacket
-		MOV			B,A					; B = A returned from SendPacket   (why bother? see Q01)
+		MOV			B,A					; B = A returned from SendPacket   why bother?(*1)
 		LDA			pktTYPE				; A = packet type that the drive returned
 		CPI			ret_normal			; is it a STANDARD return packet?
 		JZ			ParseErrorReturn	; it's supposed to be a DIRENT or READ return not a standard return
-		MOV			A,B					; A = saved result from SendPacket (why bother? see Q01)
-		ORA			A					; if A = 0 set Z (why bother? see Q01)
-		; where are we returning to?
-		; A we CALLed here from SendOpenCMD:
-		; B we fell in from DIRENT:
+		MOV			A,B					; A = saved result from SendPacket   why bother?(*1)
+		ORA			A					; if A = 0 set Z   why bother?(*1)
+		; places we might be returning to:
+		; * we CALLed from SendOpenCMD
+		; * we fell through from DIRENT
 		RET
 
 SendOpenCMD_write:
@@ -475,7 +606,7 @@ SendFinalWriteChunk:
 SendWriteCMD:
 		MVI			A,req_write
 		CALL		InitPacket
-		MOV			M,C					; write C=chunk_size to pktDLEN
+		MOV			M,C					; write C=chunk_len to pktDLEN
 		INX			H					; advance HL to pktDATA
 		MOV			B,C					; tell D2H4Bup how many bytes to copy
 		CALL		D2H4Bup				; copy B bytes from DE to HL
@@ -483,24 +614,25 @@ SendWriteCMD:
 
 LOAD:
 ; FINDFN reads FILNM1 (FC93 on 100) which has been set up by CKFN2 in MAIN
-		CALL		FINDFN
-		JNZ			errAE
+		CALL		FINDFN				; see if the proposed file already exists in ram
+		JNZ			errAE				; abort with AE error if the file already exists
 		LXI			H,errFL
-		SHLD 		ETRAP
+		SHLD 		ETRAP				; set errFL as the general error handler
 		CALL		SCNEMP				; find empty ram file direrctory entry
 		PUSH		H
-		CALL		GetFtypeX
+		CALL		GetFtypeX			; determine the filetype, CO, DO, or BA
 		; BA: A=2 F=SPC
 		; CO: A=0 F=ZP
 		; DO: A=1
-		LHLD		direntFSIZE			; read msb-first word filesize from direntFSIZE into HL
-		; H=LSB L=MSB (HL = byte-swapped filesize from a tpdd DIRENT return packet)
+		LHLD		direntFSIZE			; HL = byte-swapped filesize from DIRENT return.
+		; direntFSIZE was written by DIRENT: while still in MAIN: before coming here.
+		; All 16-bit values in tpdd packets are msb-first. H=lsb L=msb
 		MOV			B,L					; copy msb to B
 		MOV			C,H					; copy lsb to C
-		; BC = filesize
+		; BC = filesize (not byte-swapped)
 		MOV			L,C					; copy lsb to L
 		MOV			H,B					; copy msb to H
-		; HL = filesize
+		; HL = filesize (not byte-swapped any more)
 		SHLD		DskFileSize			; write filesize to DskFileSize
 		DCX			B					; BC-- (filesize minus 1)
 		MOV			E,A					; E = ftype (CO=0 DO=1 BA=2)
@@ -509,21 +641,23 @@ LOAD:
 		INX			B					; BC++
 		DCR			A					; A--
 		JNZ			@l0					; repeat until A=0
-		; A=0
 		; not sure why we're adding 0, 1, or 2 to filesize but the EOFs match up
 		; CO: BC=filesize+0  CO files end is defined in the CO header, no eof marker bytes
 		; DO: BC=filesize+1  DO files end with 1 EOF byte (0x1A)
 		; BA: BC=filesize+2  BA files end with 2 NUL bytes (3 consecutive NUL but the 1st is part of the last line, 2 NULs come after that)
 		;
-		; FtypeTable is a router table with 3 entries, one each for CO, DO, & BA files
-		; Each entry is 5 bytes in 3 fields:
+		; A = 0
+		; BC = ram filesize (true filesize + 0, 1, or 2)
+		;
+		; FtypeTable is a table with 3 blocks, one each for CO, DO, & BA filetypes
+		; Each block is 5 bytes in 3 fields:
 		; 1 byte:  attribute for MKDIRENT   FattrCO FattrDO FattrBA
 		; 2 bytes: jump address             jCOFILE jDOFILE jBAFILE
 		; 2 bytes: start of filetype area   COFILES DOFILES BAFILES
-		; Select the correct entry by adding ftype(0/1/2) 5 times
-		; which will end up being FtypeTable+0/+5/+10
-		MOV			D,A					; DE=(CO:0000|DO:0001|BA:0002)
+		MOV			D,A					; D=0 E=0/1/2 DE=0/1/2
+		; get the address of the start of FtypeTable
 		LXI			H,FtypeTable		; HL = FtypeTable
+		; move to the correct block for the file type
 		DAD			D					; HL += DE
 		DAD			D					; HL += DE
 		DAD			D					; HL += DE
@@ -537,41 +671,59 @@ LOAD:
 		; DO: A = FattrDO
 		; BA: A = FattrBA
 		PUSH		PSW					; stash FattrXX
+
+		; attr FattrCO / FattrDO / FattrBA has been read from the jump table and pushed
+
 		LXI			D,MkRamDirent		; DE = MkRamDirent
 		PUSH		D					; stash MkRamDirent
+
+		; pushed the addr of MkRamDirent
+
 		INX			H					; HL++ to jump addr lsb
 		MOV			E,M					; E = jump addr lsb
 		INX			H					; HL++ to jump addr msb 
 		MOV			D,M					; D = jump addr msb
-		PUSH		D					; save jump addr
+		PUSH		D					; save jump addr   <<< when do we ever pop & jump?(*2)
+
+		; addr jCOFILES / jDOFILES / jBAFILES has been read from the jump table and pushed
+
 		INX			H					; HL++ to XXFILES area pointer
+		MOV			E,M					; E = XXFILES pointer lsb
+		INX			H					; HL++ to XXFILES pointer msb
+		MOV			H,M					; H = XXFILES pointer msb
+		MOV			L,E					; L = XXFILES pointer lsb   HL=XXFILES pointer
+
+		; pointer COFILES / DOFILES / BAFILES has been read from the jump table
+		; and HL now points to it
+
+		; read the file area start addr from the pointer addr
 		MOV			E,M					; E = XXFILES lsb
-		INX			H					; HL++ to XXFILES msb
-		MOV			H,M					; H = XXFILES msb
-		MOV			L,E					; L = XXFILES lsb   HL=XXFILES
-		MOV			E,M					; E = byte @ start of COFILES/DOFILES/BAFILES
 		INX			H					; HL++
-		MOV			D,M					; D = byte @ XXFILES+1
-		; DE = 16 bit value from 1st 2 bytes of CO/DO/BA file area ???
-		MOV			H,B					; H = msb of filesize+0/1/2
-		MOV			L,C					; L = lsb of filesize+0/1/2
-		; HL = filesize+X
-		SHLD		RamFileSize			; RamFileSize = filesize+X
+		MOV			D,M					; D = XXFILES msb
+
+		; DE = start of COFILES, DOFILES, or BAFILES area
+
+		MOV			H,B					; H = ram filesize msb
+		MOV			L,C					; L = ram filesize lsb
+		; HL = ram filesize
+		SHLD		RamFileSize			; RamFileSize = ram filesize
 		XCHG							; swap HL:DE
-		; DE = filesize+X
-		; HL = 16 bit value from 1st 2 bytes of CO/DO/BA file area ???
-		SHLD		RamFileStart		; write HL to RamFileStart ?
+		; DE = ram filesize
+		; HL = start of CO/DO/BA FILES area
+		SHLD		RamFileStart		; RamFileStart = HL (new ram file starts at the beginning of the area for it's type)
 		PUSH		H					; stash HL=RamFileStart
 		CALL		MAKHOL				; create space for new file
 		JC			errOM				; abort if MAKHOL failed from not enough memory
-		LXI			H,wFD08				; read a WORD from wFD08 ???
-		INR			M					; incriment just the LSB at wFD08  ???
+		; set a status flag that we are now loading from disk to ram
+		LXI			H,LoadingFlag		; HL = LoadingFlag
+		INR			M					; LoadingFlag++
 		CALL		SendOpenCMD_read	; open the tpdd file for reading
 		LHLD		DskFileSize			; HL = DskFileSize
 		XCHG							; swap HL:DE  DE = DskFileSize
 		POP			H					; HL = RamFileStart
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; not following the use of pktTYPE here
 
 		LDA			pktTYPE				; A = packet type  (should be 0x10 for read return?)
 		MOV			C,A					; C = packet type  ????????
@@ -610,7 +762,7 @@ SendReadCMD:
 		MVI			A,req_read			; A = READ packet fmt code
 		CALL		InitPacket			; Construct a tpdd packet
 		CALL		SendPacket2			; send the packet to the drive, read a return packet from the drive
-		XRA			A					; A = 0		; Q01 why did we bother saving & restoring A? 
+		XRA			A					; A = 0		; (*1) why did we bother saving & restoring A? 
 		MOV			B,A					; B = 0
 		MOV			C,A					; C = 0
 		STA			pktTYPE				; A = pktTYPE (return packet fmt)
@@ -618,6 +770,8 @@ SendReadCMD:
 		POP			H					; restore HL
 		RET
 
+; Used in LOAD. The different file types need different operations when
+; inserting a new file in ram.
 FtypeTable:
 	DB FattrCO				; +0
 	DW jCOFILE
@@ -629,10 +783,16 @@ FtypeTable:
 	DW jBAFILE
 	DW BAFILES
 
+; (*2) Even though I know where these jump addresses are read from the table
+; above, I don't see where they are ever used. The jump addr is read,
+; then pushed, and then I don't see where it is ever popped or used.
+
 jDOFILE:
 		MVI			M,0x1A
 		RET
 
+; Maybe I missed something here. BA files get 2 nuls after the end of the file
+; and we do write 2 nuls here, but at the begining?
 jBAFILE:
 		XRA			A					; A=0
 		MOV			M,A					; write 0 @ HL (start of file data?)
@@ -673,7 +833,7 @@ GetFtypeX:
 		; CO: A=00 F=ZP
 		; DO: A=01 F=
 		RP								; return if not S, file is not BA
-		MVI			A,0x02				; A=2
+		MVI			A,2					; A=2
 		; BA: A=2 F=SPC
 		RET								; file is BA
 
@@ -698,11 +858,11 @@ SAVE:
 		; DO: A=1
 		; BA: A=2 F=SPC
 
-; This ftype 0/1/2 stuff is confusing because there are 2 different things going on
-; with almost the same numbers.
-; 1: AFTEREOF2 needs to bet told the type of file: A=0 for BA, 1 for DO, 2 for CO
-; 2: We need to add 0, 1, or 2 bytes to the local ram file size for eof marker bytes:
-; CO=0 (sof/eof defined by the CO header), DO=1 (0x1A), BA=2 (0x00 0x00)
+; This ftype 0/1/2 stuff is confusing to read because there are 2 different
+; things going on with the same values but different uses and meanings.
+; 1: AFTEREOF2 needs to bet told the type of file: 0/1/2 for BA/DO/CO
+; 2: We need to add eof bytes to the ram filesize: 0/1/2 for CO/DO/BA
+; CO=0 file defined by the CO header / DO=1 0x1A / BA=2 0x00 0x00
 
 		MOV			C,A					; C = ftypeX
 		; CO: C=0
@@ -735,8 +895,7 @@ SAVE:
 		POP			B					; retore B=0 C=ftypeX  CO:0  DO:1  BA:2
 		INR			C					; C++   absorb the initial C-- in the following loop
 		INX			H					; HL++  absorb the initial HL-- in the following loop
-		; This loop removes the EOF marker bytes from the local ram file length to get the true file length
-@l0:
+@l0:	; remove the EOF marker bytes from the local ram file length to get the true file length
 		DCX			H					; HL-- = length--
 		DCR			C					; C-- = 
 		JNZ			@l0
@@ -759,15 +918,15 @@ SAVE:
 WriteChunks:
 		PUSH		H
 		PUSH		H
-		LXI			H,RW_Chunk_Size		; HL = RW_Chunk_Size
-		_RST		rst_CompareDEHL		; compare DE(remaining_data) to HL(chunk_size)
+		LXI			H,CHUNK_LEN			; HL = CHUNK_LEN
+		_RST		rst_CompareDEHL		; compare DE(remaining_data) to HL(chunk_len)
 		; flags: C means HL<DE, Z means HL=DE
-		JNC			@l0					; jump if not C, exit loop when chunk_size >= remaining_data
-		MOV			C,L					; C = chunk_size
-		MOV			B,H					; B=0 (should always be 0 here since HL=chunk_size above cannot exceed 252?)
-		; BC = chunk size
+		JNC			@l0					; jump if not C, exit loop when chunk_len >= remaining_data
+		MOV			C,L					; C = chunk_len
+		MOV			B,H					; B=0 (should always be 0 here since HL=chunk_len above cannot exceed 251 right?)
+		; BC = chunk len
 		POP			H					; restore HL=position
-		DAD			B					; advance HL by one chunk_size
+		DAD			B					; advance HL by one chunk_len
 		XTHL							; replace TS with HL=new_position, HL=old_position   ?
 		XCHG							; swap HL:DE, DE=old_position, HL=remaining_data     ?
 		LXI			B,writeDLEN			; BC = writeDLEN
