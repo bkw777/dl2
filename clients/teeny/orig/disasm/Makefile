@@ -13,7 +13,7 @@ ASFLAGS := -m8085_strict -no-synth # -v
 ASFLAGS += $(shell $(AS) |awk '/^Z80 Macro Assembler /{split($$4,a,"-");if (a[1]>0) print "-DZ88DK="a[1]}')
 
 # -DHIMEM=addr		# [MAXRAM] generate a relocated binary with specified END address
-# -DDISABLE_DSR
+# -DINCLUDE_DSR		# include code to check DSR
 # -DBAUD=9600		# [19200] 9600 4800 2400 1200 600 300 110 75
 # -DCHUNK_LEN=64	# 1-251, [128]
 XFLAGS :=
@@ -22,7 +22,7 @@ XFLAGS :=
 .SECONDARY:
 
 .PHONY: all
-all: verify $(NAME).DO
+all: $(NAME).DO
 
 $(NAME).CO: $(SRC)
 	$(AS) $(ASFLAGS) $(XFLAGS) -b -o=$@ $< && \
@@ -36,6 +36,8 @@ $(NAME).CO: $(SRC)
 .PHONY: verify
 verify: $(NAME).CO
 	@cmp -l $< ../$< && echo "Built $< is identical to reference ../$<."
+	@echo "Note: default config no longer replicates the legacy binary exactly,"
+	@echo "so it's normal for verify to 'fail' now."
 
 .PHONY: load
 load: $(NAME).DO

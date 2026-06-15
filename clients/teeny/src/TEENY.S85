@@ -32,18 +32,15 @@
 ; (using the normal rom routines and a STAT string)
 ; Brother, KnitKing, and Purple Computing drives are all hard-wired to 9600
 ; by solder jumpers. They can only be changed by desoldering a solder blob.
-; Default is 19200 here because that's what the original TEENY had, and we
-; are still verifying builds against that as a reference to prove correctness
-; while rearranging and annotating the code.
-; Also today most users are only using a tpdd emulator not a real drive.
+; Most users today are using a tpdd emulator not a real drive.
 	IFNDEF BAUD
 BAUD 				EQU		19200
 	ENDIF
 
 ; The DSR check makes it so we gracefully detect when the drive is not
-; connected or not ready. It's better to have it but it was always an
-; install-time config option. TEENY.EXE for MS-DOS generates whichever you want.
-	;DEFINE DISABLE_DSR
+; connected or not ready. It's not critical, and the point of TEENY is
+; to be teeny, so by default the DSR code is not included.
+	;DEFINE INCLUDE_DSR
 
 ; A tpdd WRITE packet may specify any payload data length from 0 to 251
 ; (256 minus 5 bytes of packet overhead: Z Z cmd len chk)
@@ -406,7 +403,7 @@ InitPacket:
 		; HL @ pktDLEN
 		RET
 
-	IFNDEF DISABLE_DSR
+	IF INCLUDE_DSR
 CheckDSR:
 		IN			FLOWCTL_PORT	; read RS232 flow control pins
 		ANI			DSR_BITMASK		; check !DSR
@@ -465,7 +462,7 @@ SendPacket:
 		MOV			A,M				; A = byte from packet
 		CALL		SND232			; send byte out rs232
 		JC			errIO			; if shift+break then jump to errIO
-	IFNDEF DISABLE_DSR
+	IF INCLUDE_DSR
 		CALL		CheckDSR
 	ENDIF
 		INX			H				; advance HL to next byte in packet
@@ -505,7 +502,7 @@ SendPacket:
 
 ; read 1 byte from rs232 to M, advance HL
 ReadSerialByteIncHL:
-	IFNDEF DISABLE_DSR
+	IF INCLUDE_DSR
 		CALL		CheckDSR
 	ENDIF
 		CALL		RCV232
@@ -576,12 +573,12 @@ DIRENT:
 
 SendPacket2:
 		CALL		SendPacket
-		MOV			B,A					; B = A returned from SendPacket   why bother?(*1)
+		MOV			B,A					; B = A returned from SendPacket   why?(*1)
 		LDA			pktTYPE				; A = packet type that the drive returned
 		CPI			ret_normal			; is it a STANDARD return packet?
 		JZ			ParseErrorReturn	; it's supposed to be a DIRENT or READ return not a standard return
-		MOV			A,B					; A = saved result from SendPacket   why bother?(*1)
-		ORA			A					; if A = 0 set Z   why bother?(*1)
+		MOV			A,B					; A = saved result from SendPacket   why?(*1)
+		ORA			A					; if A = 0 set Z   why?(*1)
 		; places we might be returning to:
 		; * we CALLed from SendOpenCMD
 		; * we fell through from DIRENT
@@ -637,14 +634,13 @@ LOAD:
 		DCX			B					; BC-- (filesize minus 1)
 		MOV			E,A					; E = ftype (CO=0 DO=1 BA=2)
 		INR			A					; A = ftype+1 (CO=1 DO=2 BA=3)
-@l0:
+@l0:	; add 0/1/2 eof marker bytes to true filesize to get ram filesize
 		INX			B					; BC++
 		DCR			A					; A--
 		JNZ			@l0					; repeat until A=0
-		; not sure why we're adding 0, 1, or 2 to filesize but the EOFs match up
-		; CO: BC=filesize+0  CO files end is defined in the CO header, no eof marker bytes
-		; DO: BC=filesize+1  DO files end with 1 EOF byte (0x1A)
-		; BA: BC=filesize+2  BA files end with 2 NUL bytes (3 consecutive NUL but the 1st is part of the last line, 2 NULs come after that)
+		; CO: BC=filesize+0  CO files end is defined in the CO header, no added eof marker bytes
+		; DO: BC=filesize+1  DO files end with 1 added EOF byte (0x1A)
+		; BA: BC=filesize+2  BA files end with 2 added NUL bytes
 		;
 		; A = 0
 		; BC = ram filesize (true filesize + 0, 1, or 2)
@@ -762,7 +758,8 @@ SendReadCMD:
 		MVI			A,req_read			; A = READ packet fmt code
 		CALL		InitPacket			; Construct a tpdd packet
 		CALL		SendPacket2			; send the packet to the drive, read a return packet from the drive
-		XRA			A					; A = 0		; (*1) why did we bother saving & restoring A? 
+		XRA			A					; A = 0 ; (*1) why did we bother saving & restoring A? 
+												; IDK but without it, SAVE always errors with AE.
 		MOV			B,A					; B = 0
 		MOV			C,A					; C = 0
 		STA			pktTYPE				; A = pktTYPE (return packet fmt)
@@ -861,7 +858,7 @@ SAVE:
 ; This ftype 0/1/2 stuff is confusing to read because there are 2 different
 ; things going on with the same values but different uses and meanings.
 ; 1: AFTEREOF2 needs to bet told the type of file: 0/1/2 for BA/DO/CO
-; 2: We need to add eof bytes to the ram filesize: 0/1/2 for CO/DO/BA
+; 2: We need to remove eof bytes from ram filesize to get true filesize: 0/1/2 for CO/DO/BA
 ; CO=0 file defined by the CO header / DO=1 0x1A / BA=2 0x00 0x00
 
 		MOV			C,A					; C = ftypeX
@@ -895,7 +892,7 @@ SAVE:
 		POP			B					; retore B=0 C=ftypeX  CO:0  DO:1  BA:2
 		INR			C					; C++   absorb the initial C-- in the following loop
 		INX			H					; HL++  absorb the initial HL-- in the following loop
-@l0:	; remove the EOF marker bytes from the local ram file length to get the true file length
+@l0:	; remove 0/1/2 eof marker bytes from ram filesize to get true filesize
 		DCX			H					; HL-- = length--
 		DCR			C					; C-- = 
 		JNZ			@l0
