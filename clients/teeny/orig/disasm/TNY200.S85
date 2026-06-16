@@ -182,7 +182,7 @@ HIMEM		EQU		MAXRAM
 
 PRGTOP:
 PRGEXE:
-	LXI			H,0x0000
+	LXI			H,0
 	DAD			SP
 	SHLD		StackPointer
 	LXI			H,ZZ
@@ -219,25 +219,25 @@ MAIN:
 	JZ			LOAD
 
 	MVI			E,0x03
-	db			opcode_LXI_B
+	DB			opcode_LXI_B
 errFF:
 	MVI			E,0x00
-	db			opcode_LXI_B
+	DB			opcode_LXI_B
 errCM:
 	MVI			E,0x06
-	db			opcode_LXI_B
+	DB			opcode_LXI_B
 errIO:
 	MVI			E,0x08
-	db			opcode_LXI_B
+	DB			opcode_LXI_B
 errAE:
 	MVI			E,0x10
-	db			opcode_LXI_B
+	DB			opcode_LXI_B
 errOM:
 	MVI			E,0x12
-	db			opcode_LXI_B
+	DB			opcode_LXI_B
 errFL:
 	MVI			E,0x01
-	db			opcode_LXI_B
+	DB			opcode_LXI_B
 errNM:
 	MVI			E,0x14
 
@@ -254,7 +254,7 @@ ERROR:
 	POP			D
 @show:
 	LXI			H,STR_ErrCodes
-	MVI			D,0x0
+	MVI			D,0
 	DAD			D
 	MOV			A,M
 	_RST		rst_Print_A
@@ -274,7 +274,7 @@ GetFtypeX:
 	LDA			FX1
 	SUI			'C'
 	RP
-	MVI			A,2
+	MVI			A,0x02
 	RET
 
 PAUSE_100ms:
@@ -290,12 +290,12 @@ STR_STAT:
 	COM_STAT
 
 FUN_ram_eca1:
-	MVI			E,0x3
+	MVI			E,0x03
 	CALL		SendOpenCMD
 FUN_ram_eca6:
 	PUSH		H
 	PUSH		D
-	MVI			A,0x3
+	MVI			A,0x03
 	CALL		InitPacket
 	CALL		SendPacket2
 	XRA			A
@@ -330,7 +330,7 @@ SendPacket:
 @endpkt:
 	CMA
 	MOV			M,A
-	MVI			A,0x5
+	MVI			A,0x05
 	ADD			B
 	MOV			B,A
 	LXI			H,pktZZ
@@ -364,14 +364,14 @@ SendPacket:
 	RET
 
 KILL:
-	MVI			A,0x5
+	MVI			A,0x05
 ShortPacket:
 	CALL		InitPacket
 jSendPacket:
 	CALL		SendPacket
 	RZ
 ParseErrorReturn:
-	ANI			0xf0
+	ANI			0xF0
 	RAR
 	RAR
 	RAR
@@ -388,12 +388,12 @@ DIRENT:
 	CALL		ShortPacket
 	XRA			A
 	CALL		InitPacket
-	MVI			M,0x1a
+	MVI			M,0x1A
 	INX			H
 	LXI			D,KYBUF+2
-	MVI			B,0x9
+	MVI			B,0x09
 	CALL		D2H4Bup
-	MVI			B,0xf
+	MVI			B,0x0F
 @l0:
 	MVI			M,SPACE
 	INX			H
@@ -494,7 +494,7 @@ LOAD:
 	POP			H
 	LDA			pktTYPE
 	MOV			C,A
-	MVI			B,0x0
+	MVI			B,0
 @l1:
 	MOV			A,D
 	ORA			E
@@ -518,7 +518,7 @@ InitPacket:
 	LXI			H,pktTYPE
 	MOV			M,A
 	INX			H
-	MVI			M,0x0
+	MVI			M,0
 	RET
 
 	IF INCLUDE_DSR
@@ -526,7 +526,7 @@ CheckDSR:
 	IN			FLOWCTL_PORT
 	ANI			DSR_BITMASK
 	RNZ
-	MVI			E,0x4
+	MVI			E,0x04
 	JMP			ERROR
 	ENDIF
 

@@ -7,7 +7,7 @@
 ;	z88dk-z80asm -m8085_strict -no-synth -DMODEL_100 -b -o=TEENY.CO TEENY.S85 && \
 ;	z88dk-z80asm -m8085_strict -no-synth -DMODEL_100 -DPRGLEN=$(wc -c <TEENY.CO) -b -o=TEENY.CO TEENY.S85
 ;
-; Currently builds for 100, K85, M10, 200
+; Builds for 100, K85, M10, 200, NEC
 ; $ make 100
 ; or
 ; build & verify that the 100 or M10 build reproduces the original exactly
@@ -948,4 +948,5 @@ WriteChunks:
 		MOV			C,E
 		POP			H
 		JMP			SendFinalWriteChunk
+
 PRGEND:
