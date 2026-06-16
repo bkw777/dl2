@@ -2,7 +2,7 @@
 # Requires https://github.com/z88dk/z88dk
 # Requires https://github.com/bkw777/dl2
 
-MODELS = 100 K85 M10 200 # NEC
+MODELS = 100 K85 M10 200 NEC
 NAME = TNY
 SRC = TEENY.S85
 
@@ -39,10 +39,11 @@ $(patsubst %,$(NAME)%.CO,$(MODELS)): $(NAME)%.CO : $(SRC) %.S85
 	$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -DPRGLEN=$$n -b -o=$@ $<
 	@rm *.o
 	@if test "$*" = "200" ;then echo '!NOTICE!  $* does not work. See ../orig/disasm for working 200 source' ;fi
+	@if test "$*" = "NEC" ;then echo '!NOTICE!  $* does not work. See ../orig/disasm for working NEC source' ;fi
 
 %.DO: %.CO
 	@which -s co2ba || echo "Please install https://github.com/bkw777/dl2 for co2ba to generate $@"
-	co2ba $< savem >$@
+	case "$*" in *NEC*) o=bsave ;; *) o=savem ;; esac ;co2ba $< $$o >$@
 
 .PHONY: verify_%
 verify_%: $(NAME)%.CO

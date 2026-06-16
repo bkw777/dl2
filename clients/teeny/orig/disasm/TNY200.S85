@@ -17,11 +17,13 @@
 BAUD 				EQU		19200
 	ENDIF
 
-	;DEFINE INCLUDE_DSR
+	DEFINE INCLUDE_DSR		; include to reproduce the original binary exactly
 
 	IFNDEF CHUNK_LEN
-CHUNK_LEN		EQU		0x80		; 1-251, default 128
+CHUNK_LEN			EQU		128
 	ENDIF
+
+COM_SETUP_PAUSE_MS	EQU		100
 
 ; -----------------------------------------------------------------------------
 ; ASSEMBLER
@@ -41,21 +43,6 @@ _RST MACRO n
 ; -----------------------------------------------------------------------------
 
 	INCLUDE		"../../src/200.S85"
-
-	IFNDEF FLOWCTL_PORT
-FLOWCTL_PORT		EQU		0xBB				; COM & LPT flow control bits
-	ENDIF
-	IFNDEF DSR_BITMASK
-DSR_BITMASK			EQU		0x20
-	ENDIF
-
-; COM "STAT" string, not including the speed (speed is configurable)
-; TPDD protocol is raw binary data, so must be 8 bit and no xon/xoff
-	IFNDEF COM_PARAMS
-COM_PARAMS MACRO
-	DB "8N1D"
-	ENDM
-	ENDIF
 
 ; complete COM STAT string ex: "98N1D"
 COM_STAT MACRO
@@ -141,7 +128,7 @@ open_mode_read		EQU		0x03
 ; The location and size of ALTLCD is different on 100 vs 200,
 ; but these variables are the same on both, relative offsets to ALTLCD.
 
-; F7B0 start of ALTLCD							; F7B0
+; F7B0 start of ALTLCD (200)					; F7B0
 RamFileStart		EQU		ALTLCD + 0x40		; F7F0
 RamFileSize			EQU		ALTLCD + 0x42		; F7F2
 FileSize			EQU		ALTLCD + 0x44		; F7F4
@@ -157,7 +144,8 @@ pktDATA				EQU		ALTLCD + 0x4E		; F7FE  0 to CHUNK_LEN bytes of payload data
 direntFSIZE			EQU		pktDATA + 25		; F817
 ; end of ALTLCD				ALTLCD + 0x027F		; FA2F
 
-; Curious location, both 100 and 200 use the same FF80
+; Curious location for this variable
+; ALL old versions of TEENY, 100, NEC, even 200, all used the same FF80
 ; On 100 FF80 is within COMBUF : FF46-FF85
 ; on 200 FF80 is outside COMBUF: FFBB-FFFA
 writeDLEN			EQU		0xFF80				; 1 byte, src for pktDLEN during write chunks loop
@@ -290,7 +278,7 @@ GetFtypeX:
 	RET
 
 PAUSE_100ms:
-	MVI			D,0x2E
+	MVI			D,COM_SETUP_PAUSE_MS*100/215	; orig 0x2E
 @l0:
 	DCX			D
 	MOV			A,D

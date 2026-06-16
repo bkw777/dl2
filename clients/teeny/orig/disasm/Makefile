@@ -1,9 +1,9 @@
-# Makefile for legacy TEENY for 200 disassembly
+# Makefile for legacy TEENY for 200 & NEC disassembly
 # Requires https://github.com/z88dk/z88dk
 # Requires https://github.com/bkw777/dl2
 
-NAME = TNY200
-SRC = $(NAME).S85
+MODELS = 200 NEC
+NAME = TNY
 
 AS = z88dk-z80asm
 ASFLAGS := -m8085_strict -no-synth # -v
@@ -22,25 +22,29 @@ XFLAGS :=
 .SECONDARY:
 
 .PHONY: all
-all: $(NAME).DO
+all: $(MODELS)
 
-$(NAME).CO: $(SRC)
+.PHONY: verify
+verify: verify_200 verify_NEC
+
+.PHONY: $(MODELS)
+$(MODELS): % : $(NAME)%.DO
+
+$(patsubst %,$(NAME)%.CO,$(MODELS)): $(NAME)%.CO : $(NAME)%.S85 ../../src/%.S85
 	$(AS) $(ASFLAGS) $(XFLAGS) -b -o=$@ $< && \
 	$(AS) $(ASFLAGS) $(XFLAGS) -DPRGLEN=$$(wc -c <$@) -b -o=$@ $<
 	@rm *.o
 
 %.DO: %.CO
 	@which -s co2ba || echo "Please install https://github.com/bkw777/dl2 for co2ba to generate $@"
-	co2ba $< savem >$@
+	case "$*" in *NEC*) o=bsave ;; *) o=savem ;; esac ;co2ba $< $$o >$@
 
-.PHONY: verify
-verify: $(NAME).CO
+.PHONY: verify_%
+verify_%: $(NAME)%.CO
 	@cmp -l $< ../$< && echo "Built $< is identical to reference ../$<."
-	@echo "Note: default config no longer replicates the legacy binary exactly,"
-	@echo "so it's normal for verify to 'fail' now."
 
-.PHONY: load
-load: $(NAME).DO
+.PHONY: load_%
+load_%: $(NAME)%.DO
 	@which -s dl || echo "Please install https://github.com/bkw777/dl2 to bootstrap $<"
 	dl -v -b $<
 

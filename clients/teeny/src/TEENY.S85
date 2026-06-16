@@ -53,8 +53,10 @@ BAUD 				EQU		19200
 ; including TANDY's Floppy itself use 128. But you can actually use anything
 ; up to 251.
 	IFNDEF CHUNK_LEN
-CHUNK_LEN		EQU		0x80
+CHUNK_LEN			EQU		128
 	ENDIF
+
+COM_SETUP_PAUSE_MS	EQU		100
 
 ; -----------------------------------------------------------------------------
 ; ASSEMBLER
@@ -152,6 +154,7 @@ rst_NextNonSpace	EQU		2		; RST 2 = get next non-whitespace char from M to A
 rst_CompareDEHL		EQU		3		; RST 3 = compare DE and HL
 rst_Print_A			EQU		4		; RST 4 = print A to LCD/LPT
 
+
 ; -----------------------------------------------------------------------------
 ; TPDD
 ; -----------------------------------------------------------------------------
@@ -203,11 +206,18 @@ direntFSIZE			EQU		pktDATA + 25		; FD27
 
 ; DLEN for a WRITE packet
 ; Not pktDLEN itself, used to fill pktDLEN in outgoing WRITE packet.
-; Curious location, both 100 and 200 use the same FF80.
+; Curious location for this variable.
+; _ALL_ old teeny versions for 100, M10, NEC, and even 200, all used the same FF80.
+; M10 is not interesting because COMBUF is the same as 100, and K85 is currently
+; using the same thing too, but K85 is new not a reference.
+; K85 is using the same only because all the others already were.
+; How can this be safe to be within COMBUFF at all?
+; Or, if the data comes from COMBUF, then why not on the others?
 ; On 100 FF80 is within COMBUF: FF46-FF85
 ; On 200 FF80 seems unrelated:  FFBB-FFFA
 ;    M10                        FF46-FF85
 ;    K85                        FFBE-FFFD
+;    NEC                        FEC4-FF04
 writeDLEN			EQU		0xFF80
 
 
@@ -380,17 +390,14 @@ STR_Prompt:
 STR_ErrMsg:
 		DB			" Err",CR,LF,0
 
-; burn cpu for 100ms - count from 0x2E00 to 0
-; 21-27 cycles/iter @ 2.45 mhz = 8-11us/iter
-; x 11,776 iters = 94-118 ms
-PAUSE_100ms:
-		MVI			D,0x2E			; DE = 0x2E00, 11,776 iterations
-@l0:
+	IFNDEF PAUSE_DEx10us			; NEC has this in the system rom
+PAUSE_DEx10us:						; 8-11us/iter * DE iters
 		DCX 		D				; DE--
 		MOV			A,D				; A = D
 		ORA			E				; D V E sets Z only when both D and E == 0
-		JNZ			@l0				; repeat until DE=0
+		JNZ			PAUSE_DEx10us	; repeat until DE=0
 		RET
+	ENDIF
 
 STR_STAT:
 		COM_STAT
@@ -534,7 +541,9 @@ ParseErrorReturn:
 ; activate rs232
 DIRENT:
 		CALL		COMOFF				; disable MDM/COM
-		CALL		PAUSE_100ms			; burn cpu for 100ms
+		; original TEENY uses 0x2E -> about 100ms. make it so MS=100 produces 0x2E
+		MVI        D,COM_SETUP_PAUSE_MS*100/215		; 0x2E00 timing loops
+		CALL       PAUSE_DEx10us		; burn cpu for DE*10us = about 100ms
 		LXI			H,STR_STAT			; load a STAT string ("98N1D")
 		STC								; set carry flag - tells SET232 to apply to the RS232 port
 		CALL		SET232				; configure uart per the stat string

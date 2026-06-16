@@ -1,0 +1,51 @@
+; NEC.S85
+; NEC PC-8201A header for TEENY.S85
+; https://github.com/bkw777/m100_dev/blob/main/rom_cross_map.ods
+; https://github.com/bkw777/m100_dev/tree/main/platforms/N82
+; https://www.web8201.net/modelt_memorymaps/mapview.asp
+
+; routines
+PTILL0			EQU		0x1462		; print null-terminated string at HL to screen
+SET232			EQU		0x1C4E		; set RS232 parameters to STAT string pointed to by HL
+FINDFN			EQU		0x229B		; search dir for filename matching FILNM1
+SCNEMP			EQU		0x22D3		; scan for an empty directory entry
+RESETFPS		EQU		0x233A		; reset file pointers
+AFTEREOF2		EQU		0x2399		; advance HL past end of file, type A
+MKDIRENT		EQU		0x2435		; insert entry into directory
+D2H4Bup			EQU		0x31F7		; move the memory pointed to by DE to the memory pointed to by HL
+INLIN			EQU		0x47AA		; input line without "?"
+CKFN2			EQU		0x4DBD		; evaluate & reformat filename, write FILNM1
+MENU			EQU		0x5645		; go to main menu
+MAKHOL			EQU		0x6C0A		; insert BC number of spaces in memory
+MASDEL			EQU		0x6C3C		; delete BC chars at M (in a DO file)
+RCV232			EQU		0x6DD3		; get A from the RS232 with XON/XOFF
+SND232			EQU		0x6EBE		; send A out serial port with XON/XOFF
+COMOFF			EQU		0x6FA8		; deactivate RS232 or Modem
+INT1D			EQU		0x76E5		; set interrupt to 0x1D
+
+; variables
+MAXRAM			EQU		0xF380
+ETRAP			EQU		0xF3FE		; error trap
+;KYBUF			EQU		0xF462		; keyboard buffer - correct NEC address == M100 F685, but see below
+BAFILES			EQU		0xF871		; pointer to start of BA files
+DOFILES			EQU		0xFAE1		; pointer to start of DO files
+COFILES			EQU		0xFAE3		; pointer to start of CO files
+FILNM1			EQU		0xFB78		; 9 bytes, padded fname for save/open/etc
+FX1				EQU		FILNM1+6	; EXT of FILNM1 after CKFN2 (“CO”, “DO”, “BA”)
+ALTLCD			EQU		0xFBC0		; start of ALT LCD buffer, 320 bytes
+KYBCNT			EQU		0xFE68		; number of characters in keyboard buffer
+
+; There does seem to be a KYBUF on NEC at F462,
+; but for some reason TEENY for NEC does not use it.
+; Instead it uses MVHLDE to copy from BUF to ALTLCD+0x30, then uses that.
+MVHLDE			EQU		0x67A8		; Move bytes from HL to DE until null
+BUF				EQU		0xF5A1		; Start of direct execution buffer
+KYBUF			EQU		ALTLCD+0x30	; copy of KYBUF we make ourselves
+
+PAUSE_DEx10us	EQU		0x7040		; burn cpu for DE*10us
+
+; COM "STAT" string, not including the speed
+; TPDD protocol is raw binary data, so must be 8 bit and no xon/xoff
+COM_PARAMS MACRO
+	DB "N81NN"
+	ENDM
