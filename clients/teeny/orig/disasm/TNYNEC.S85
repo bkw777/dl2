@@ -131,7 +131,7 @@ open_mode_read		EQU		0x03
 
 ; TINY uses ALTCD for it's variables and packet buffer
 ; start of ALTLCD (NEC)							; FBC0
-;KYBUF				EQU		ALTLCD + 0x30		; FBF0 (defined in NEC,S85 instead of here because no other machines do this)
+_KYBUF				EQU		ALTLCD + 0x30		; FBF0 copy of KYBUF we make ourselves for some reason
 RamFileStart		EQU		ALTLCD + 0x40		; FC00
 RamFileSize			EQU		ALTLCD + 0x42		; FC02
 DskFileSize			EQU		ALTLCD + 0x44		; FC04  native lsb-first copy of tpdd msb-first filesize
@@ -221,11 +221,11 @@ MAIN:
 		XRA			A
 		STA			BUF+0x0B
 		INX			H
-		LXI			D,KYBUF
+		LXI			D,_KYBUF
 		CALL		MVHLDE
 		LXI			H,errNM
 		SHLD		ETRAP
-		LXI			H,KYBUF+1
+		LXI			H,_KYBUF+1
 		MVI			M,'"'
 		CALL		CKFN2
 		CALL		RESETFPS
@@ -407,7 +407,7 @@ DIRENT:
 		CALL		InitPacket
 		MVI			M,0x1a
 		INX			H
-		LXI			D,KYBUF+2
+		LXI			D,_KYBUF+2
 		MVI			B,0x9
 		CALL		D2H4Bup
 		MVI			B,0xf

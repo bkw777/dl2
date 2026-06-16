@@ -26,7 +26,7 @@ INT1D			EQU		0x76E5		; set interrupt to 0x1D
 ; variables
 MAXRAM			EQU		0xF380
 ETRAP			EQU		0xF3FE		; error trap
-;KYBUF			EQU		0xF462		; keyboard buffer - correct NEC address == M100 F685, but see below
+KYBUF			EQU		0xF462		; keyboard buffer
 BAFILES			EQU		0xF871		; pointer to start of BA files
 DOFILES			EQU		0xFAE1		; pointer to start of DO files
 COFILES			EQU		0xFAE3		; pointer to start of CO files
@@ -35,12 +35,11 @@ FX1				EQU		FILNM1+6	; EXT of FILNM1 after CKFN2 (“CO”, “DO”, “BA”)
 ALTLCD			EQU		0xFBC0		; start of ALT LCD buffer, 320 bytes
 KYBCNT			EQU		0xFE68		; number of characters in keyboard buffer
 
-; There does seem to be a KYBUF on NEC at F462,
-; but for some reason TEENY for NEC does not use it.
-; Instead it uses MVHLDE to copy from BUF to ALTLCD+0x30, then uses that.
+; For some reason TEENY for NEC does not use KYBUF. Instead it uses MVHLDE
+; to copy from BUF to ALTLCD+0x30, then uses that in place of KYBUF.
 MVHLDE			EQU		0x67A8		; Move bytes from HL to DE until null
 BUF				EQU		0xF5A1		; Start of direct execution buffer
-KYBUF			EQU		ALTLCD+0x30	; copy of KYBUF we make ourselves
+;_KYBUF			EQU		ALTLCD+0x30	; copy of KYBUF we make ourselves
 
 PAUSE_DEx10us	EQU		0x7040		; burn cpu for DE*10us
 
