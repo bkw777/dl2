@@ -44,6 +44,7 @@ tb=${XB:1} xb=true ;[[ "${XB:0:1}" = "+" ]] && xb=false ;readonly xb tb # transf
 unset Ev Qd Qv UNTA
 n=$LFIRST
 TIME=false ;[[ "$ACTION" == "TIME" ]] && TIME=true
+NEC=false ;[[ "EXECBA|BSAVE" =~ "$ACTION" ]] && NEC=true
 
 DOCURL="https://github.com/bkw777/dl2/blob/master/co2ba.md"
 abrt () { printf '%s: Usage\n%s IN.CO [call|exec|callba|execba|savem|bsave] > OUT.DO\n\n%s\n\n%b\n' "$0" "${0##*/}" "$DOCURL" "$@" >&2 ;exit 1 ; }
@@ -146,8 +147,15 @@ printf '%s\r\n' "${O/\%s/$x}"
 
 $TIME && tn=20
 $ik && di=",G,K" dn="F,H-J" || di="" dn="F-K"  # DEFINT DEFSNG
-PRI=':CLS:?USING"Installing \    \   0%";N'
-PRP=':?@18,USING"###%";(I-F)*100/A'
+
+$NEC && {
+	PRI=':CLS:?"Installing",N:LOCATE22,0:?"  0%"'
+	PRP=':LOCATE22,0:?USING"###%";(I-F)*100/A'
+} || {
+	PRI=':CLS:?USING"Installing \    \   0%";N'
+	PRP=':?@18,USING"###%";(I-F)*100/A'
+}
+
 case ${METHOD^^} in
 	Y) # !yenc - Adolph/B9/White yenc-like encoding
 		unset Qd Qv UNTA ;find_xa ;((ta)) && { Qd=",Q" ;$xa && Qv=$ta UNTA=":B=BXORQ" || Qv=$((256-ta)) UNTA=":B=(B+Q)MOD256" ; }
@@ -211,7 +219,8 @@ printf '%uIFK<>GTHEN?"Bad Checksum":ELSE' $((++n*g))
 case "$ACTION" in
 	TIME) printf 'Y=Z:GOSUB%u:?Z-Y"seconds"\r\n' $((tn*g)) ;;
 	CALL|EXEC) printf '%sJ\r\n' $ACTION ;;
-	SAVEM|BSAVE) printf '?"Please type: NEW":%sN,F,H,J\r\n' $ACTION ;;
+	SAVEM) printf '?"Please type: NEW":%sN,F,H,J\r\n' $ACTION ;;
+	BSAVE) printf '?"Please type: NEW":%sN,F,A,J\r\n' $ACTION ;;
 	CALLBA|EXECBA) printf 'M=CHR$(34):L="X.DO":OPENLFOROUTPUTAS1:?#1,"0CLEAR0,"F":%s"J":MENU":CLOSE1:?"Please type:":?"KILL"M""L:?"SAVE"M""N:LOADL\r\n' ${ACTION:0:4} ;;
 	*) printf '?"top "F:?"end "H:?"exe "J\r\n' ;;
 esac
