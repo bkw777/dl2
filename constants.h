@@ -33,7 +33,7 @@
 #define REQ_SYSINFO       0x33 // TPDD2 Get System Information
 #define REQ_EXEC          0x34 // TPDD2 Execute Program
 
-// TPDD return block formats                {fmt,len}
+// TPDD return block formats            {fmt,len}
 #define RET_READ          0x10
 static const uint8_t RET_DIRENT[2]    = {0x11,0x1C};
 static const uint8_t RET_STD[2]       = {0x12,0x01}; // shared return format for: error open close delete status write

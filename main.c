@@ -217,7 +217,7 @@ const char * magic_files[] = {
 #define RSO "\033[m"  // reset standout
 #define D8C "\033 F"  // disable 8-bit vt control bytes (0x80-0x9F)
 
-// The TPDD1 rom is actually the FB-100 rom.
+// This is called FB100_ROM because the TPDD1 rom is actually the FB-100 rom.
 // The roms in Brother FB-100, knitking FDD19, Purple Computing D103, and
 // TANDY 26-3808 (TPDD1) have all been dumped and compared, and are all identical.
 // That means the rom came from Brother and is the FB-100 rom in all cases.
