@@ -90,9 +90,9 @@ ESC 				EQU		0x1B
 SPACE				EQU		0x20
 
 ; file types, attribute byte A for MKDIRENT
-FattrBA				EQU		0x80		; .BA files
-FattrDO				EQU		0xC0		; .DO files
-FattrCO				EQU		0xA0		; .CO files
+fattrBA				EQU		0x80		; .BA files
+fattrDO				EQU		0xC0		; .DO files
+fattrCO				EQU		0xA0		; .CO files
 ; file types, reg A for AFTEREOF2
 ftypeBA				EQU		0x00
 ftypeDO				EQU		0x01
@@ -109,13 +109,13 @@ rst_Print_A			EQU		4		; RST 4 = print A to LCD/LPT
 
 ZZ					EQU		0x5A5A				; packet start / preamble, 'Z','Z'
 
-req_dirent			EQU		0x00
-req_open			EQU		0x01
-req_close			EQU		0x02
-req_read			EQU		0x03
-req_write			EQU		0x04
-req_delete			EQU		0x05
-req_status			EQU		0x07
+cmd_dirent			EQU		0x00
+cmd_open			EQU		0x01
+cmd_close			EQU		0x02
+cmd_read			EQU		0x03
+cmd_write			EQU		0x04
+cmd_delete			EQU		0x05
+cmd_status			EQU		0x07
 
 ret_read			EQU		0x10
 ret_dirent			EQU		0x11
@@ -131,7 +131,9 @@ open_mode_read		EQU		0x03
 
 ; TINY uses ALTCD for it's variables and packet buffer
 ; start of ALTLCD (NEC)							; FBC0
+
 _KYBUF				EQU		ALTLCD + 0x30		; FBF0 NEC only - virtual KYBUF we make ourselves
+
 RamFileStart		EQU		ALTLCD + 0x40		; FC00
 RamFileSize			EQU		ALTLCD + 0x42		; FC02
 DskFileSize			EQU		ALTLCD + 0x44		; FC04
@@ -140,24 +142,26 @@ LoadingFlag			EQU		ALTLCD + 0x48		; FC08
 ; TPDD packet
 pktZZ				EQU		ALTLCD + 0x4A		; FC0A  tpdd packet preamble "ZZ"
 pktTYPE				EQU		ALTLCD + 0x4C		; FC0C  tpdd packet command or return type
-pktDLEN				EQU		ALTLCD + 0x4D		; FC0D  tpdd packet data length
-pktDATA				EQU		ALTLCD + 0x4E		; FC0E  tpdd packet data (length varies 0-?? 64? up to 252 is possible & legal but idk yet what TEENY does)
-; position varies but also a single byte checksum comes after pktDATA, and is the final byte of the packet
+pktDLEN				EQU		ALTLCD + 0x4D		; FC0D  tpdd packet data length 0-128
+pktDATA				EQU		ALTLCD + 0x4E		; FC0E  tpdd packet data, 0-128 bytes + checksum 1 byte
 
-; FSIZE in a DIRENT packet
+; filesize field within a dirent return packet
 ; pktDATA +  0 : start of fname
 ; pktDATA + 23 : end of fname
 ; pktDATA + 24 : attr
 ; pktDATA + 25 : fsize msb
 ; pktDATA + 26 : fsize lsb
 direntFSIZE			EQU		pktDATA + 25		; FC27
+
+; end of pkt buf			pktDATA + CHUNK_LEN + 1
+
 ; end of ALTLCD				ALTLCD + 0x013F		; FCFF
 
-; DLEN for a WRITE packet
+; DLEN for next WRITE packet.
 ; Not pktDLEN itself, used to fill pktDLEN in outgoing WRITE packet.
 ; Curious location for this variable.
-; _ALL_ old teeny versions for 100, M10, NEC, and even 200, all used the same FF80.
-; How can this be safe to be within COMBUFF at all?
+; ALL old teeny versions for 100, M10, NEC, and even 200, all used the same FF80.
+; How can this be safe to be within COMBUF at all?
 ; Or, if the data comes from COMBUF, then why not on the others?
 ; On 100 FF80 is within COMBUF: FF46-FF85
 ; On 200 FF80 seems unrelated:  FFBB-FFFA
@@ -188,9 +192,9 @@ HIMEM				EQU		MAXRAM
 	;--------------------------------------------------------------------------
 	; .CO HEADER
 	;--------------------------------------------------------------------------
-	DW PRGTOP
-	DW PRGLEN
-	DW PRGEXE
+		DW			PRGTOP
+		DW			PRGLEN
+		DW			PRGEXE
 	ENDIF ; PRGLEN
 ;------------------------------------------------------------------------------
 
@@ -397,11 +401,11 @@ ParseErrorReturn:
 
 DIRENT:
 		CALL		COMOFF
-		MVI			D,COM_SETUP_PAUSE_MS*100/215	; orig 0x2E
+		MVI			D,COM_SETUP_PAUSE_MS*100/215	; 0x2E
 		CALL		PAUSE_DEx10us
 		LXI			H,STR_STAT
 		CALL		SET232
-		MVI			A,req_status
+		MVI			A,cmd_status
 		CALL		ShortPacket
 		XRA			A
 		CALL		InitPacket
@@ -433,7 +437,7 @@ SendPacket2:
 SendOpenCMD_write:
 		MVI			E,open_mode_write
 SendOpenCMD:
-		MVI			A,req_open
+		MVI			A,cmd_open
 		CALL		InitPacket
 		MOV			M,A
 		INX			H
@@ -443,7 +447,7 @@ SendOpenCMD:
 SendFinalWriteChunk:
 		POP			D
 SendWriteCMD:
-		MVI			A,req_write
+		MVI			A,cmd_write
 		CALL		InitPacket
 		MOV			M,C
 		INX			H
@@ -538,7 +542,7 @@ SendOpenCMD_read:
 SendReadCMD:
 		PUSH		H
 		PUSH		D
-		MVI			A,req_read
+		MVI			A,cmd_read
 		CALL		InitPacket
 		CALL		SendPacket2
 		XRA			A
@@ -550,13 +554,13 @@ SendReadCMD:
 		RET
 
 FtypeTable:
-		DB			FattrCO
+		DB			fattrCO
 		DW			jCOFILE
 		DW			COFILES
-		DB			FattrDO
+		DB			fattrDO
 		DW			jDOFILE
 		DW			DOFILES
-		DB			FattrBA
+		DB			fattrBA
 		DW			jBAFILE
 		DW			BAFILES
 
@@ -633,7 +637,7 @@ SAVE:
 		POP			D
 		POP			H
 		CALL		WriteChunks
-		MVI			A,req_close
+		MVI			A,cmd_close
 		JMP			ShortPacket
 
 WriteChunks:

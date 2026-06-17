@@ -124,6 +124,7 @@ open_mode_read		EQU		0x03
 
 ; TINY uses ALTCD for it's variables and packet buffer
 ; start of ALTLCD (200)							; F7B0
+
 RamFileStart		EQU		ALTLCD + 0x40		; F7F0
 RamFileSize			EQU		ALTLCD + 0x42		; F7F2
 FileSize			EQU		ALTLCD + 0x44		; F7F4
@@ -133,10 +134,10 @@ LoadingFlag			EQU		ALTLCD + 0x48		; F7F8
 pktZZ				EQU		ALTLCD + 0x4A		; F7FA  2 bytes, tpdd packet preamble "ZZ"
 pktTYPE				EQU		ALTLCD + 0x4C		; F7FC  1 byte,  tpdd packet command or return type
 pktDLEN				EQU		ALTLCD + 0x4D		; F7FD  1 byte,  tpdd packet data length field
-pktDATA				EQU		ALTLCD + 0x4E		; F7FE  0 to CHUNK_LEN bytes of payload data
-; Position varies: 1 byte, tpdd packet checksum, comes after pktDATA, and is the final byte of the packet
+pktDATA				EQU		ALTLCD + 0x4E		; F7FE  0-128 bytes, tpdd packet data, plus 1 byte checksum
 
 direntFSIZE			EQU		pktDATA + 25		; F817
+
 ; end of ALTLCD				ALTLCD + 0x027F		; FA2F
 
 ; Curious location for this variable
@@ -165,9 +166,9 @@ HIMEM		EQU		MAXRAM
 	;--------------------------------------------------------------------------
 	; .CO HEADER
 	;--------------------------------------------------------------------------
-	DW PRGTOP
-	DW PRGLEN
-	DW PRGEXE
+		DW			PRGTOP
+		DW			PRGLEN
+		DW			PRGEXE
 	ENDIF ; PRGLEN
 
 
@@ -177,470 +178,470 @@ HIMEM		EQU		MAXRAM
 
 PRGTOP:
 PRGEXE:
-	LXI			H,0
-	DAD			SP
-	SHLD		StackPointer
-	LXI			H,ZZ
-	SHLD		pktZZ
+		LXI			H,0
+		DAD			SP
+		SHLD		StackPointer
+		LXI			H,ZZ
+		SHLD		pktZZ
 MAIN:
-	LHLD		StackPointer
-	SPHL
-	XRA			A
-	STA			LoadingFlag
-	LXI			H,MAIN
-	PUSH		H
-	LXI			H,STR_Prompt
-	CALL		PTILL0
-	STA			KYBCNT
-	CALL		INLIN
-	LXI			H,errNM
-	SHLD		ETRAP
-	LXI			H,KYBUF+1
-	MVI			M,'"'
-	CALL		CKFN2
-	CALL		RESETFPS
-	LDA			KYBUF
-	CPI			'Q'
-	JZ			MENU
-	CPI			'S'
-	JZ			SAVE
-	PUSH		PSW
-	CALL		DIRENT
-	JZ			errFF
-	POP			PSW
-	SUI			'K'
-	JZ			KILL
-	DCR			A
-	JZ			LOAD
+		LHLD		StackPointer
+		SPHL
+		XRA			A
+		STA			LoadingFlag
+		LXI			H,MAIN
+		PUSH		H
+		LXI			H,STR_Prompt
+		CALL		PTILL0
+		STA			KYBCNT
+		CALL		INLIN
+		LXI			H,errNM
+		SHLD		ETRAP
+		LXI			H,KYBUF+1
+		MVI			M,'"'
+		CALL		CKFN2
+		CALL		RESETFPS
+		LDA			KYBUF
+		CPI			'Q'
+		JZ			MENU
+		CPI			'S'
+		JZ			SAVE
+		PUSH		PSW
+		CALL		DIRENT
+		JZ			errFF
+		POP			PSW
+		SUI			'K'
+		JZ			KILL
+		DCR			A
+		JZ			LOAD
 
-	MVI			E,0x03
-	DB			opcode_LXI_B
+		MVI			E,0x03
+		DB			opcode_LXI_B
 errFF:
-	MVI			E,0x00
-	DB			opcode_LXI_B
+		MVI			E,0x00
+		DB			opcode_LXI_B
 errCM:
-	MVI			E,0x06
-	DB			opcode_LXI_B
+		MVI			E,0x06
+		DB			opcode_LXI_B
 errIO:
-	MVI			E,0x08
-	DB			opcode_LXI_B
+		MVI			E,0x08
+		DB			opcode_LXI_B
 errAE:
-	MVI			E,0x10
-	DB			opcode_LXI_B
+		MVI			E,0x10
+		DB			opcode_LXI_B
 errOM:
-	MVI			E,0x12
-	DB			opcode_LXI_B
+		MVI			E,0x12
+		DB			opcode_LXI_B
 errFL:
-	MVI			E,0x01
-	DB			opcode_LXI_B
+		MVI			E,0x01
+		DB			opcode_LXI_B
 errNM:
-	MVI			E,0x14
+		MVI			E,0x14
 
 ERROR:
-	LDA			LoadingFlag
-	ORA			A
-	JZ			@show
-	PUSH		D
-	LHLD		RamFileSize
-	MOV			B,H
-	MOV			C,L
-	LHLD		RamFileStart
-	CALL		MASDEL
-	POP			D
+		LDA			LoadingFlag
+		ORA			A
+		JZ			@show
+		PUSH		D
+		LHLD		RamFileSize
+		MOV			B,H
+		MOV			C,L
+		LHLD		RamFileStart
+		CALL		MASDEL
+		POP			D
 @show:
-	LXI			H,STR_ErrCodes
-	MVI			D,0
-	DAD			D
-	MOV			A,M
-	_RST		rst_Print_A
-	_RST		rst_NextNonSpace
-	_RST		rst_Print_A
-	LXI			H,STR_ErrMsg
-	CALL		PTILL0
-	JMP			MAIN
+		LXI			H,STR_ErrCodes
+		MVI			D,0
+		DAD			D
+		MOV			A,M
+		_RST		rst_Print_A
+		_RST		rst_NextNonSpace
+		_RST		rst_Print_A
+		LXI			H,STR_ErrMsg
+		CALL		PTILL0
+		JMP			MAIN
 
 STR_ErrCodes:
-	DB			"FFLSNRCMIOWPDFNDAEOMNM"
+		DB			"FFLSNRCMIOWPDFNDAEOMNM"
 
 STR_Prompt:
-	DB			"> C FFFFFF.XX (C=KLSQ)",CR,LF,"> ",0
+		DB			"> C FFFFFF.XX (C=KLSQ)",CR,LF,"> ",0
 
 GetFtypeX:
-	LDA			FX1
-	SUI			'C'
-	RP
-	MVI			A,0x02
-	RET
+		LDA			FX1
+		SUI			'C'
+		RP
+		MVI			A,0x02
+		RET
 
 PAUSE_100ms:
-	MVI			D,COM_SETUP_PAUSE_MS*100/215	; orig 0x2E
+		MVI			D,COM_SETUP_PAUSE_MS*100/215	; orig 0x2E
 @l0:
-	DCX			D
-	MOV			A,D
-	ORA			E
-	JNZ			@l0
-	RET
+		DCX			D
+		MOV			A,D
+		ORA			E
+		JNZ			@l0
+		RET
 
 STR_STAT:
-	COM_STAT
+		COM_STAT
 
 FUN_ram_eca1:
-	MVI			E,0x03
-	CALL		SendOpenCMD
+		MVI			E,0x03
+		CALL		SendOpenCMD
 FUN_ram_eca6:
-	PUSH		H
-	PUSH		D
-	MVI			A,0x03
-	CALL		InitPacket
-	CALL		SendPacket2
-	XRA			A
-	MOV			B,A
-	MOV			C,A
-	STA			pktTYPE
-	POP			D
-	POP			H
-	RET
+		PUSH		H
+		PUSH		D
+		MVI			A,0x03
+		CALL		InitPacket
+		CALL		SendPacket2
+		XRA			A
+		MOV			B,A
+		MOV			C,A
+		STA			pktTYPE
+		POP			D
+		POP			H
+		RET
 
 STR_ErrMsg:
-	DB			" Err",CR,LF,0
+		DB			" Err",CR,LF,0
 
 SendPacket:
-	LXI			H,pktTYPE
-	MOV			A,M
-	INX			H
-	ADD			M
-	MOV			D,A
-	MOV			A,M
-	MOV			E,A
-	MOV			B,A
-	INX			H
-	ORA			A
-	MOV			A,D
-	JZ			@endpkt
+		LXI			H,pktTYPE
+		MOV			A,M
+		INX			H
+		ADD			M
+		MOV			D,A
+		MOV			A,M
+		MOV			E,A
+		MOV			B,A
+		INX			H
+		ORA			A
+		MOV			A,D
+		JZ			@endpkt
 @l0:
-	ADD			M
-	INX			H
-	DCR			E
-	JNZ			@l0
+		ADD			M
+		INX			H
+		DCR			E
+		JNZ			@l0
 @endpkt:
-	CMA
-	MOV			M,A
-	MVI			A,0x05
-	ADD			B
-	MOV			B,A
-	LXI			H,pktZZ
+		CMA
+		MOV			M,A
+		MVI			A,0x05
+		ADD			B
+		MOV			B,A
+		LXI			H,pktZZ
 @send_byte:
-	MOV			A,M
-	CALL		SND232
-	JC			errIO
+		MOV			A,M
+		CALL		SND232
+		JC			errIO
 	IF INCLUDE_DSR
-	CALL		CheckDSR
+		CALL		CheckDSR
 	ENDIF
-	INX			H
-	DCR			B
-	JNZ			@send_byte
-	LXI			H,pktTYPE
-	CALL		INT1D
-	CALL		ReadSerialByteAppendM
-	CALL		ReadSerialByteAppendM
-	MOV			C,A
-	INR			C
+		INX			H
+		DCR			B
+		JNZ			@send_byte
+		LXI			H,pktTYPE
+		CALL		INT1D
+		CALL		ReadSerialByteAppendM
+		CALL		ReadSerialByteAppendM
+		MOV			C,A
+		INR			C
 @read_byte:
-	CALL		ReadSerialByteAppendM
-	DCR			C
-	JNZ			@read_byte
-	XRA			A
-	SIM
-	LXI			H,pktDLEN
-	MOV			C,M
-	INX			H
-	MOV			A,M
-	ORA			A
-	RET
+		CALL		ReadSerialByteAppendM
+		DCR			C
+		JNZ			@read_byte
+		XRA			A
+		SIM
+		LXI			H,pktDLEN
+		MOV			C,M
+		INX			H
+		MOV			A,M
+		ORA			A
+		RET
 
 KILL:
-	MVI			A,0x05
+		MVI			A,0x05
 ShortPacket:
-	CALL		InitPacket
+		CALL		InitPacket
 jSendPacket:
-	CALL		SendPacket
-	RZ
+		CALL		SendPacket
+		RZ
 ParseErrorReturn:
-	ANI			0xF0
-	RAR
-	RAR
-	RAR
-	MOV			E,A
-	JMP			ERROR
+		ANI			0xF0
+		RAR
+		RAR
+		RAR
+		MOV			E,A
+		JMP			ERROR
 
 DIRENT:
-	CALL		COMOFF
-	CALL		PAUSE_100ms
-	LXI			H,STR_STAT
-	STC
-	CALL		SET232
-	MVI			A,req_status
-	CALL		ShortPacket
-	XRA			A
-	CALL		InitPacket
-	MVI			M,0x1A
-	INX			H
-	LXI			D,KYBUF+2
-	MVI			B,0x09
-	CALL		D2H4Bup
-	MVI			B,0x0F
+		CALL		COMOFF
+		CALL		PAUSE_100ms
+		LXI			H,STR_STAT
+		STC
+		CALL		SET232
+		MVI			A,req_status
+		CALL		ShortPacket
+		XRA			A
+		CALL		InitPacket
+		MVI			M,0x1A
+		INX			H
+		LXI			D,KYBUF+2
+		MVI			B,0x09
+		CALL		D2H4Bup
+		MVI			B,0x0F
 @l0:
-	MVI			M,SPACE
-	INX			H
-	DCR			B
-	JNZ			@l0
-	MVI			M,'F'
-	INX			H
-	MOV			M,B
+		MVI			M,SPACE
+		INX			H
+		DCR			B
+		JNZ			@l0
+		MVI			M,'F'
+		INX			H
+		MOV			M,B
 SendPacket2:
-	CALL		SendPacket
-	MOV			B,A
-	LDA			pktTYPE
-	CPI			ret_normal
-	JZ			ParseErrorReturn
-	MOV			A,B
-	ORA			A
-	RET
+		CALL		SendPacket
+		MOV			B,A
+		LDA			pktTYPE
+		CPI			ret_normal
+		JZ			ParseErrorReturn
+		MOV			A,B
+		ORA			A
+		RET
 
 SendOpenCMD_write:
-	MVI			E,open_mode_write
+		MVI			E,open_mode_write
 SendOpenCMD:
-	MVI			A,req_open
-	CALL		InitPacket
-	MOV			M,A
-	INX			H
-	MOV			M,E
-	JMP			jSendPacket
+		MVI			A,req_open
+		CALL		InitPacket
+		MOV			M,A
+		INX			H
+		MOV			M,E
+		JMP			jSendPacket
 
 SendFinalWriteChunk:
-	POP			D
+		POP			D
 SendWriteCMD:
-	MVI			A,req_write
-	CALL		InitPacket
-	MOV			M,C
-	INX			H
-	MOV			B,C
-	CALL		D2H4Bup
-	JMP			jSendPacket
+		MVI			A,req_write
+		CALL		InitPacket
+		MOV			M,C
+		INX			H
+		MOV			B,C
+		CALL		D2H4Bup
+		JMP			jSendPacket
 
 LOAD:
-	CALL		FINDFN
-	JNZ			errAE
-	LXI			H,errFL
-	SHLD		ETRAP
-	CALL		SCNEMP
-	PUSH		H
-	CALL		GetFtypeX
-	LHLD		direntFSIZE
-	MOV			B,L
-	MOV			C,H
-	MOV			L,C
-	MOV			H,B
-	SHLD		FileSize
-	DCX			B
-	MOV			E,A
-	INR			A
+		CALL		FINDFN
+		JNZ			errAE
+		LXI			H,errFL
+		SHLD		ETRAP
+		CALL		SCNEMP
+		PUSH		H
+		CALL		GetFtypeX
+		LHLD		direntFSIZE
+		MOV			B,L
+		MOV			C,H
+		MOV			L,C
+		MOV			H,B
+		SHLD		FileSize
+		DCX			B
+		MOV			E,A
+		INR			A
 @l0:
-	INX			B
-	DCR			A
-	JNZ			@l0
-	MOV			D,A
-	LXI			H,FtypeTable
-	DAD			D
-	DAD			D
-	DAD			D
-	DAD			D
-	DAD			D
-	MOV			A,M
-	PUSH		PSW
-	LXI			D,MkRamDirent
-	PUSH		D
-	INX			H
-	MOV			E,M
-	INX			H
-	MOV			D,M
-	PUSH		D
-	INX			H
-	MOV			E,M
-	INX			H
-	MOV			H,M
-	MOV			L,E
-	MOV			E,M
-	INX			H
-	MOV			D,M
-	MOV			H,B
-	MOV			L,C
-	SHLD		RamFileSize
-	XCHG
-	SHLD		RamFileStart
-	PUSH		H
-	CALL		MAKHOL
-	JC			errOM
-	LXI			H,LoadingFlag
-	INR			M
-	CALL		FUN_ram_eca1
-	LHLD		FileSize
-	XCHG
-	POP			H
-	LDA			pktTYPE
-	MOV			C,A
-	MVI			B,0
+		INX			B
+		DCR			A
+		JNZ			@l0
+		MOV			D,A
+		LXI			H,FtypeTable
+		DAD			D
+		DAD			D
+		DAD			D
+		DAD			D
+		DAD			D
+		MOV			A,M
+		PUSH		PSW
+		LXI			D,MkRamDirent
+		PUSH		D
+		INX			H
+		MOV			E,M
+		INX			H
+		MOV			D,M
+		PUSH		D
+		INX			H
+		MOV			E,M
+		INX			H
+		MOV			H,M
+		MOV			L,E
+		MOV			E,M
+		INX			H
+		MOV			D,M
+		MOV			H,B
+		MOV			L,C
+		SHLD		RamFileSize
+		XCHG
+		SHLD		RamFileStart
+		PUSH		H
+		CALL		MAKHOL
+		JC			errOM
+		LXI			H,LoadingFlag
+		INR			M
+		CALL		FUN_ram_eca1
+		LHLD		FileSize
+		XCHG
+		POP			H
+		LDA			pktTYPE
+		MOV			C,A
+		MVI			B,0
 @l1:
-	MOV			A,D
-	ORA			E
-	MOV			A,C
-	STA			pktTYPE
-	RZ
-	ORA			A
-	CM			FUN_ram_eca6
-	DCX			D
-	PUSH		H
-	LXI			H,pktDATA
-	DAD			B
-	MOV			A,M
-	POP			H
-	MOV			M,A
-	INX			H
-	INR			C
-	JMP			@l1
+		MOV			A,D
+		ORA			E
+		MOV			A,C
+		STA			pktTYPE
+		RZ
+		ORA			A
+		CM			FUN_ram_eca6
+		DCX			D
+		PUSH		H
+		LXI			H,pktDATA
+		DAD			B
+		MOV			A,M
+		POP			H
+		MOV			M,A
+		INX			H
+		INR			C
+		JMP			@l1
 
 InitPacket:
-	LXI			H,pktTYPE
-	MOV			M,A
-	INX			H
-	MVI			M,0
-	RET
+		LXI			H,pktTYPE
+		MOV			M,A
+		INX			H
+		MVI			M,0
+		RET
 
 	IF INCLUDE_DSR
 CheckDSR:
-	IN			FLOWCTL_PORT
-	ANI			DSR_BITMASK
-	RNZ
-	MVI			E,0x04
-	JMP			ERROR
+		IN			FLOWCTL_PORT
+		ANI			DSR_BITMASK
+		RNZ
+		MVI			E,0x04
+		JMP			ERROR
 	ENDIF
 
 ReadSerialByteAppendM:
 	IF INCLUDE_DSR
-	CALL		CheckDSR
+		CALL		CheckDSR
 	ENDIF
-	CALL		RCV232
-	JC			errIO
-	JNZ			errCM
-	MOV			M,A
-	INX			H
-	RET
+		CALL		RCV232
+		JC			errIO
+		JNZ			errCM
+		MOV			M,A
+		INX			H
+		RET
 
 FtypeTable:
-	DB			FattrCO
-	DW			jCOFILE
-	DW			COFILES
-	DB			FattrDO
-	DW			jDOFILE
-	DW			DOFILES
-	DB			FattrBA
-	DW			jBAFILE
-	DW			BAFILES
+		DB			FattrCO
+		DW			jCOFILE
+		DW			COFILES
+		DB			FattrDO
+		DW			jDOFILE
+		DW			DOFILES
+		DB			FattrBA
+		DW			jBAFILE
+		DW			BAFILES
 
 jDOFILE:
-	MVI			M,0x1A
-	RET
+		MVI			M,0x1A
+		RET
 
 jBAFILE:
-	XRA			A
-	MOV			M,A
-	INX			H
-	MOV			M,A
-	LHLD		RamFileSize
-	XCHG
-	LHLD		DOFILES
-	DAD			D
-	SHLD		DOFILES
-	RET
+		XRA			A
+		MOV			M,A
+		INX			H
+		MOV			M,A
+		LHLD		RamFileSize
+		XCHG
+		LHLD		DOFILES
+		DAD			D
+		SHLD		DOFILES
+		RET
 
 jCOFILE:
-	LHLD		RamFileStart
-	SHLD		COFILES
-	RET
+		LHLD		RamFileStart
+		SHLD		COFILES
+		RET
 
 MkRamDirent:
-	POP			PSW
-	LHLD		RamFileStart
-	XCHG
-	DCX			D
-	POP			H
-	JMP			MKDIRENT
+		POP			PSW
+		LHLD		RamFileStart
+		XCHG
+		DCX			D
+		POP			H
+		JMP			MKDIRENT
 
 SAVE:
-	CALL		DIRENT
-	JNZ			errAE
-	LDA			FX1
-	CPI			'B'
-	JC			errNM
-	CPI			'E'
-	JNC			errNM
-	CALL		FINDFN
-	JZ			errFF
-	CALL		GetFtypeX
-	MOV			C,A
-	MVI			A,ftypeCO
-	SUB			C
-	PUSH		B
-	PUSH		D
-	XCHG
-	CALL		AFTEREOF2
-	POP			D
-	MOV			A,L
-	SUB			E
-	MOV			L,A
-	MOV			A,H
-	SBB			D
-	MOV			H,A
-	POP			B
-	INR			C
-	INX			H
+		CALL		DIRENT
+		JNZ			errAE
+		LDA			FX1
+		CPI			'B'
+		JC			errNM
+		CPI			'E'
+		JNC			errNM
+		CALL		FINDFN
+		JZ			errFF
+		CALL		GetFtypeX
+		MOV			C,A
+		MVI			A,ftypeCO
+		SUB			C
+		PUSH		B
+		PUSH		D
+		XCHG
+		CALL		AFTEREOF2
+		POP			D
+		MOV			A,L
+		SUB			E
+		MOV			L,A
+		MOV			A,H
+		SBB			D
+		MOV			H,A
+		POP			B
+		INR			C
+		INX			H
 @l0:
-	DCX			H
-	DCR			C
-	JNZ			@l0
-	MOV			A,L
-	ORA			H
-	RZ
-	PUSH		D
-	PUSH		H
-	CALL		SendOpenCMD_write
-	POP			D
-	POP			H
-	CALL		WriteChunks
-	MVI			A,req_close
-	JMP			ShortPacket
+		DCX			H
+		DCR			C
+		JNZ			@l0
+		MOV			A,L
+		ORA			H
+		RZ
+		PUSH		D
+		PUSH		H
+		CALL		SendOpenCMD_write
+		POP			D
+		POP			H
+		CALL		WriteChunks
+		MVI			A,req_close
+		JMP			ShortPacket
 
 WriteChunks:
-	PUSH		H
-	PUSH		H
-	LXI			H,CHUNK_LEN
-	_RST		rst_CompareDEHL
-	JNC			@l0
-	MOV			C,L
-	MOV			B,H
-	POP			H
-	DAD			B
-	XTHL
-	XCHG
-	LXI			B,writeDLEN
-	DAD			B
-	PUSH		H
-	CALL		SendWriteCMD
-	POP			D
-	POP			H
-	JMP			WriteChunks
+		PUSH		H
+		PUSH		H
+		LXI			H,CHUNK_LEN
+		_RST		rst_CompareDEHL
+		JNC			@l0
+		MOV			C,L
+		MOV			B,H
+		POP			H
+		DAD			B
+		XTHL
+		XCHG
+		LXI			B,writeDLEN
+		DAD			B
+		PUSH		H
+		CALL		SendWriteCMD
+		POP			D
+		POP			H
+		JMP			WriteChunks
 @l0:
-	MOV			C,E
-	POP			H
-	JMP			SendFinalWriteChunk
+		MOV			C,E
+		POP			H
+		JMP			SendFinalWriteChunk
 PRGEND:

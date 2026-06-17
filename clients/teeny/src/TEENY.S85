@@ -1,5 +1,6 @@
 ; TINY/TEENY disassembly
 ; TINY by Ed Giese (Acroatix). TEENY is TINY that Ron Weisen made a bit smaller.
+; This is based originally on a disassembly of TEENY for Model 100
 ; platform & rom references: https://github.com/bkw777/m100_dev
 ; This disassembly by Brian K. White
 ;
@@ -189,6 +190,7 @@ pkt_len_overhead	EQU		5	; 2(ZZ) + 1(fmt) + 1(len) [DATA] + 1(chk)
 
 ; TINY uses ALTCD for it's variables and packet buffer
 ; start of ALTLCD (100)							; FCC0
+
 RamFileStart		EQU		ALTLCD + 0x40		; FD00
 RamFileSize			EQU		ALTLCD + 0x42		; FD02
 DskFileSize			EQU		ALTLCD + 0x44		; FD04  native lsb-first copy of tpdd msb-first filesize
@@ -199,19 +201,17 @@ pktZZ				EQU		ALTLCD + 0x4A		; FD0A  tpdd packet preamble "ZZ"
 pktTYPE				EQU		ALTLCD + 0x4C		; FD0C  tpdd packet type, cmd_xxx or ret_xxx
 pktDLEN				EQU		ALTLCD + 0x4D		; FD0D  tpdd packet data length, 0-128
 pktDATA				EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data, 0-128 bytes, +1 checksum byte
-; position varies but also a single byte checksum comes after pktDATA, and is the final byte of the packet
 
-; The length of DATA varies from 0 to 128 and the there is one more byte after that with the checksum.
-; So the end of the packet buffer window is ALTLCD + pktDATA + CHUNK_SIZE + 1
-; FCC0 + 4E + 80 + 1 = FD8F
-
-; FSIZE in a DIRENT packet
+; filesize field within a DIRENT return packet
 ; pktDATA +  0 : start of fname
 ; pktDATA + 23 : end of fname
 ; pktDATA + 24 : attr
 ; pktDATA + 25 : fsize msb
 ; pktDATA + 26 : fsize lsb
 direntFSIZE			EQU		pktDATA + tpdd_fname_len + 1	; FD27
+
+; end of packet buffer		pktDATA + CHUNK_LEN + 1
+
 ; end of ALTLCD				ALTLCD + 0x013F		; FDFF
 
 ; DLEN for a WRITE packet
@@ -319,7 +319,7 @@ MAIN:
 ; ERROR CODES  - uses the LXI B trick
 ; The first MVI E we jump to executes normally and sets E to something.
 ; The remaining stack after that becomes no-ops by the DB's being executed as
-; LXI B, which consumes the next MVI E,b as data into B which we never use.
+; LXI B, which consumes the next MVI E,b as data overwriting B, which we never use.
 
 		MVI			E,eSN			; fell from above = unknown cmd = syntax error
 		DB			opcode_LXI_B
@@ -417,9 +417,9 @@ STR_STAT:
 
 InitPacket:
 		LXI 		H,pktTYPE		; HL @ pktTYPE
-		MOV			M,A				; write A to pktTYPE
+		MOV			M,A				; pktTYPE = A = cmd_xxxxx from caller
 		INX			H				; HL @ pktDLEN
-		MVI			M,0				; write 0 to pktDLEN
+		MVI			M,0				; pktDLEN = 0
 		; HL @ pktDLEN
 		RET
 
@@ -930,8 +930,10 @@ SAVE:
 		MOV			H,A					; H = A
 		; HL = eof-sof = file length
 		POP			B					; retore B=0 C=ftypeX  CO:0  DO:1  BA:2
-		INR			C					; C++   absorb the initial C-- in the following loop
-		INX			H					; HL++  absorb the initial HL-- in the following loop
+		; Add 1 to both C and HL before entering the following loop because we don't
+		; hit the first JNZ until after running the body at least once.
+		INR			C					; C++
+		INX			H					; HL++
 @l0:	; remove 0/1/2 eof marker bytes from ram filesize to get true filesize
 		DCX			H					; HL-- = length--
 		DCR			C					; C-- = 
