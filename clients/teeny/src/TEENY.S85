@@ -26,34 +26,25 @@
 ; CONFIGURATION
 ; -----------------------------------------------------------------------------
 
-; TPDD1 & TPDD2 have dip switches that can set the drive to several speeds
-; from 150 to 76k, They both ship set to 19200 by default.
-; The highest speed that the M100 can do is 19200.
-; (using the normal rom routines and a STAT string)
-; Brother, KnitKing, and Purple Computing drives are all hard-wired to 9600
-; by solder jumpers. They can only be changed by desoldering a solder blob.
-; Most users today are using a tpdd emulator not a real drive.
+; TPDD1 default is 19200 but dip switch settable 150-76k.
+; TPDD2 is 19200 only. (not even solder-jumper option)
+; Brother FB-100, KnitKing FDD19, and Purple Computing D103 are 9600 only.
+; (actually settable 150-76k like TPDD1, but only via solder jumpers)
+; System rom max is 19200.
 	IFNDEF BAUD
 BAUD 				EQU		19200
 	ENDIF
 
 ; The DSR check makes it so we gracefully detect when the drive is not
-; connected or not ready. It's not critical, and the point of TEENY is
-; to be teeny, so by default the DSR code is not included.
+; connected or not ready. But since it's not neccessary, and the point of
+; TEENY is to be teeny, the DSR code is not included by default in this version.
+; It is included in most old teeny binaries, though it was a user choice at
+; install-time in TEENY.EXE . If we really cared about robustness and data
+; integrity, we wouldn't be ignoring the checksums on the return packets!
 	;DEFINE INCLUDE_DSR
 
-; A tpdd WRITE packet may specify any payload data length from 0 to 251
-; (256 minus 5 bytes of packet overhead: Z Z cmd len chk)
-; M100/KC85 platform only has a 64 byte com buffer and TEENY does not
-; use any flow control other than the cmd<>ack sync nature of the tpdd
-; packet protocol itself, so large chunks are not wise at 19,200 baud.
-; Also it's better if the size is the same or some even division or multiple
-; of the loigical sector size of the disk formatting, and for a normal
-; filesystem disk that is 64 bytes. Most (probably all) other tpdd clients
-; including TANDY's Floppy itself use 128. But you can actually use anything
-; up to 251.
 	IFNDEF CHUNK_LEN
-CHUNK_LEN			EQU		128
+CHUNK_LEN			EQU		128		; 1-128
 	ENDIF
 
 COM_SETUP_PAUSE_MS	EQU		100
@@ -142,58 +133,77 @@ ESC 				EQU		0x1B
 SPACE				EQU		0x20
 
 ; file types, attribute byte A for MKDIRENT
-FattrBA				EQU		0x80		; .BA files
-FattrDO				EQU		0xC0		; .DO files
-FattrCO				EQU		0xA0		; .CO files
+fattrBA				EQU		0x80		; .BA files
+fattrDO				EQU		0xC0		; .DO files
+fattrCO				EQU		0xA0		; .CO files
 ; file types, reg A for AFTEREOF2
 ftypeBA				EQU		0x00
 ftypeDO				EQU		0x01
 ftypeCO				EQU		0x02
+; number of extra bytes in a RAM file vs the true file size
+eofbytesBA			EQU		2
+eofbytesDO			EQU		1
+eofbytesCO			EQU		0
 
 rst_NextNonSpace	EQU		2		; RST 2 = get next non-whitespace char from M to A
 rst_CompareDEHL		EQU		3		; RST 3 = compare DE and HL
 rst_Print_A			EQU		4		; RST 4 = print A to LCD/LPT
 
+local_fname_len		EQU		9		; XXXXXX.XX
 
 ; -----------------------------------------------------------------------------
 ; TPDD
 ; -----------------------------------------------------------------------------
 
-ZZ					EQU		0x5A5A				; packet start / preamble, really 2 consecutive 'Z', not a int16 number
+ZZ					EQU		0x5A5A				; packet start / preamble, "ZZ"
 
-req_dirent			EQU		0x00
-req_open			EQU		0x01
-req_close			EQU		0x02
-req_read			EQU		0x03
-req_write			EQU		0x04
-req_delete			EQU		0x05
-req_status			EQU		0x07
+; commands
+cmd_dirent			EQU		0x00
+cmd_open			EQU		0x01
+cmd_close			EQU		0x02
+cmd_read			EQU		0x03
+cmd_write			EQU		0x04
+cmd_delete			EQU		0x05
+cmd_status			EQU		0x07
 
+; returns
 ret_read			EQU		0x10
 ret_dirent			EQU		0x11
-ret_normal			EQU		0x12
+ret_std				EQU		0x12
 
-open_mode_write		EQU		0x01
-open_mode_append	EQU		0x02
-open_mode_read		EQU		0x03
+; dirent actions
+dirent_set_name		EQU		0x00
+
+; file open modes
+write_mode			EQU		0x01
+append_mode			EQU		0x02
+read_mode			EQU		0x03
+
+tpdd_fname_len		EQU		24
+cmd_dirent_dlen		EQU		tpdd_fname_len + 1 + 1	; 24(fname) + 1(attr) +1(action)
+pkt_len_overhead	EQU		5	; 2(ZZ) + 1(fmt) + 1(len) [DATA] + 1(chk)
 
 ; -----------------------------------------------------------------------------
 ; APPLICATION
 ; -----------------------------------------------------------------------------
 
 ; TINY uses ALTCD for it's variables and packet buffer
-; start of ALTLCD							; FCC0
+; start of ALTLCD (100)							; FCC0
 RamFileStart		EQU		ALTLCD + 0x40		; FD00
 RamFileSize			EQU		ALTLCD + 0x42		; FD02
 DskFileSize			EQU		ALTLCD + 0x44		; FD04  native lsb-first copy of tpdd msb-first filesize
-StackPointer		EQU		ALTLCD + 0x46		; FD06
+InitialSP			EQU		ALTLCD + 0x46		; FD06  initial stack pointer
 LoadingFlag			EQU		ALTLCD + 0x48		; FD08
 ; TPDD packet
 pktZZ				EQU		ALTLCD + 0x4A		; FD0A  tpdd packet preamble "ZZ"
-pktTYPE				EQU		ALTLCD + 0x4C		; FD0C  tpdd packet command or return type
-pktDLEN				EQU		ALTLCD + 0x4D		; FD0D  tpdd packet data length
-pktDATA				EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data (length varies 0-?? 64? up to 252 is possible & legal but idk yet what TEENY does)
+pktTYPE				EQU		ALTLCD + 0x4C		; FD0C  tpdd packet type, cmd_xxx or ret_xxx
+pktDLEN				EQU		ALTLCD + 0x4D		; FD0D  tpdd packet data length, 0-128
+pktDATA				EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data, 0-128 bytes, +1 checksum byte
 ; position varies but also a single byte checksum comes after pktDATA, and is the final byte of the packet
+
+; The length of DATA varies from 0 to 128 and the there is one more byte after that with the checksum.
+; So the end of the packet buffer window is ALTLCD + pktDATA + CHUNK_SIZE + 1
+; FCC0 + 4E + 80 + 1 = FD8F
 
 ; FSIZE in a DIRENT packet
 ; pktDATA +  0 : start of fname
@@ -201,7 +211,7 @@ pktDATA				EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data (length varies 0-?? 64? 
 ; pktDATA + 24 : attr
 ; pktDATA + 25 : fsize msb
 ; pktDATA + 26 : fsize lsb
-direntFSIZE			EQU		pktDATA + 25		; FD27
+direntFSIZE			EQU		pktDATA + tpdd_fname_len + 1	; FD27
 ; end of ALTLCD				ALTLCD + 0x013F		; FDFF
 
 ; DLEN for a WRITE packet
@@ -256,14 +266,15 @@ HIMEM				EQU		MAXRAM
 ;------------------------------------------------------------------------------
 PRGTOP:
 PRGEXE:
-		LXI			H,0x0000		; HL = 0
-		DAD			SP				; add stack pointer to HL
-		SHLD		StackPointer	; save stack pointer
+		LXI			H,0				; HL = 0
+		DAD			SP				; HL = stack pointer
+		SHLD		InitialSP		; InitialSP = stack pointer
 		LXI			H,ZZ			; HL = "ZZ" = tpdd packet preamble
-		SHLD		pktZZ				; save HL to ram pktZZ
+		SHLD		pktZZ			; pktZZ = "ZZ" preamble field of packet buffer never changes
 MAIN:
-		LHLD		StackPointer	; copy saved stack pointer from ram to HL
-		SPHL						; copy saved stack pointer from HL to SP
+		; reset stack pointer every time we return to main since we have many aborts after random pushes
+		LHLD		InitialSP		; HL = InitialSP
+		SPHL						; SP = InitialSP
 		XRA			A				; A = 0
 		STA			LoadingFlag		; LoadingFlag = 0
 		LXI			H,MAIN			; load MAIN addr to HL
@@ -339,15 +350,17 @@ ERROR:
 		ORA 		A				; does LoadingFlag == 0?
 		JZ 			@show			; if 0 skip to @show
 		PUSH 		D				; stash DE (D doesn't matter, E=eXX from above)
+		; jaddr@ts-1
 		LHLD 		RamFileSize		; HL=RamFileSize
 		MOV 		B,H				; B=H
 		MOV 		C,L				; C=L  BC=RamFileSize
 		LHLD 		RamFileStart	; HL=RamFileStart
 		CALL		MASDEL			; delete BC bytes @ HL
 		POP 		D				; restore DE (only care about E)
+		; jaddr@ts
 @show:
 		LXI			H,STR_ErrCodes	; HL = start of string of err codes
-		MVI			D,0x00			; D=0 E=eXX from above
+		MVI			D,0				; D=0 E=eXX from above
 		DAD			D				; HL=STR_Errcodes+eXX
 		MOV			A,M				; get first byte of error code
 		_RST		rst_Print_A			; print it
@@ -406,7 +419,7 @@ InitPacket:
 		LXI 		H,pktTYPE		; HL @ pktTYPE
 		MOV			M,A				; write A to pktTYPE
 		INX			H				; HL @ pktDLEN
-		MVI			M,0x00			; write 0 to pktDLEN
+		MVI			M,0				; write 0 to pktDLEN
 		; HL @ pktDLEN
 		RET
 
@@ -459,7 +472,7 @@ SendPacket:
 		; B =  2   + 1    + 1    + pktDLEN + 1
 		;     "ZZ"   TYPE   DLEN   DATA      CHK
 
-		MVI			A,0x05			; A = 5
+		MVI			A,pkt_len_overhead	; A = 5
 		ADD			B				; add pktDLEN from B to A, A = pktDLEN+5
 		MOV			B,A				; B = pktDLEN+5
 		; B = loop counter for all bytes in packet, ZZ to CKSUM
@@ -521,7 +534,7 @@ ReadSerialByteIncHL:
 
 ; start building DELETE cmd packet
 KILL:
-		MVI			A,req_delete
+		MVI			A,cmd_delete
 ShortPacket:
 		CALL		InitPacket
 jSendPacket:
@@ -549,8 +562,8 @@ DIRENT:
 		CALL		SET232				; configure uart per the stat string
 
 ; build a STATUS cmd packet
-		MVI			A,req_status		; load A with the tpdd command for drive status
-		CALL		ShortPacket			; write 0x07 (req_status) to pktTYPE then call SendPacket (skips the usual packet-building becasue this command has no data payload)
+		MVI			A,cmd_status		; A = tpdd drive status command
+		CALL		ShortPacket			; write 0x07 (cmd_status) to pktTYPE then call SendPacket (skips the usual packet-building becasue this command has no data payload)
 
 ; build a DIRENT packet
 ; 2     1   1   24           1     1       1
@@ -558,33 +571,34 @@ DIRENT:
 
 ; start building a DIRENT(set_name) cmd packet        
 		XRA			A					; A = 0
-		CALL		InitPacket			; write 0x00 (req_dirent) to pktTYPE (cmd)
+		CALL		InitPacket			; write 0x00 (cmd_dirent) to pktTYPE (cmd)
 		; HL @ pktDLEN (len)
-		MVI			M,0x1A				; write 0x1A (26 bytes data len) to pktDLEN (len)
+		MVI			M,cmd_dirent_dlen	; pktDLEN = 26
 		INX			H					; HL = pktDATA (start of data)
 		; HL @ pktDATA (data)
-		LXI			D,KYBUF+2			; DE = 3rd byte into keyboard buffer (skip over "C " cmd & space)
-		MVI			B,0x09				; B = 9
+		LXI			D,KYBUF+2			; DE = 3rd byte into keyboard buffer (skip over "C ")
+		MVI			B,local_fname_len	; B = 9
 		CALL		D2H4Bup				; append 9 bytes (filename FFFFFF.XX) from DE (keyb buf) to HL (packet data)
 		; HL @ pktDATA+9
-		MVI			B,0x0f				; B = 15
+		MVI			B,tpdd_fname_len-local_fname_len	; B = 15, 24 byte tpdd filename field minus 9 bytes XXXXXX.XX
 @l0:
 		MVI			M,SPACE				; append " " to packet data
 		INX			H					; next byte
 		DCR			B					; B--
-		JNZ 		@l0					; repeat 14 more times (write 15 spaces) = 24 bytes tpdd filename field
+		JNZ 		@l0					; repeat 14 more times (write 15 spaces) + 9 bytes filename = 24 bytes tpdd filename field
 		; HL @ pktDATA+24
 		MVI 		M,'F'				; hard-coded always write 'F' in attr field
 		INX			H					; next byte
-		; HL @ pktDATA+25
-		MOV			M,B					; B = 0 after the dcr loop, so writing 0 to action field (0 = set_name)
-		; action 0 = set_name the dirent command is simply telling the drive the filename for a sebsequent open/close/read/write/kill
+		; HL @ pktDATA+25 aka the dirent action field, and B happens to be 0,
+		; which also happens to be the dirent action code for dirent(set_name)
+		MOV			M,B					; M@pktDATA+25 = action = B = 0 = set_name
+		; dirent(set_name) tells the drive the filename for an open/close/read/write/kill to follow
 
 SendPacket2:
 		CALL		SendPacket
 		MOV			B,A					; B = A returned from SendPacket   why?(*1)
 		LDA			pktTYPE				; A = packet type that the drive returned
-		CPI			ret_normal			; is it a STANDARD return packet?
+		CPI			ret_std				; is it a standard return packet?
 		JZ			ParseErrorReturn	; it's supposed to be a DIRENT or READ return not a standard return
 		MOV			A,B					; A = saved result from SendPacket   why?(*1)
 		ORA			A					; if A = 0 set Z   why?(*1)
@@ -594,13 +608,13 @@ SendPacket2:
 		RET
 
 SendOpenCMD_write:
-		MVI			E,open_mode_write
+		MVI			E,write_mode
 SendOpenCMD:
-		MVI			A,req_open
+		MVI			A,cmd_open
 		CALL		InitPacket
 		; HL @ pktDLEN
 		; InitPacket left HL sitting on pktDLEN and didn't change A.
-		; Why would we write the req_open pktTYPE code there?
+		; Why would we write the cmd_open pktTYPE code there?
 		; Because it HAPPENS to be 1, and we HAPPEN to want to write a length of 1.
 		MOV			M,A					; write 0x01 to pktDLEN - OPEN command has 1 byte of data
 		INX			H					; advance HL to the first byte of pktDATA
@@ -610,7 +624,7 @@ SendOpenCMD:
 SendFinalWriteChunk:
 		POP 		D
 SendWriteCMD:
-		MVI			A,req_write
+		MVI			A,cmd_write
 		CALL		InitPacket
 		MOV			M,C					; write C=chunk_len to pktDLEN
 		INX			H					; advance HL to pktDATA
@@ -656,7 +670,7 @@ LOAD:
 		;
 		; FtypeTable is a table with 3 blocks, one each for CO, DO, & BA filetypes
 		; Each block is 5 bytes in 3 fields:
-		; 1 byte:  attribute for MKDIRENT   FattrCO FattrDO FattrBA
+		; 1 byte:  attribute for MKDIRENT   fattrCO fattrDO fattrBA
 		; 2 bytes: jump address             jCOFILE jDOFILE jBAFILE
 		; 2 bytes: start of filetype area   COFILES DOFILES BAFILES
 		MOV			D,A					; D=0 E=0/1/2 DE=0/1/2
@@ -672,25 +686,29 @@ LOAD:
 		; DO: HL = FtypeTable+5
 		; BA: HL = FtypeTable+10
 		MOV			A,M					; A = byte @ HL
-		; CO: A = FattrCO
-		; DO: A = FattrDO
-		; BA: A = FattrBA
-		PUSH		PSW					; stash FattrXX
+		; CO: A = fattrCO
+		; DO: A = fattrDO
+		; BA: A = fattrBA
+		PUSH		PSW					; push fattrXX
 
-		; attr FattrCO / FattrDO / FattrBA has been read from the jump table and pushed
+		; attr fattrCO / fattrDO / fattrBA has been read from the jump table and pushed
 
 		LXI			D,MkRamDirent		; DE = MkRamDirent
-		PUSH		D					; stash MkRamDirent
+		PUSH		D					; push MkRamDirent
 
-		; pushed the addr of MkRamDirent
+		; MkRamDirent is on the stack
+		; There is no matching pop, it gets used by RET
+		; at the end of jCOFILE/jDOFILE/jBAFILE
 
 		INX			H					; HL++ to jump addr lsb
 		MOV			E,M					; E = jump addr lsb
 		INX			H					; HL++ to jump addr msb 
 		MOV			D,M					; D = jump addr msb
-		PUSH		D					; save jump addr   <<< when do we ever pop & jump?(*2)
+		PUSH		D					; push jump addr
 
-		; addr jCOFILES / jDOFILES / jBAFILES has been read from the jump table and pushed
+		; jCOFILE/jDOFILE/jBAFILE is on the stack
+		; There is no matching pop, it gets used by RZ
+		; exiting the loop at the end of LOAD
 
 		INX			H					; HL++ to XXFILES area pointer
 		MOV			E,M					; E = XXFILES pointer lsb
@@ -698,8 +716,7 @@ LOAD:
 		MOV			H,M					; H = XXFILES pointer msb
 		MOV			L,E					; L = XXFILES pointer lsb   HL=XXFILES pointer
 
-		; pointer COFILES / DOFILES / BAFILES has been read from the jump table
-		; and HL now points to it
+		; HL = COFILES/DOFILES/BAFILES
 
 		; read the file area start addr from the pointer addr
 		MOV			E,M					; E = XXFILES lsb
@@ -717,6 +734,7 @@ LOAD:
 		; HL = start of CO/DO/BA FILES area
 		SHLD		RamFileStart		; RamFileStart = HL (new ram file starts at the beginning of the area for it's type)
 		PUSH		H					; stash HL=RamFileStart
+		; jaddr@ts-1
 		CALL		MAKHOL				; create space for new file
 		JC			errOM				; abort if MAKHOL failed from not enough memory
 		; set a status flag that we are now loading from disk to ram
@@ -726,45 +744,54 @@ LOAD:
 		LHLD		DskFileSize			; HL = DskFileSize
 		XCHG							; swap HL:DE  DE = DskFileSize
 		POP			H					; HL = RamFileStart
+		; jaddr@ts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; not following the use of pktTYPE here
 
 		LDA			pktTYPE				; A = packet type  (should be 0x10 for read return?)
 		MOV			C,A					; C = packet type  ????????
-		MVI			B,0x00				; B = 0	 BC = packet type  ???????
+		MVI			B,0					; B = 0	 BC = packet type  ???????
 		; C/BC = pktTYPE ????????
 		; DE = tpdd file size
 		; HL = ram file start
+		; TS = jCOFILE/jDOFILE/jBAFILE
+		; TS-1 = MkRamDirent
+		; TS-2 = fattrXX
 @l1:
 		MOV			A,D					; A = D (filesize lsb)
 		ORA			E					; A=D=lsb OR E=msb , aka set Z when DE==0
 		MOV			A,C					; A = packet type from C
 		STA			pktTYPE				; pktTYPE = packet type from C
-		RZ								; exit loop when DE==0
+
+		; We did not get here via CALL: ORG->MAIN->JZ LOAD->here
+		; So RZ will "return" to whatever is at top-of-stack -> jXXFILE
+		RZ								; when DE=0 jump to jXXFILE
+
 		ORA			A					; is packet type 0?
 		CM			SendReadCMD			; call if packet type <0 ???
 		DCX			D					; DE--
 		PUSH		H					; stash HL = current byte position in ram file
+		; jaddr@ts-1
 		LXI			H,pktDATA			; HL = start of packet data
 		DAD			B					; HL += BC, BC = packet type ???????
 		MOV			A,M					; A = byte @ HL
 		POP			H					; retore HL = byte position in file
+		; jaddr@ts+1
 		MOV			M,A					; write byte from packet to ram
 		INX			H					; HL++ (advance to next byte of file)
-		; Packet len including all overhead cannot exceed 256, DLEN only 252
-		; so the packet data position counter only needs C not BC
+		; entire packet len always <256, byte is enough
 		INR			C					; C++ (advance to next byte of packet)
 		JMP			@l1					; repeat
 
 SendOpenCMD_read:
-		MVI			E,open_mode_read
+		MVI			E,read_mode
 		CALL		SendOpenCMD
 SendReadCMD:
 		PUSH		H					; stash HL
 		PUSH		D					; stash DE
 ; start READ cmd packet
-		MVI			A,req_read			; A = READ packet fmt code
+		MVI			A,cmd_read			; A = READ packet fmt code
 		CALL		InitPacket			; Construct a tpdd packet
 		CALL		SendPacket2			; send the packet to the drive, read a return packet from the drive
 		XRA			A					; A = 0 ; (*1) why did we bother saving & restoring A? 
@@ -779,53 +806,57 @@ SendReadCMD:
 ; Used in LOAD. The different file types need different operations when
 ; inserting a new file in ram.
 FtypeTable:
-	DB FattrCO				; +0
+	DB fattrCO				; +0
 	DW jCOFILE
 	DW COFILES
-	DB FattrDO				; +5
+	DB fattrDO				; +5
 	DW jDOFILE
 	DW DOFILES
-	DB FattrBA				; +10
+	DB fattrBA				; +10
 	DW jBAFILE
 	DW BAFILES
 
-; (*2) Even though I know where these jump addresses are read from the table
-; above, I don't see where they are ever used. The jump addr is read,
-; then pushed, and then I don't see where it is ever popped or used.
+
+; In LOAD: we pushed fattrXX, then MkRamDirent, then jXXFILE.
+; Then at the end of the copy-to-ram loop we RZ while we are not in a CALL,
+; so RZ takes the jXXFILE addr off the top of the stack and "returns" there.
+; Then each of these ends in a RET, and we are again/still not in a CALL,
+; so the RET at the end of jCOFILE/jDOFILE/jBAFILE goes to MkRamDirent.
+; Top of stack has fattrXX on entering MkRamDirent
 
 jDOFILE:
 		MVI			M,0x1A
-		RET
+		RET								; really a jump to MkRamDirent
 
-; Maybe I missed something here. BA files get 2 nuls after the end of the file
-; and we do write 2 nuls here, but at the begining?
 jBAFILE:
+		; We jumped here by the RZ at the end of the copy-to-ram loop,
+		; HL currently points at the byte after the end of the file.
+		; BA files need 2 NUL added after the contents, write 2 nulls here.
 		XRA			A					; A=0
-		MOV			M,A					; write 0 @ HL (start of file data?)
+		MOV			M,A					; write 0 @ HL
 		INX			H					; HL++
 		MOV			M,A					; write 0 @ HL
 		LHLD		RamFileSize			; HL = RamFileSize
 		XCHG							; DE = RamFileSize
-		; DOFILES area starts immediately after BAFILES area ends
-		; Make room to add a new BA file by moving DOFILES forward fsizeX bytes
+		; DOFILES area starts immediately after BAFILES area ends.
+		; Update the DOFILES pointer to point to the first byte
+		; after the file we just wrote.
 		LHLD		DOFILES				; HL = DOFILES
 		DAD			D					; add RamFileSize to DOFILES
 		SHLD		DOFILES				; write updated DOFILES
-		; now DOFILES starts RamFileSize after the end of the last BA file
-		; we can now write a new BA file into that gap
-		RET
+		RET								; really a jump to MkRamDirent
 
 jCOFILE:
 		LHLD		RamFileStart
 		SHLD		COFILES
-		RET
+		RET								; really a jump to MkRamDirent
 
 MkRamDirent:
-		POP			PSW
-		LHLD		RamFileStart
-		XCHG
-		DCX			D
-		POP			H
+		POP			PSW					; A = fattrXX
+		LHLD		RamFileStart		; HL = RamFileStart
+		XCHG							; DE = RamFileStart
+		DCX			D					; DE--
+		POP			H					; HL = whatever DE was, DOFILES/COFILES/BAFILES?
 		JMP			MKDIRENT
 
 ; read 1st byte of fname ext, return:
@@ -839,7 +870,7 @@ GetFtypeX:
 		; CO: A=00 F=ZP
 		; DO: A=01 F=
 		RP								; return if not S, file is not BA
-		MVI			A,2					; A=2
+		MVI			A,eofbytesBA		; A = eofbytesBA = 2
 		; BA: A=2 F=SPC
 		RET								; file is BA
 
@@ -914,7 +945,7 @@ SAVE:
 		POP			D					; DE = true len
 		POP			H					; HL = sof
 		CALL		WriteChunks			; send WRITE packets
-		MVI			A,req_close
+		MVI			A,cmd_close
 		JMP			ShortPacket			; send CLOSE packet
 
 ; initial:
@@ -929,7 +960,7 @@ WriteChunks:
 		; flags: C means HL<DE, Z means HL=DE
 		JNC			@l0					; jump if not C, exit loop when chunk_len >= remaining_data
 		MOV			C,L					; C = chunk_len
-		MOV			B,H					; B=0 (should always be 0 here since HL=chunk_len above cannot exceed 251 right?)
+		MOV			B,H					; B=0 (should always be 0 here since chunk_len<=128)
 		; BC = chunk len
 		POP			H					; restore HL=position
 		DAD			B					; advance HL by one chunk_len

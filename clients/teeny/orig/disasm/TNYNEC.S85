@@ -107,7 +107,7 @@ rst_Print_A			EQU		4		; RST 4 = print A to LCD/LPT
 ; TPDD
 ; -----------------------------------------------------------------------------
 
-ZZ					EQU		0x5A5A				; packet start / preamble, really 2 consecutive 'Z', not a int16 number
+ZZ					EQU		0x5A5A				; packet start / preamble, 'Z','Z'
 
 req_dirent			EQU		0x00
 req_open			EQU		0x01
@@ -131,10 +131,10 @@ open_mode_read		EQU		0x03
 
 ; TINY uses ALTCD for it's variables and packet buffer
 ; start of ALTLCD (NEC)							; FBC0
-_KYBUF				EQU		ALTLCD + 0x30		; FBF0 copy of KYBUF we make ourselves for some reason
+_KYBUF				EQU		ALTLCD + 0x30		; FBF0 NEC only - virtual KYBUF we make ourselves
 RamFileStart		EQU		ALTLCD + 0x40		; FC00
 RamFileSize			EQU		ALTLCD + 0x42		; FC02
-DskFileSize			EQU		ALTLCD + 0x44		; FC04  native lsb-first copy of tpdd msb-first filesize
+DskFileSize			EQU		ALTLCD + 0x44		; FC04
 StackPointer		EQU		ALTLCD + 0x46		; FC06
 LoadingFlag			EQU		ALTLCD + 0x48		; FC08
 ; TPDD packet

@@ -8,7 +8,6 @@
 ; verify
 ; cmp -l -b TNY200.CO ../TNY200.CO && echo SAME || echo FAIL
 
-
 ; -----------------------------------------------------------------------------
 ; CONFIGURATION
 ; -----------------------------------------------------------------------------
@@ -17,7 +16,7 @@
 BAUD 				EQU		19200
 	ENDIF
 
-	DEFINE INCLUDE_DSR		; include to reproduce the original binary exactly
+	DEFINE INCLUDE_DSR
 
 	IFNDEF CHUNK_LEN
 CHUNK_LEN			EQU		128
@@ -119,16 +118,12 @@ open_mode_write		EQU		0x01
 open_mode_append	EQU		0x02
 open_mode_read		EQU		0x03
 
-
 ; -----------------------------------------------------------------------------
 ; APPLICATION
 ; -----------------------------------------------------------------------------
 
-; TINY uses ALTCD for it's variables and packet buffer.
-; The location and size of ALTLCD is different on 100 vs 200,
-; but these variables are the same on both, relative offsets to ALTLCD.
-
-; F7B0 start of ALTLCD (200)					; F7B0
+; TINY uses ALTCD for it's variables and packet buffer
+; start of ALTLCD (200)							; F7B0
 RamFileStart		EQU		ALTLCD + 0x40		; F7F0
 RamFileSize			EQU		ALTLCD + 0x42		; F7F2
 FileSize			EQU		ALTLCD + 0x44		; F7F4

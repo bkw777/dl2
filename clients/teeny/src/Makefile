@@ -8,15 +8,17 @@ SRC = TEENY.S85
 
 AS = z88dk-z80asm
 ASFLAGS := -m8085_strict -no-synth # -v
-# z88dk-z80asm < 25000 has a bug that it only accepts the zilog syntax for RST.
-# If $(AS) is z88dk then add -DZ88DK=ver to flags. Used in m100_common.S85
-# fixed as of https://github.com/z88dk/z88dk/commit/db5c165
+# Adds -DZ88DK=ver to flags if the assembler is z88dk.
 ASFLAGS += $(shell $(AS) |awk '/^Z80 Macro Assembler /{split($$4,a,"-");if (a[1]>0) print "-DZ88DK="a[1]}')
 
 # -DHIMEM=addr		# [MAXRAM] generate a relocated binary with specified END address
 # -DINCLUDE_DSR		# include code for DSR check
 # -DBAUD=9600		# [19200] 9600 4800 2400 1200 600 300 110 75
-# -DCHUNK_LEN=64	# 1-252, [128]
+# -DCHUNK_LEN=64	# 1-[128]
+# Use -DBAUD=9600 if you have a FB-100, FDD19, or Purple Computing drive,
+# or remove the solder blob under the little cover on the bottom.
+# Example usage from the make command line:
+# $ make 100 XFLAGS='=-DHIMEM=62000 -DBAUD=9600 -DINCLUDE_DSR'
 XFLAGS :=
 
 # don't delete .CO when building .DO
@@ -28,18 +30,11 @@ all: $(MODELS)
 .PHONY: $(MODELS)
 $(MODELS): % : $(NAME)%.DO
 
-# We need the length of the binary to set ORG, but we don't know the length
-# until after compile. So we compile once with default org 0 and no CO header
-# just to get the length. Then compile again with correct ORG & CO header.
-# Also generate map file (-m) to provide the function call addresses,
-# and filter .map to produce .calls
 $(patsubst %,$(NAME)%.CO,$(MODELS)): $(NAME)%.CO : $(SRC) %.S85
 	$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -b -o=$@ $< && \
-	n=$$(wc -c <$@) && \
-	$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -DPRGLEN=$$n -b -o=$@ $<
+	$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -DPRGLEN=`wc -c <$@` -b -o=$@ $<
 	@rm *.o
-	@if test "$*" = "200" ;then echo '!NOTICE!  $* does not work. See ../orig/disasm for working 200 source' ;fi
-	@if test "$*" = "NEC" ;then echo '!NOTICE!  $* does not work. See ../orig/disasm for working NEC source' ;fi
+	@case $* in 200|NEC) echo '!NOTICE!  $* does not work. See ../orig/disasm for working $* source' ;; esac
 
 %.DO: %.CO
 	@which -s co2ba || echo "Please install https://github.com/bkw777/dl2 for co2ba to generate $@"
