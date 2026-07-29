@@ -1,6 +1,6 @@
 # Using Sardine with dl2 and a disk image of the dictionary disk
 
-Reference: [Manual for Ultimate ROM II](http://www.club100.org/library/librom.html):  
+Reference: [Ultimate ROM II & Sardine manuals](https://www.club100.org/library/libdoc.html)
 
 One way to use Sardine is to let Ultimate ROM II load & unload the program from disk into ram on the fly instead of installing permanently in ram. Sardine uses raw sector access commands to read a special dictionary data disk.  
 For this to work, UR2 has to be able to load `SAR100.CO` from a normal filesystem disk using normal file/filesystem access, and then `SAR100.CO` needs to be able to use TPDD1 FDC-mode commands to read raw sectors from the special dictionary data disk.  
