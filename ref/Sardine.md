@@ -1,4 +1,4 @@
-#Using Sardine with dl2 and a disk image of the dictionary disk
+# Using Sardine with dl2 and a disk image of the dictionary disk
 
 Reference: [Manual for Ultimate ROM II](http://www.club100.org/library/librom.html):  
 
