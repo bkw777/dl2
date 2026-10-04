@@ -34,7 +34,6 @@ DOFILES			EQU		0xF661		; pointer to start of DO files
 COFILES			EQU		0xF663		; pointer to start of CO files
 KYBUF			EQU		0xEF70		; keyboard buffer
 FILNM1			EQU		0xF746		; 9 bytes, padded fname for save/open/etc
-FX1				EQU		FILNM1+6	; EXT of FILNM1 after CKFN2 (“CO”, “DO”, “BA”)
 ALTLCD			EQU		0xF7B0		; start of ALT LCD buffer, 640 bytes
 KYBCNT			EQU		0xFD1E		; number of characters in keyboard buffer
 

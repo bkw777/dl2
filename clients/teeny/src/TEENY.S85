@@ -17,7 +17,8 @@
 
 ;;;;
 ;;;; 100 works
-;;;; M10 works
+;;;; M10na works
+;;;; M10eu testing
 ;;;; K85 works
 ;;;; 200 does not work, but ../orig/disasm/TNY200.S85 does
 ;;;; NEC does not work, but ../orig/disasm/TNYNEC.S85 does
@@ -73,8 +74,10 @@ _RST MACRO n
 	INCLUDE		"NEC.S85"
 	ELIF MODEL_K85
 	INCLUDE		"K85.S85"
-	ELIF MODEL_M10
-	INCLUDE		"M10.S85"
+	ELIF MODEL_M10na
+	INCLUDE		"M10na.S85"
+	ELIF MODEL_M10eu
+	INCLUDE		"M10eu.S85"
 	ELSE
 	INCLUDE		"100.S85"
 	ENDIF
@@ -133,7 +136,7 @@ CR					EQU		0x0D
 ESC 				EQU		0x1B
 SPACE				EQU		0x20
 
-; file types, attribute byte A for MKDIRENT
+; MKDIRENT file type attributes
 fattrBA				EQU		0x80		; .BA files
 fattrDO				EQU		0xC0		; .DO files
 fattrCO				EQU		0xA0		; .CO files
@@ -146,11 +149,12 @@ eofbytesBA			EQU		2
 eofbytesDO			EQU		1
 eofbytesCO			EQU		0
 
-rst_NextNonSpace	EQU		2		; RST 2 = get next non-whitespace char from M to A
-rst_CompareDEHL		EQU		3		; RST 3 = compare DE and HL
-rst_Print_A			EQU		4		; RST 4 = print A to LCD/LPT
+rst_NextNonSpace	EQU		2			; RST 2 = get next non-whitespace char from M to A
+rst_CompareDEHL		EQU		3			; RST 3 = compare DE and HL
+rst_Print_A			EQU		4			; RST 4 = print A to LCD/LPT
 
-local_fname_len		EQU		9		; XXXXXX.XX
+local_fname_len		EQU		9			; XXXXXX.XX
+FX1					EQU		FILNM1+6	; EXT of FILNM1 after CKFN2 (“CO”, “DO”, “BA”)
 
 ; -----------------------------------------------------------------------------
 ; TPDD

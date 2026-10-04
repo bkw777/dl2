@@ -98,10 +98,11 @@ ftypeBA				EQU		0x00
 ftypeDO				EQU		0x01
 ftypeCO				EQU		0x02
 
-rst_NextNonSpace	EQU		2		; RST 2 = get next non-whitespace char from M to A
-rst_CompareDEHL		EQU		3		; RST 3 = compare DE and HL
-rst_Print_A			EQU		4		; RST 4 = print A to LCD/LPT
+rst_NextNonSpace	EQU		2			; RST 2 = get next non-whitespace char from M to A
+rst_CompareDEHL		EQU		3			; RST 3 = compare DE and HL
+rst_Print_A			EQU		4			; RST 4 = print A to LCD/LPT
 
+FX1					EQU		FILNM1+6	; EXT of FILNM1 after CKFN2 (“CO”, “DO”, “BA”)
 
 ; -----------------------------------------------------------------------------
 ; TPDD

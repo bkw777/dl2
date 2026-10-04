@@ -30,6 +30,5 @@ BAFILES			EQU		0xF99A		; pointer to start of BA files
 DOFILES			EQU		0xFBAE		; pointer to start of DO files
 COFILES			EQU		0xFBB0		; pointer to start of CO files
 FILNM1			EQU		0xFC93		; 9 bytes, padded fname for save/open/etc
-FX1				EQU		FILNM1+6	; EXT of FILNM1 after CKFN2 (“CO”, “DO”, “BA”)
 ALTLCD			EQU		0xFCC0		; start of ALT LCD buffer, 320 bytes
 KYBCNT			EQU		0xFFAA		; number of characters in keyboard buffer
