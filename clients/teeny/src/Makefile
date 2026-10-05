@@ -2,9 +2,10 @@
 # Requires https://github.com/z88dk/z88dk
 # Requires https://github.com/bkw777/dl2
 
+NAME = TEENY
+SRC = $(NAME).S85
 MODELS = 100 K85 M10na M10eu 200 NEC
-NAME = TNY
-SRC = TEENY.S85
+URL = github.com/bkw777/dl2
 
 AS = z88dk-z80asm
 ASFLAGS := -m8085_strict -no-synth # -v
@@ -28,9 +29,9 @@ XFLAGS :=
 all: $(MODELS)
 
 .PHONY: $(MODELS)
-$(MODELS): % : $(NAME)%.DO
+$(MODELS): % : $(NAME)_%.DO
 
-$(patsubst %,$(NAME)%.CO,$(MODELS)): $(NAME)%.CO : $(SRC) %.S85
+$(patsubst %,$(NAME)_%.CO,$(MODELS)): $(NAME)_%.CO : $(SRC) %.S85
 	$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -b -o=$@ $< && \
 	$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -DPRGLEN=`wc -c <$@` -b -o=$@ $<
 	@rm *.o
@@ -38,16 +39,20 @@ $(patsubst %,$(NAME)%.CO,$(MODELS)): $(NAME)%.CO : $(SRC) %.S85
 
 %.DO: %.CO
 	@which -s co2ba || echo "Please install https://github.com/bkw777/dl2 for co2ba to generate $@"
-	case "$*" in *NEC*) o=bsave ;; *) o=savem ;; esac ;co2ba $< $$o >$@
+	@case "$*" in *NEC*) o=bsave ;; *) o=savem ;; esac ; \
+	x="$*" c= ;while read l ;do [ -n "$$l" ] && { set $$l ;[ "_$$2" = "_platform:" ] && { shift 2 ; c="$$@" ;continue ; } ; } ;done < $${x##*_}.S85 ; \
+	CMD="PN=$(NAME) COMMENT=\"$$c - $(URL)\" co2ba $< $$o >$@" ; \
+	echo "$$CMD" ; \
+	eval $$CMD
 
 .PHONY: verify_%
-verify_%: $(NAME)%.CO
+verify_%: $(NAME)_%.CO
 	@cmp -l $< ../orig/$< && echo "Built $< is identical to reference ../orig/$<."
 	@echo "Note: default config no longer replicates the legacy binary exactly,"
 	@echo "so it's normal for verify to 'fail' now."
 
 .PHONY: load_%
-load_%: $(NAME)%.DO
+load_%: $(NAME)_%.DO
 	@which -s dl || echo "Please install https://github.com/bkw777/dl2 to bootstrap $<"
 	dl -v -b $<
 

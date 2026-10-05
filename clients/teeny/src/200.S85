@@ -1,10 +1,10 @@
-; 200.S85
-; TANDY model 200 header for TEENY.S85
+; 200.S85 - platform header for TEENY.S85
+; platform: TANDY Model 200 North America
 ; https://github.com/bkw777/m100_dev/blob/main/rom_cross_map.ods
 ; https://github.com/bkw777/m100_dev/tree/main/platforms/200
 ; To examine the 200 rom, append the 8k to the 32k.
 
-; 200 built from the shared source doesn't work, but this file is good.
+; TEENY.S85 doesn't generate a working 200 binary but this file is correct.
 ; This file is also used by ../orig/disasm/TNY200.S85 which is working.
 
 ; routines

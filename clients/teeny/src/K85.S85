@@ -1,5 +1,5 @@
-; K85.S85
-; Kyotronic KC-85 header for TEENY.S85
+; K85.S85 - platform header for TEENY.S85
+; platform: Kyotronic KC-85 North America
 ; https://github.com/bkw777/m100_dev/blob/main/rom_cross_map.ods
 ; https://github.com/bkw777/m100_dev/tree/main/platforms/K85
 

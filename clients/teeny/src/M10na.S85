@@ -1,5 +1,5 @@
-; M10na.S85
-; Olivetti M-10 NorthAmerica header for TEENY.S85
+; M10na.S85 - platform header for TEENY.S85
+; platform: Olivetti M-10 North America
 ; https://github.com/bkw777/m100_dev/blob/main/rom_cross_map.ods
 ; https://github.com/bkw777/m100_dev/tree/main/platforms/M10
 
