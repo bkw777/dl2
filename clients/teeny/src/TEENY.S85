@@ -2,13 +2,13 @@
 ; TINY by Ed Giese (Acroatix). TEENY is TINY that Ron Weisen made a bit smaller.
 ; This is based originally on a disassembly of TEENY for Model 100
 ; platform & rom references: https://github.com/bkw777/m100_dev
-; This disassembly by Brian K. White
+; Brian K. White
 ;
 ; build with:
 ;	z88dk-z80asm -m8085_strict -no-synth -DMODEL_100 -b -o=TEENY.CO TEENY.S85 && \
 ;	z88dk-z80asm -m8085_strict -no-synth -DMODEL_100 -DPRGLEN=$(wc -c <TEENY.CO) -b -o=TEENY.CO TEENY.S85
 ;
-; Builds for 100, K85, M10, 200, NEC
+; Builds for 100, K85, M10 na & eu, 200, NEC
 ; $ make 100
 ; or
 ; build & verify that the 100 or M10 build reproduces the original exactly
@@ -18,7 +18,7 @@
 ;;;;
 ;;;; 100 works
 ;;;; M10na works
-;;;; M10eu testing
+;;;; M10eu works
 ;;;; K85 works
 ;;;; 200 does not work, but ../orig/disasm/TNY200.S85 does
 ;;;; NEC does not work, but ../orig/disasm/TNYNEC.S85 does
@@ -207,8 +207,7 @@ pktDLEN				EQU		ALTLCD + 0x4D		; FD0D  tpdd packet data length, 0-128
 pktDATA				EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data, 0-128 bytes, +1 checksum byte
 
 ; filesize field within a DIRENT return packet
-; pktDATA +  0 : start of fname
-; pktDATA + 23 : end of fname
+; pktDATA +  0 : fname
 ; pktDATA + 24 : attr
 ; pktDATA + 25 : fsize msb
 ; pktDATA + 26 : fsize lsb
@@ -221,17 +220,21 @@ direntFSIZE			EQU		pktDATA + tpdd_fname_len + 1	; FD27
 ; DLEN for a WRITE packet
 ; Not pktDLEN itself, used to fill pktDLEN in outgoing WRITE packet.
 ; Curious location for this variable.
-; _ALL_ old teeny versions for 100, M10, NEC, and even 200, all used the same FF80.
-; M10 is not interesting because COMBUF is the same as 100, and K85 is currently
-; using the same thing too, but K85 is new not a reference.
-; K85 is using the same only because all the others already were.
+; ALL old teeny versions for 100, M10na, NEC, even 200, used the same FF80.
+; This address falls within COMBUF on 100 & M10na, but not on 200 or NEC,
+; yet the same litteral address is used on all platforms.
+; (K85 and M10eu don't count as they are new platforms so they only use the same
+;  address because the others already did and I decided to follow for now.)
 ; How can this be safe to be within COMBUFF at all?
-; Or, if the data comes from COMBUF, then why not on the others?
-; On 100 FF80 is within COMBUF: FF46-FF85
-; On 200 FF80 seems unrelated:  FFBB-FFFA
-;    M10                        FF46-FF85
-;    K85                        FFBE-FFFD
-;    NEC                        FEC4-FF04
+; Is it a magic address? The address is never directly/explicitly referenced
+; in the system rom.
+; TODO: try moving this somewhere more clearly safe like ALTLCD with the rest.
+; platform: COMBUF:
+; 100       FF46-FF85
+; 200       FFBB-FFFA
+; M10na     FF46-FF85
+; K85       FFBE-FFFD
+; NEC       FEC4-FF04
 writeDLEN			EQU		0xFF80
 
 
@@ -539,19 +542,20 @@ ReadSerialByteIncHL:
 ; start building DELETE cmd packet
 KILL:
 		MVI			A,cmd_delete
+; start building a short packet (some commands have no data payload)
 ShortPacket:
 		CALL		InitPacket
 jSendPacket:
 		CALL		SendPacket
-		RZ			; return if return packet DLEN is 0 (normal delete file return packet has 0 data len)
-		; otherwise, it's some error
+		RZ			; return if return packet DLEN is 0 (some commands return no data)
+		; otherwise, decode the result byte
 		; A contains the 1st (and in this case only) byte of pktDATA
 ParseErrorReturn:
 		; A has the error code sent in the data field of the return packet
-		ANI			0xf0
-		RAR
-		RAR
-		RAR
+		ANI			0xF0		; A &= 0xF0
+		RAR						; Rotate Accumulator Right through carry
+		RAR						; Rotate Accumulator Right through carry
+		RAR						; Rotate Accumulator Right through carry
 		MOV			E,A			; E = eXX error code offset
 		JMP			ERROR
 
@@ -824,7 +828,7 @@ FtypeTable:
 ; In LOAD: we pushed fattrXX, then MkRamDirent, then jXXFILE.
 ; Then at the end of the copy-to-ram loop we RZ while we are not in a CALL,
 ; so RZ takes the jXXFILE addr off the top of the stack and "returns" there.
-; Then each of these ends in a RET, and we are again/still not in a CALL,
+; Then each of these jXXFILE: ends in a RET, and we are still not in a CALL,
 ; so the RET at the end of jCOFILE/jDOFILE/jBAFILE goes to MkRamDirent.
 ; Top of stack has fattrXX on entering MkRamDirent
 
@@ -889,21 +893,28 @@ SAVE:
 		JNC			errNM				; reject if not less than 'E'
 		CALL		FINDFN				; find the start of the file in ram
 		; Z = not found, NZ = found
-		; HL - Pointer to file's dir entry
-		; DE - Points to start of file in RAM
-		; A - Contains file attribute
-		; BC - Unchanged
+		; HL: Pointer to file's dir entry
+		; DE: Points to start of file in RAM
+		; A: Contains file attribute
+		; BC: Unchanged
 		JZ			errFF				; file not found in RAM
 		CALL		GetFtypeX			; get ftype for AFTEREOF2
 		; CO: A=0 F=ZP
 		; DO: A=1
 		; BA: A=2 F=SPC
 
-; This ftype 0/1/2 stuff is confusing to read because there are 2 different
-; things going on with the same values but different uses and meanings.
-; 1: AFTEREOF2 needs to bet told the type of file: 0/1/2 for BA/DO/CO
-; 2: We need to remove eof bytes from ram filesize to get true filesize: 0/1/2 for CO/DO/BA
-; CO=0 file defined by the CO header / DO=1 0x1A / BA=2 0x00 0x00
+; This ftype 0/1/2 stuff is confusing to read because the ftype value is being
+; used in two different ways with two different meanings because one sequence
+; of three values just happens to be a mirror image of the other,
+; and I guess it saved a few bytes to capitalize on the coincidence.
+;
+; MKDIRENT ftype is 0=BA, 1=DO, 2=CO
+; And it just happens to also be that:
+; For ftype 0 (BA) the rom adds 2 bytes to mark EOF: 0x00 0x00
+; For ftype 1 (DO) the rom adds 1 byte to mark EOF: 0x1A
+; For ftype 2 (CO) the rom adds 0 bytes to mark EOF: the file is defined by the CO header
+;
+; So it just happens to coincidentally be that: true_fsize = ram_fsize-(2-ftype)
 
 		MOV			C,A					; C = ftypeX
 		; CO: C=0
@@ -945,41 +956,40 @@ SAVE:
 		MOV			A,L					; A = len lsb
 		ORA			H					; len msbVlsb, aka set Z if len=0
 		RZ								; if file len=0 then there's nothing to do
-		PUSH		D					; stash DE = sof
-		PUSH		H					; stash HL = true len
+		PUSH		D					; TS[0] = DE = sof
+		PUSH		H					; TS[0] HL = true_len, TS[1] = sof
 		CALL		SendOpenCMD_write	; tell drive to open the file for write
-		POP			D					; DE = true len
+		POP			D					; DE = true_len
 		POP			H					; HL = sof
 		CALL		WriteChunks			; send WRITE packets
-		MVI			A,cmd_close
+		MVI			A,cmd_close			; A = cmd_close
 		JMP			ShortPacket			; send CLOSE packet
 
+
+; I am not following this and I must have the annotations wrong here
 ; initial:
 ; HL = current position = sof
-; DE = remaining file data = len
-; BC = idk i lost the plot
+; DE = remaining len = len
 WriteChunks:
-		PUSH		H
-		PUSH		H
+		PUSH		H					; TS[0]=position_copy_a
+		PUSH		H					; TS[0]=position_copy_b TS[1]=position_copy_a
 		LXI			H,CHUNK_LEN			; HL = CHUNK_LEN
-		_RST		rst_CompareDEHL		; compare DE(remaining_data) to HL(chunk_len)
-		; flags: C means HL<DE, Z means HL=DE
-		JNC			@l0					; jump if not C, exit loop when chunk_len >= remaining_data
-		MOV			C,L					; C = chunk_len
-		MOV			B,H					; B=0 (should always be 0 here since chunk_len<=128)
-		; BC = chunk len
-		POP			H					; restore HL=position
-		DAD			B					; advance HL by one chunk_len
-		XTHL							; replace TS with HL=new_position, HL=old_position   ?
-		XCHG							; swap HL:DE, DE=old_position, HL=remaining_data     ?
+		_RST		rst_CompareDEHL		; compare DE(remaining_len) to HL(chunk_len)
+		; flags: C if HL<DE, Z if HL=DE, only A destroyed
+		JNC			@l0					; exit loop when chunk_len >= remaining_len
+		MOV			C,L					; C = L = chunk_len (HL=chunk_len<=128)
+		MOV			B,H					; B = H = 0         (HL=chunk_len<=128)
+		; BC = chunk_len
+		POP			H					; HL=old_position_copy_b, TS[0]=old_position_copy_a
+		DAD			B					; HL = HL+BC = old_position_copy_b + chunk_len = new_position
+		XTHL							; swap TS:HL -> TS[0]=new_position, HL=old_position_copy_a
+		XCHG							; swap HL:DE -> DE=old_position_copy_a, HL=remaining_len
 		LXI			B,writeDLEN			; BC = writeDLEN
-		DAD			B					; HL = remeining_data + writeDLEN ???  I've lost the plot
-		PUSH		H					; push HL=remaining_data+DLEN ????
-		; BC = writeDLEN
-		; HL = remaining_data+writeDLEN   this must be wrong
+		DAD			B					; HL = HL+BC = remaining_len + writeDLEN  ???
+		PUSH		H					; TS[0]=???  TS[1]=new_position
 		CALL		SendWriteCMD
-		POP			D
-		POP			H
+		POP			D					; DE = new_position
+		POP			H					; HL = ???
 		JMP			WriteChunks
 @l0:
 		MOV			C,E
