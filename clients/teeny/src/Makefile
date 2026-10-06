@@ -4,7 +4,7 @@
 
 NAME = TEENY
 SRC = $(NAME).S85
-MODELS = 100 K85 M10na M10eu 200 NEC
+MODELS = 100na K85na M10na M10eu 200na NECna
 URL = github.com/bkw777/dl2
 
 AS = z88dk-z80asm
@@ -35,7 +35,7 @@ $(patsubst %,$(NAME)_%.CO,$(MODELS)): $(NAME)_%.CO : $(SRC) %.S85
 	$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -b -o=$@ $< && \
 	$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -DPRGLEN=`wc -c <$@` -b -o=$@ $<
 	@rm *.o
-	@case $* in 200|NEC) echo '!NOTICE!  $* does not work. See ../orig/disasm for working $* source' ;; esac
+	@case $* in 200*|NEC*) echo '!NOTICE!  $* does not work. See ../orig/disasm for working $* source' ;; esac
 
 %.DO: %.CO
 	@which -s co2ba || echo "Please install https://github.com/bkw777/dl2 for co2ba to generate $@"

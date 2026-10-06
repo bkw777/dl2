@@ -30,7 +30,7 @@ verify: verify_200 verify_NEC
 .PHONY: $(MODELS)
 $(MODELS): % : $(NAME)%.DO
 
-$(patsubst %,$(NAME)%.CO,$(MODELS)): $(NAME)%.CO : $(NAME)%.S85 ../../src/%.S85
+$(patsubst %,$(NAME)%.CO,$(MODELS)): $(NAME)%.CO : $(NAME)%.S85 ../../src/%na.S85
 	$(AS) $(ASFLAGS) $(XFLAGS) -b -o=$@ $< && \
 	$(AS) $(ASFLAGS) $(XFLAGS) -DPRGLEN=$$(wc -c <$@) -b -o=$@ $<
 	@rm *.o

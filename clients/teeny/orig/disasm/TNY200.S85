@@ -41,7 +41,7 @@ _RST MACRO n
 ; TARGET PLATFORM
 ; -----------------------------------------------------------------------------
 
-	INCLUDE		"../../src/200.S85"
+	INCLUDE		"../../src/200na.S85"
 
 ; complete COM STAT string ex: "98N1D"
 COM_STAT MACRO
