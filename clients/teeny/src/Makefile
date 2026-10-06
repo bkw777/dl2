@@ -40,7 +40,7 @@ $(patsubst %,$(NAME)_%.CO,$(MODELS)): $(NAME)_%.CO : $(SRC) %.S85
 %.DO: %.CO
 	@which -s co2ba || echo "Please install https://github.com/bkw777/dl2 for co2ba to generate $@"
 	@case "$*" in *NEC*) o=bsave ;; *) o=savem ;; esac ; \
-	x="$*" c= ;while read l ;do [ -n "$$l" ] && { set $$l ;[ "_$$2" = "_platform:" ] && { shift 2 ; c="$$@" ;continue ; } ; } ;done < $${x##*_}.S85 ; \
+	x="$*" ;while read a b c ;do [ "_$$b" = "_platform:" ] && break || c= ;done < $${x##*_}.S85 ; \
 	CMD="PN=$(NAME) COMMENT=\"$$c - $(URL)\" co2ba $< $$o >$@" ; \
 	echo "$$CMD" ; \
 	eval $$CMD
