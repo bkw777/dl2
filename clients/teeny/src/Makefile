@@ -6,6 +6,8 @@ NAME = TEENY
 SRC = $(NAME).S85
 MODELS = 100na K85na M10na M10eu 200na NECna
 URL = github.com/bkw777/dl2
+CO2BA_CMD = callba      # savem / callbe
+CO2BA_CMD_NEC = execba  # bsave / execba
 
 AS = z88dk-z80asm
 ASFLAGS := -m8085_strict -no-synth # -v
@@ -32,14 +34,16 @@ all: $(MODELS)
 $(MODELS): % : $(NAME)_%.DO
 
 $(patsubst %,$(NAME)_%.CO,$(MODELS)): $(NAME)_%.CO : $(SRC) %.S85
-	$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -b -o=$@ $< && \
-	$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -DPRGLEN=`wc -c <$@` -b -o=$@ $<
+	@$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -b -o=$@ $< && \
+	CMD="$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -DPRGLEN=`wc -c <$@` -b -o=$@ $<" ; \
+	echo "$$CMD" ; \
+	eval $$CMD
 	@rm *.o
 	@case $* in 200*|NEC*) echo '!NOTICE!  $* does not work. See ../orig/disasm for working $* source' ;; esac
 
 %.DO: %.CO
 	@which -s co2ba || echo "Please install https://github.com/bkw777/dl2 for co2ba to generate $@"
-	@case "$*" in *NEC*) o=bsave ;; *) o=savem ;; esac ; \
+	@case "$*" in *NEC*) o=$(CO2BA_CMD_NEC) ;; *) o=$(CO2BA_CMD) ;; esac ; \
 	x="$*" ;while read a b c ;do [ "_$$b" = "_platform:" ] && break || c= ;done < $${x##*_}.S85 ; \
 	CMD="PN=$(NAME) COMMENT=\"$$c - $(URL)\" co2ba $< $$o >$@" ; \
 	echo "$$CMD" ; \

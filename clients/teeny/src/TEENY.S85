@@ -1,7 +1,8 @@
 ; TINY/TEENY disassembly
 ; TINY by Ed Giese (Acroatix). TEENY is TINY that Ron Weisen made a bit smaller.
-; This is based originally on a disassembly of TEENY for Model 100
-; platform & rom references: https://github.com/bkw777/m100_dev
+; Originally based on a disassembly of TEENY for Model 100.
+; This version no longer aims to reproduce the legacy binary.
+; Platform & rom references: https://github.com/bkw777/m100_dev
 ; Brian K. White
 ;
 ; build with:
@@ -351,7 +352,6 @@ errFL:
 errNM:
 		MVI			E,eNM
 
-
 ERROR:
 		LDA 		LoadingFlag		; A = LoadingFlag
 		ORA 		A				; does LoadingFlag == 0?
@@ -373,42 +373,9 @@ ERROR:
 		_RST		rst_Print_A			; print it
 		_RST		rst_NextNonSpace	; get next byte of err code
 		_RST		rst_Print_A			; print it
-		LXI			H,STR_ErrMsg	; get STR_ErrMsg
+		LXI			H,STR_Err		; get STR_Err
 		CALL		PTILL0			; print it
 		JMP			MAIN			; restart at main
-
-
-STR_ErrCodes:
-eSN		EQU			0x00
-		DB			"SN"
-eFF		EQU			0x02
-		DB			"FF"
-eNR		EQU			0x04
-		DB			"NR"
-eCM		EQU			0x06
-		DB			"CM"
-eIO		EQU			0x08
-		DB			"IO"
-eWP		EQU			0x0A
-		DB			"WP"
-eDF		EQU			0x0C
-		DB			"DF"
-eND		EQU			0x0E
-		DB			"ND"
-eAE		EQU			0x10
-		DB			"AE"
-eOM		EQU			0x12
-		DB			"OM"
-eFL		EQU			0x14
-		DB			"FL"
-eNM		EQU			0x16
-		DB			"NM"
-
-STR_Prompt:
-		DB			"> C FFFFFF.XX (C=KLSQ)",CR,LF,"> ",0
-
-STR_ErrMsg:
-		DB			" Err",CR,LF,0
 
 	IFNDEF PAUSE_DEx10us			; NEC has this in the system rom
 PAUSE_DEx10us:						; 8-11us/iter * DE iters
@@ -438,7 +405,6 @@ CheckDSR:
 		MVI			E,eNR			; set NR error
 		JMP			ERROR
 	ENDIF
-
 
 ; * Calculate & append checksum to packet
 ; * Send the REQuest packet
@@ -824,7 +790,6 @@ FtypeTable:
 	DW jBAFILE
 	DW BAFILES
 
-
 ; In LOAD: we pushed fattrXX, then MkRamDirent, then jXXFILE.
 ; Then at the end of the copy-to-ram loop we RZ while we are not in a CALL,
 ; so RZ takes the jXXFILE addr off the top of the stack and "returns" there.
@@ -904,8 +869,8 @@ SAVE:
 		; BA: A=2 F=SPC
 
 ; This ftype 0/1/2 stuff is confusing to read because the ftype value is being
-; used in two different ways with two different meanings because one sequence
-; of three values just happens to be a mirror image of the other,
+; used in two different ways with two different meanings. What's going on is
+; one sequence of three values just happens to be a mirror image of the other,
 ; and I guess it saved a few bytes to capitalize on the coincidence.
 ;
 ; MKDIRENT ftype is 0=BA, 1=DO, 2=CO
@@ -995,5 +960,27 @@ WriteChunks:
 		MOV			C,E
 		POP			H
 		JMP			SendFinalWriteChunk
+
+STR_Err:
+		DB			" Err",CR,LF,0
+
+STR_ErrCodes:
+		DB			"SNDFFLIOMWPAECMNMNR"
+; offsets into STR_ErrorCodes
+eSN		EQU			0x00
+eND		EQU			0x01
+eDF		EQU			0x02
+eFF		EQU			0x03
+eFL		EQU			0x04
+eIO		EQU			0x06
+eOM		EQU			0x07
+eWP		EQU			0x09
+eAE		EQU			0x0B
+eCM		EQU			0x0D
+eNM		EQU			0x0F
+eNR		EQU			0x11
+
+STR_Prompt:
+		DB			"> C FFFFFF.XX (C=KLSQ)",CR,LF,"> ",0
 
 PRGEND:
