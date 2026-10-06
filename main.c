@@ -116,10 +116,11 @@ MA 02111, USA.
 #define DEFAULT_OPERATION_MODE MODE_OPR
 #endif
 
+// default true but default profile k85 makes it false
+// Model 100 keyboard does not have a '~' key!
 #ifndef DEFAULT_TILDES
 #define DEFAULT_TILDES true
 #endif
-
 
 // To mimic the original Desk-Link from Travelling Software:
 #ifndef TSDOS_ROOT_LABEL
@@ -201,15 +202,15 @@ const char * magic_files[] = {
 // Probably no xenix client exists until I port one, but it would be this:
 //	{ "xenix",  14, 0, false, ATTR_RAW, false, false, false }
 //
-//     id,   base, ext, pad,    attr,    dme,  magic, upcase
+//     id,   base, ext, pad,    attr,    dme,  magic, upcase, tildes
 #define CLIENT_PROFILES { \
-	{ "raw",    0,  0, false, ATTR_RAW, false, false, false }, \
-	{ "k85",    6,  2, true,  ATTR_DEF, true,  true,  true  }, \
-	{ "wp2",    8,  2, true,  ATTR_DEF, false, false, false }, \
-	{ "cpm",    8,  3, false, ATTR_DEF, false, false, true  }, \
-	{ "rexcpm", 6,  2, true,  ATTR_DEF, false, false, true  }, \
-	{ "z88",    12, 3, false, ATTR_DEF, false, false, false }, \
-	{ "st",     6,  2, true,  ATTR_DEF, false, false, true  }  \
+	{ "raw",    0,  0, false, ATTR_RAW, false, false, false, true  }, \
+	{ "k85",    6,  2, true,  ATTR_DEF, true,  true,  true,  false }, \
+	{ "wp2",    8,  2, true,  ATTR_DEF, false, false, false, true  }, \
+	{ "cpm",    8,  3, false, ATTR_DEF, false, false, true,  true  }, \
+	{ "rexcpm", 6,  2, true,  ATTR_DEF, false, false, true,  true  }, \
+	{ "z88",    12, 3, false, ATTR_DEF, false, false, false, true  }, \
+	{ "st",     6,  2, true,  ATTR_DEF, false, false, true,  true  }  \
 }
 
 // terminal emulation
@@ -300,6 +301,7 @@ typedef struct {
 	bool    dme;
 	bool    magic;
 	bool    upcase;
+	bool    tildes;
 } CLIENT_PROFILE;
 const CLIENT_PROFILE profiles [] = CLIENT_PROFILES ;
 //const char* profile = profiles[0].id;
@@ -623,7 +625,7 @@ void show_profiles_help (int e) {
 
 	for (int i=0; i<n; i++) {
 		dbg(0,
-			"%s\t%d\t%d\t%s\t'%c'\t%s\t%s\t%s\n",
+			"%s\t%d\t%d\t%s\t'%c'\t%s\t%s\t%s\t%s\n",
 			profiles[i].id,
 			profiles[i].base,
 			profiles[i].ext,
@@ -631,7 +633,8 @@ void show_profiles_help (int e) {
 			profiles[i].attr,
 			profiles[i].dme?"on":"off",
 			profiles[i].magic?"on":"off",
-			profiles[i].upcase?"on":"off"
+			profiles[i].upcase?"on":"off",
+			profiles[i].tildes?"on":"off"
 		);
 	}
 
@@ -734,7 +737,8 @@ void set_fnames (const char* s) {
 	default_attr = ATTR_DEF;
 	dme_en = false;
 	enable_magic_files = false;
-	upcase = false;
+	upcase = DEFAULT_UPCASE;
+	tildes = DEFAULT_TILDES;
 
 	return;
 }
@@ -770,6 +774,7 @@ void load_profile (const char* s) {
 	dme_en = profiles[i].dme;
 	enable_magic_files = profiles[i].magic;
 	upcase = profiles[i].upcase;
+	tildes = profiles[i].tildes;
 
 }
 
@@ -1593,9 +1598,10 @@ FILE_ENTRY* make_file_entry(char* namep, uint8_t attr, uint16_t len, char flags)
 		// replace any . with _
 		for (int i=0;i<bl;i++) if (bn[i]=='.') bn[i]='_';
 		// tilde
-		if ( tildes &&
-				dp?dp>bl:il>ol ||
-				(f.flags&FE_FLAGS_DIR && il > ol-ext_len-1)
+		if ( tildes && (
+				dp?dp>bl:il > ol ||
+				( f.flags&FE_FLAGS_DIR && il > ol-ext_len-1 )
+				)
 			) bn[bl-1]='~';
 
 		// ext
@@ -2834,7 +2840,7 @@ void show_main_help() {
 		,DEFAULT_UPCASE?"on":"off"
 		,DEFAULT_PROFILE
 		,dme_en?"on":"off"
-		,tildes?"on":"off"
+		,DEFAULT_TILDES?"on":"off"
 	);
 
 }
