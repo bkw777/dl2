@@ -4,6 +4,9 @@
 
 MODELS = 200 NEC
 NAME = TNY
+URL = github.com/bkw777/dl2 clients/teeny/orig/disasm
+CO2BA_CMD = callba      # savem / callbe
+CO2BA_CMD_NEC = execba  # bsave / execba
 
 AS = z88dk-z80asm
 ASFLAGS := -m8085_strict -no-synth # -v
@@ -37,7 +40,7 @@ $(patsubst %,$(NAME)%.CO,$(MODELS)): $(NAME)%.CO : $(NAME)%.S85 ../../src/%na.S8
 
 %.DO: %.CO
 	@which -s co2ba || echo "Please install https://github.com/bkw777/dl2 for co2ba to generate $@"
-	case "$*" in *NEC*) o=bsave ;; *) o=savem ;; esac ;co2ba $< $$o >$@
+	case "$*" in *NEC*) o=$(CO2BA_CMD_NEC) ;; *) o=$(CO2BA_CMD) ;; esac ; PN=TEENY COMMENT="$(URL) $<" co2ba $< $$o >$@
 
 .PHONY: verify_%
 verify_%: $(NAME)%.CO
