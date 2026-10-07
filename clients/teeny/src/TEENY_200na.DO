@@ -2,8 +2,8 @@
 0READF:CLEAR12,F:DEFINTA-E,Q,G,K:DEFSNGF,H-J:DEFSTRL-O:READF,A,J,G,N,E,Q:M="!":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?USING"Installing \    \   0%";N
 1READL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)XORD:B=BXORQ:D=0:POKEI,B:I=I+1:K=KXORB:NEXT:?@18,USING"###%";(I-F)*100/A:IFI<=HTHEN1
 2IFK<>GTHEN?"Bad Checksum":ELSEM=CHR$(34):L="X.DO":OPENLFOROUTPUTAS1:?#1,"0CLEAR0,"F":CALL"J":MENU":CLOSE1:?"Please type:":?"KILL"M""L:?"SAVE"M""N:LOADL
-3DATA60376,728,60376,79,"TEENY",128,64
-4DATA"a@@yb¶·a!š!šbº·j¶·¹ïr¸·a¥«¥aÕ®ŒQr^½¶!”a!¬bt¯a1¯vbŽ!š!¢lz0¯¾!‘Šä'¾!“ŠS®µ¨¬Šo¬±–!‹Š–¬}Š!ƒ­^@A^CA^MA^FA^KA^GA^DA^Oz¸·÷Š!—¬•j²·!„!j°·šÂ‘aÂ®V@Y>§—§a;®ŒQƒ¥«[:ó‚*¬‰yx!Žq!„!Ž!Ža¼·7cv@‰a¼·>cÆ!—>!Ÿ!‡c÷:ŠÖ¬Æc]‚Ð¬o7~EÀ!‡aº·>!ƒÆšu¬cE‚ß¬a¼·àÏŠ¬Š¬!L
-5DATA"Š¬M‚ù¬ïpa½·!Žc>÷‰YÅšu¬‚r¬7c‰~E8¬À¬ˆ¦°___!Ÿƒ!ƒ¬õÇVn*¬a1¬w]Y~G˜¬ï8¬vZcQ2¯FIú!FOv`cE‚M­v!†c0À¬!‡z¼·¾RŠŸ¬8÷‰^A~A8¬7c3ƒ›¬‘~D8¬1c!ú!ƒ›¬Œk‚x¬a~¬bt¯Al¥J®jW¸!…!Œ) b´·K!Ÿ|C}‚#­!—a—­YYYYY>µQ@®•c!žc!–•c!žc&+!žc!– )b²·«b°·¥èÂš{¬a¸·tÿ­j´·«¡z¼
-6DATA"·!F@:ó9r¼·ˆ÷¼„­[¥a¾·I>¡7cLƒæ­^Ci­¥•~C8¬X­ï!‡!r¼·‘¡‰à¹­#¶€¦­!¡¶À©­Õ²vZ‰ï7c7j²·«j!¡¶Yb!¡¶‰j°·b#¶‰±j°·«[¡ƒìmz!Œ·–!ƒ°~B‰¨¬‚x¬z!Œ·¾!‚š!¬¾!…’!¬ŒkŠo¬J®!~BÑ…•«l‘=Ó/<Ú'LckM‚!ƒ®=ôˆ•¥g­‘¡!š®~Bƒ˜¬¥¥aÀ@Ÿ’6®!!„¡I£«AÀ¿I¥u­‘¡ƒ!š®!‹¡ƒt­`!…22MJ@!“!Ž
-7DATA"!„!†!†!Œ	!!!—!!!…!ƒ!!Ž!!Ž!’~`!ƒ`!†!†!†!†!†!†n!˜!˜`h!ƒ}!‹!Œ!“!‘iMJ~`@
+3DATA60371,733,60371,88,"TEENY",128,64
+4DATA"a@@yb¶·a!š!šbº·j¶·¹ïr¸·a «¥aÕ®ŒQr^½¶!”a|¬bt¯a1¯vbŽ!š!¢lz0¯¾!‘Šä'¾!“ŠN®µ£¬Šj¬±–!‹Š‘¬}Š~­^@A^BA^FA^HA^PA^RA^TA^Vz¸·÷Š!’¬•j²·!„!j°·šÂ‘a=®V@Y>§—§a6®ŒQƒ «[:ó‚%¬‰yx!Žq!„!Ž!Ža¼·7cv@‰a¼·>cÆ!—>!Ÿ!‡c÷:ŠÑ¬Æc]‚Ë¬o7~EÀ!‡aº·>!ƒÆšp¬cE‚Ú¬a¼·àÏ…¬…¬!L…¬
+5DATA"M‚ô¬ïpa½·!Žc>÷‰YÅšp¬‚m¬7c‰~E3¬;¬ˆ¦°___!Ÿƒ~¬õÇVn%¬a,¬w]Y~G“¬ï3¬vZcQ2¯FIú!FOv`cE‚H­v!†c0;¬!‡z¼·¾RŠš¬8÷‰^A~A3¬7c3ƒ–¬‘~D3¬1c!ú!ƒ–¬Œk‚s¬ay¬bt¯Al¥E®jW¸!…!Œ) b´·K!Ÿ|C}‚!ž­!—a’­YYYYY>µQ»­•c!žc!–•c!žc&+!žc!– )b²·«b°·¥èÂšv¬a¸·tú­j´·«¡z¼·
+6DATA"!F@:ó9r¼·ˆ÷¼ÿ­[¥a¾·I>¡7cLƒá­^Cd­¥•~C3¬S­ï!‡!r¼·‘¡‰à´­#¶€¡­!¡¶À¤­Õ²vZ‰ï7c7j²·«j!¡¶Yb!¡¶‰j°·b#¶‰±j°·«[¡ƒìmz!Œ·–!ƒ°~B‰£¬‚s¬z!Œ·¾!‚š|¬¾!…’|¬ŒkŠj¬E®!~BÑ…•«l‘=Ó/<Ú'LckM‚~®=ôˆ•¥b­‘¡!•®~Bƒ“¬¥¥aÀ@Ÿ’1®!!„¡I£«AÀ¿I¥p­‘¡ƒ!•®!‹¡ƒo­`!…22MJ@!“!Ž!†!†
+7DATA"!Ž!’!ƒ!	!!—!!„!†!Ž!„!!…!!!†!Œ!Ž!~`!ƒ`!†!†!†!†!†!†n!˜!˜`h!ƒ}!‹!Œ!“!‘iMJ~`@

@@ -128,8 +128,8 @@ open_mode_read		EQU		0x03
 
 RamFileStart		EQU		ALTLCD + 0x40		; F7F0
 RamFileSize			EQU		ALTLCD + 0x42		; F7F2
-FileSize			EQU		ALTLCD + 0x44		; F7F4
-StackPointer		EQU		ALTLCD + 0x46		; F7F6
+DskFileSize			EQU		ALTLCD + 0x44		; F7F4
+InitialSP			EQU		ALTLCD + 0x46		; F7F6
 LoadingFlag			EQU		ALTLCD + 0x48		; F7F8
 ; TPDD packet
 pktZZ				EQU		ALTLCD + 0x4A		; F7FA  2 bytes, tpdd packet preamble "ZZ"
@@ -181,11 +181,11 @@ PRGTOP:
 PRGEXE:
 		LXI			H,0
 		DAD			SP
-		SHLD		StackPointer
+		SHLD		InitialSP
 		LXI			H,ZZ
 		SHLD		pktZZ
 MAIN:
-		LHLD		StackPointer
+		LHLD		InitialSP
 		SPHL
 		XRA			A
 		STA			LoadingFlag
@@ -215,28 +215,28 @@ MAIN:
 		DCR			A
 		JZ			LOAD
 
-		MVI			E,0x03
+		MVI			E,eSN
 		DB			opcode_LXI_B
 errFF:
-		MVI			E,0x00
+		MVI			E,eFF
 		DB			opcode_LXI_B
 errCM:
-		MVI			E,0x06
+		MVI			E,eCM
 		DB			opcode_LXI_B
 errIO:
-		MVI			E,0x08
+		MVI			E,eIO
 		DB			opcode_LXI_B
 errAE:
-		MVI			E,0x10
+		MVI			E,eAE
 		DB			opcode_LXI_B
 errOM:
-		MVI			E,0x12
+		MVI			E,eOM
 		DB			opcode_LXI_B
 errFL:
-		MVI			E,0x01
+		MVI			E,eFL
 		DB			opcode_LXI_B
 errNM:
-		MVI			E,0x14
+		MVI			E,eNM
 
 ERROR:
 		LDA			LoadingFlag
@@ -263,6 +263,19 @@ ERROR:
 
 STR_ErrCodes:
 		DB			"FFLSNRCMIOWPDFNDAEOMNM"
+; offsets into STR_ErrCodes
+eFF		EQU			0x00
+eFL		EQU			0x01
+eSN		EQU			0x03
+eNR		EQU			0x04
+eCM		EQU			0x06
+eIO		EQU			0x08
+eWP		EQU			0x0A
+eDF		EQU			0x0C
+eND		EQU			0x0E
+eAE		EQU			0x10
+eOM		EQU			0x12
+eNM		EQU			0x14
 
 STR_Prompt:
 		DB			"> C FFFFFF.XX (C=KLSQ)",CR,LF,"> ",0
@@ -443,7 +456,7 @@ LOAD:
 		MOV			C,H
 		MOV			L,C
 		MOV			H,B
-		SHLD		FileSize
+		SHLD		DskFileSize
 		DCX			B
 		MOV			E,A
 		INR			A
@@ -486,7 +499,7 @@ LOAD:
 		LXI			H,LoadingFlag
 		INR			M
 		CALL		FUN_ram_eca1
-		LHLD		FileSize
+		LHLD		DskFileSize
 		XCHG
 		POP			H
 		LDA			pktTYPE

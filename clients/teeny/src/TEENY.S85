@@ -415,6 +415,11 @@ SendPacket:
 ; Take the least significant byte of that sum.
 ; Invert all the bits in that byte.
 ; The checksummed range is the start of cmd through end of data.
+
+; -----------------------------------------------------------------------------
+; BUILD OUTGOING PACKET
+; -----------------------------------------------------------------------------
+
 ; start at pktTYPE
 		LXI			H,pktTYPE		; HL @ pktTYPE
 		MOV			A,M				; A = pktTYPE
@@ -451,6 +456,11 @@ SendPacket:
 		; B = loop counter for all bytes in packet, ZZ to CKSUM
 		; start HL at pktZZ
 		LXI			H,pktZZ			; HL @ pktZZ (0x5A5A aka "ZZ")
+
+; -----------------------------------------------------------------------------
+; SEND OUTGOING PACKET
+; -----------------------------------------------------------------------------
+
 @send_byte:
 		MOV			A,M				; A = byte from packet
 		CALL		SND232			; send byte out rs232
@@ -462,9 +472,9 @@ SendPacket:
 		DCR			B				; B--
 		JNZ			@send_byte		; send bytes until B=0
 
-		; DONE SENDING COMMAND PACKET
-
-		; NOW READ RETURN PACKET
+; -----------------------------------------------------------------------------
+; RECIEVE RETURN PACKET
+; -----------------------------------------------------------------------------
 
 		; tpdd return packet starts with pktTYPE, no ZZ
 		LXI			H,pktTYPE		; HL @ pkTYPE
@@ -490,7 +500,7 @@ SendPacket:
 		; All return packet types have at least 1 byte of data.
 		; A standard type has exactly 1 byte of data, an error code.
 		; pktDATA=0x00 means no error.
-		; So we are returning Z = success, anything else = error.
+		; So we are returning Z = success, anything else = A=error_code.
 		RET
 
 ; read 1 byte from rs232 to M, advance HL
@@ -964,21 +974,44 @@ WriteChunks:
 STR_Err:
 		DB			" Err",CR,LF,0
 
+; Error Codes, both local and from from the drive.
+; See dl2/constants.h for what the drive sends.
+; See ParseErrorReturn above for how we translate what the drive sends.
+; The drive sends codes in the range from 0x00 to 0x8F, and we need to
+; translate those into offsets into this short string.
 STR_ErrCodes:
-		DB			"SNDFFLIOMWPAECMNMNR"
+
+; this more compact packing is not usable
+; because it ignores that error codes returned by the drive need to mapped
+;		DB			"SNDFFLIOMWPAECMNMNR"
 ; offsets into STR_ErrorCodes
+;eSN		EQU			0x00
+;eND		EQU			0x01
+;eDF		EQU			0x02
+;eFF		EQU			0x03
+;eFL		EQU			0x04
+;eIO		EQU			0x06
+;eOM		EQU			0x07
+;eWP		EQU			0x09
+;eAE		EQU			0x0B
+;eCM		EQU			0x0D
+;eNM		EQU			0x0F
+;eNR		EQU			0x11
+
+		DB			"SNFFNRCMIOWPDFNDAEOMFLNM"
+; offsets into STR_ErrCodes
 eSN		EQU			0x00
-eND		EQU			0x01
-eDF		EQU			0x02
-eFF		EQU			0x03
-eFL		EQU			0x04
-eIO		EQU			0x06
-eOM		EQU			0x07
-eWP		EQU			0x09
-eAE		EQU			0x0B
-eCM		EQU			0x0D
-eNM		EQU			0x0F
-eNR		EQU			0x11
+eFF		EQU			0x02
+eNR		EQU			0x04
+eCM		EQU			0x06
+eIO		EQU			0x08
+eWP		EQU			0x0A
+eDF		EQU			0x0C
+eND		EQU			0x0E
+eAE		EQU			0x10
+eOM		EQU			0x12
+eFL		EQU			0x14
+eNM		EQU			0x16
 
 STR_Prompt:
 		DB			"> C FFFFFF.XX (C=KLSQ)",CR,LF,"> ",0
