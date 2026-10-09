@@ -122,6 +122,11 @@ MA 02111, USA.
 #define DEFAULT_TILDES true
 #endif
 
+// default false but default profile k85 makes it true
+#ifndef DEFAULT_TSLOAD
+#define DEFAULT_TSLOAD false
+#endif
+
 // To mimic the original Desk-Link from Travelling Software:
 #ifndef TSDOS_ROOT_LABEL
 #define TSDOS_ROOT_LABEL   "0:    "
@@ -134,7 +139,7 @@ MA 02111, USA.
 #define TSDOS_DIR_LABEL    "<>"
 
 /*
- * "magic" files - See ref/ur2.txt
+ * "magic" Ultimate ROM II / TSLOAD files - See ref/ur2.txt
  * 
  * Support for Ultimate ROM II, TSLOAD, & any other on-the-fly loaders.
  * These filenames will always be loadable "by magic" in any cd path, even
@@ -155,7 +160,7 @@ MA 02111, USA.
  * 
  * TODO add run-time config list of filenames and search paths
  */
-const char * magic_files[] = {
+const char * tsload_files[] = {
 	"DOS100.CO",
 	"DOS200.CO",
 	"DOSNEC.CO",
@@ -168,7 +173,7 @@ const char * magic_files[] = {
 	"DOSM10.CO", // or DOSOLV.CO ? Jeff Birt found TS-DOS for Olivetti M-10 listed in a catalog.
 	"DOSK85.CO", // or DOSKYO.CO ? may have never existed
 	"SARM10.CO", // or SAROLV.CO ? Since TS-DOS for M-10 existed, probably Sardine existed too.
-	"SARK85.CO"  // or SRAKYO.CO ? may have never existed
+	"SARK85.CO"  // or SARKYO.CO ? may have never existed
 };
 
 // client compatibility profiles
@@ -309,7 +314,7 @@ char profile[PROFILE_ID_LEN+1] = {0};
 uint8_t base_len = 0;
 uint8_t ext_len = 0;
 char default_attr = ATTR_RAW;
-bool enable_magic_files = false;
+bool enable_magic_tsload = DEFAULT_TSLOAD;
 bool pad_fn = false;
 bool dme_en = false;
 
@@ -609,7 +614,7 @@ void show_profiles_help (int e) {
 		"PAD     fixed-length space-padded\n"
 		"ATTR    default attribute byte if no xattr\n"
 		"DME     enable TS-DOS directory mode extension\n"
-		"TSLOAD  enable \"magic files\" (ex: DOS100.CO) for TSLOAD / Ultimate ROM II\n"
+		"TSLOAD  enable magic UR-II/TSLOAD files (ex: DOS100.CO)\n"
 		"UPCASE  translate filenames to all uppercase\n"
 	);
 
@@ -736,7 +741,7 @@ void set_fnames (const char* s) {
 	pad_fn = false;
 	default_attr = ATTR_DEF;
 	dme_en = false;
-	enable_magic_files = false;
+	enable_magic_tsload = DEFAULT_TSLOAD;
 	upcase = DEFAULT_UPCASE;
 	tildes = DEFAULT_TILDES;
 
@@ -772,7 +777,7 @@ void load_profile (const char* s) {
 	pad_fn = profiles[i].pad;
 	default_attr = profiles[i].attr;
 	dme_en = profiles[i].dme;
-	enable_magic_files = profiles[i].magic;
+	enable_magic_tsload = profiles[i].magic;
 	upcase = profiles[i].upcase;
 	tildes = profiles[i].tildes;
 
@@ -1156,9 +1161,9 @@ char* collapse_padded_fname(char* fname) {
 
 int check_magic_file(char* b) {
 	dbg(3,"%s(\"%s\")\n",__func__,b);
-	if (!enable_magic_files) return 1;
-	int l = sizeof(magic_files)/sizeof(magic_files[0]);
-	for (int i=0;i<l;++i) if (!strcmp(magic_files[i],b)) return 0;
+	if (!enable_magic_tsload) return 1;
+	int l = sizeof(tsload_files)/sizeof(tsload_files[0]);
+	for (int i=0;i<l;++i) if (!strcmp(tsload_files[i],b)) return 0;
 	return 1;
 }
 
@@ -2122,7 +2127,7 @@ void req_write() {
 
 	if (o_file_h<0) {ret_std(ERR_NO_FNAME); return;}
 
-	if (f_open_mode!=F_OPEN_WRITE && f_open_mode !=F_OPEN_APPEND) {
+	if (f_open_mode!=F_OPEN_WRITE && f_open_mode!=F_OPEN_APPEND) {
 		ret_std(ERR_FMT_MISMATCH);
 		return;
 	}
@@ -2132,16 +2137,16 @@ void req_write() {
 		if (gb[1]<REQ_RW_DATA_MAX) dbg(1,"\n"); // final packet
 	}
 
-	if (write (o_file_h,gb+2,gb[1]) != gb[1]) ret_std (ERR_SECTOR_NUM);
-	else ret_std (ERR_SUCCESS);
+	if (write(o_file_h,gb+2,gb[1]) != gb[1]) ret_std(ERR_SECTOR_NUM);
+	else ret_std(ERR_SUCCESS);
 }
 
 void req_delete() {
 	dbg(2,"%s()\n",__func__);
 	if (cur_file->flags&FE_FLAGS_DIR) rmdir(cur_file->local_fname);
-	else unlink (cur_file->local_fname);
+	else unlink(cur_file->local_fname);
 	dbg(1,"Deleted: %s\n",cur_file->local_fname);
-	ret_std (ERR_SUCCESS);
+	ret_std(ERR_SUCCESS);
 }
 
 
@@ -2762,7 +2767,7 @@ void show_config () {
 	dbg(0,"upcase          : %s\n",upcase?"true":"false");
 	dbg(0,"verbosity       : %d\n",debug);
 	dbg(0,"dme_en          : %s\n",dme_en?"true":"false");
-	dbg(0,"magic_files     : %s\n",enable_magic_files?"true":"false");
+	dbg(0,"tsload_files    : %s\n",enable_magic_tsload?"true":"false");
 	dbg(0,"bootstrap_fname : \"%s\"\n",bootstrap_fname);
 	dbg(0,"BASIC_byte_ms   : %d\n",BASIC_byte_us/1000);
 	dbg(0,"app_lib_dir     : \"%s\"\n",app_lib_dir);
@@ -2812,6 +2817,7 @@ void show_main_help() {
 		" -p dir      Path - /path/to/dir with files to be served (./)\n"
 		" -r bool     RTS/CTS hardware flow control (%6$s)\n"
 		" -s #        Speed - serial port baud rate (%5$d)\n"
+		" -t bool     TSLOAD - enable magic TSLOAD files (%11$s)\n"
 		" -u          Uppercase all filenames (%7$s)\n"
 		" -~ bool     Truncated filenames end in '~' (%10$s)\n"
 		" -v          Verbosity - more v's = more verbose, both activity & help\n"
@@ -2841,6 +2847,7 @@ void show_main_help() {
 		,DEFAULT_PROFILE
 		,dme_en?"on":"off"
 		,DEFAULT_TILDES?"on":"off"
+		,DEFAULT_TSLOAD?"on":"off"
 	);
 
 }
@@ -2951,7 +2958,7 @@ int main(int argc, char** argv) {
 	if (getenv("PROFILE")) load_profile(getenv("PROFILE"));
 	if (getenv("ATTR")) default_attr = *getenv("ATTR");
 	if (getenv("DME")) dme_en = atobool(getenv("DME"));
-	if (getenv("TSLOAD")) enable_magic_files = atobool(getenv("TSLOAD"));
+	if (getenv("TSLOAD")) enable_magic_tsload = atobool(getenv("TSLOAD"));
 	if (getenv("TILDES")) tildes = atobool(getenv("TILDES"));
 	if (getenv("CLIENT_TTY")) strcpy(client_tty_name,getenv("CLIENT_TTY"));
 	if (getenv("BAUD")) baud = atoi(getenv("BAUD"));
@@ -2965,7 +2972,7 @@ int main(int argc, char** argv) {
 #endif
 
 	// commandline
-	while ((i = getopt (argc, argv, ":0a:b:c:d:e:fhi:lm:np:r:s:uvwx:z:~:^"
+	while ((i = getopt (argc, argv, ":0a:b:c:d:e:fhi:lm:np:r:s:t:uvwx:z:~:^"
 #if !defined(_WIN)
 		"g"
 #endif
@@ -2992,6 +2999,7 @@ int main(int argc, char** argv) {
 			case 'p': add_share_path(optarg);                     break;
 			case 'r': rtscts = atobool(optarg);                   break;
 			case 's': baud = atoi(optarg);                        break;
+			case 't': enable_magic_tsload = atoi(optarg);         break;
 			case 'u': upcase = true;                              break;
 			case 'v': debug++;                                    break;
 			case 'w': load_profile("wp2");                        break; // back compat, short for -c wp2
@@ -3060,7 +3068,7 @@ int main(int argc, char** argv) {
 	dbg(2,"TPDD2 banks %s\n",(model==2)?"enabled":"disabled");
 	if (strcmp(profile,DEFAULT_PROFILE)) dbg(2,"Client Compatibility Profile: \"%s\"\n",profile);
 	dbg(2,"TS-DOS directories %s\n",(dme_en)?"enabled":"disabled");
-	dbg(2,"Magic files for UR-II/TSLOAD %s\n",(enable_magic_files)?"enabled":"disabled");
+	dbg(2,"Magic UR-II/TSLOAD files %s\n",(enable_magic_tsload)?"enabled":"disabled");
 	if (model==2) dbg(0,"Bank 0 Dir: %s\nBank 1 Dir: %s\n",share_path[0],share_path[1]);
 	if (tildes) dbg(2,"Truncated filenames end in \"~\"\n");
 #ifdef USE_XATTR

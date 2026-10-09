@@ -21,6 +21,7 @@ APP_VERSION := $(shell git describe --long 2>&-)
 #DEFAULT_XONOFF := false
 #DEFAULT_RTSCTS := false
 #DEFAULT_UPCASE := false
+#DEFAULT_TSLOAD := false
 #DEFAULT_PROFILE := "k85" # k85 = Floppy/TS-DOS/etc - 6.2, padded, F, dme, magic files
 #RAW_ATTR := 0x20       # attr for "raw" mode, drive firmware fills unused fields with 0x20
 #DEFAULT_TILDES := true
@@ -105,8 +106,8 @@ DEFS = \
 #	-DPRINT_8BIT \
 #	-DNADSBOX_EXTENSIONS \
 
-#ifdef TPDD1_ROM
-#	DEFS += -DTPDD1_ROM=\"$(TPDD1_ROM)\"
+#ifdef FB100_ROM
+#	DEFS += -DFB100_ROM=\"$(FB100_ROM)\"
 #endif
 ifdef TPDD2_ROM
 	DEFS += -DTPDD2_ROM=\"$(TPDD2_ROM)\"
@@ -149,6 +150,9 @@ ifdef RAW_ATTR
 endif
 ifdef DEFAULT_TILDES
 	DEFS += -DDEFAULT_TILDES=$(DEFAULT_TILDES)
+endif
+ifdef DEFAULT_TSLOAD
+	DEFS += -DDEFAULT_TSLOAD=$(DEFAULT_TSLOAD)
 endif
 ifdef XATTR_NAME
 	DEFS += -DXATTR_NAME=\"$(XATTR_NAME)\"

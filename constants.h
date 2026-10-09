@@ -58,19 +58,19 @@ static const uint8_t RET_EXEC[2]      = {0x3B,0x03}; // TPDD2
 #define F_OPEN_READ       0x03
 
 // TPDD Operation-mode error codes
-// Normal
+// Success
 #define ERR_SUCCESS       0x00 // 'Operation Complete'
-// File
+// Directory
 #define ERR_NO_FILE       0x10 // 'File Not Found'
 #define ERR_EXISTS        0x11 // 'File Exists'
-// Sequence
+// Syntax
 #define ERR_NO_FNAME      0x30 // 'Missing Filename'
 #define ERR_DIR_SEARCH    0x31 // 'Directory Search Error'
 #define ERR_BANK          0x35 // 'Bank Error'
 #define ERR_PARAM         0x36 // 'Parameter Error'
 #define ERR_FMT_MISMATCH  0x37 // 'Open Format Mismatch'
 #define ERR_EOF           0x3F // 'End of File'
-// Disk I/O
+// Integrity
 #define ERR_NO_START      0x40 // 'No Start Mark'
 #define ERR_ID_CRC        0x41 // 'ID CRC Check Error'
 #define ERR_SECTOR_LEN    0x42 // 'Sector Length Error'
@@ -85,15 +85,15 @@ static const uint8_t RET_EXEC[2]      = {0x3B,0x03}; // TPDD2
 // Protect
 #define ERR_WRITE_PROTECT 0x50 // 'Write-Protected Disk'
 #define ERR_DISK_NOINIT   0x5E // 'Disk Not Formatted'
-#define ERR_WP_TPDD1_DISK 0x5F // TPDD2 'Write Protect to 26-3808 Diskette'
-// File Territory
+#define ERR_WP_TPDD1_DISK 0x5F // TPDD2 'Write Protect to 26-3808 Diskette' (TPDD2 detects a write-protected TPDD1 disk)
+// Bounds
 #define ERR_DIR_FULL      0x60 // 'Disk Full or Max File Size Exceeded or Directory Full' / TPDD2 'Directory Full'
 #define ERR_DISK_FULL     0x61 // 'Disk Full'
 #define ERR_FILE_LEN      0x6E // 'File Too Long' (real drive limits to 65534, we exceed for REXCPM)
-// Diskette Condition
+// Presense
 #define ERR_NO_DISK       0x70 // 'Disk Not Inserted'
 #define ERR_DISK_CHG      0x71 // 'Disk Change Error'
-// Sensor
+// Sensors
 #define ERR_NO_INDEX_SIGNAL 0x80
 #define ERR_ABNORMAL_TRACK_ZERO 0x81
 #define ERR_ABNORMAL_INDEX_SIGNAL 0x82
