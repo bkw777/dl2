@@ -21,7 +21,7 @@ ASFLAGS += $(shell $(AS) |awk '/^Z80 Macro Assembler /{split($$4,a,"-");if (a[1]
 # Use -DBAUD=9600 if you have a FB-100, FDD19, or Purple Computing drive,
 # or remove the solder blob under the little cover on the bottom.
 # Example usage from the make command line:
-# $ make 100 XFLAGS='=-DHIMEM=62000 -DBAUD=9600 -DINCLUDE_DSR'
+# $ make 100na XFLAGS='-DHIMEM=62000 -DBAUD=9600 -DINCLUDE_DSR'
 XFLAGS :=
 
 # don't delete .CO when building .DO

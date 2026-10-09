@@ -214,30 +214,28 @@ pktDATA				EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data, 0-128 bytes, +1 checksu
 ; pktDATA + 26 : fsize lsb
 direntFSIZE			EQU		pktDATA + tpdd_fname_len + 1	; FD27
 
-; end of packet buffer		pktDATA + CHUNK_LEN + 1
+;              start of data + data len + checksum byte
+; end of packet buffer		pktDATA + CHUNK_LEN + 1         ; FD8F
 
 ; end of ALTLCD				ALTLCD + 0x013F		; FDFF
 
 ; DLEN for a WRITE packet
-; Not pktDLEN itself, used to fill pktDLEN in outgoing WRITE packet.
-; Curious location for this variable.
-; ALL old teeny versions for 100, M10na, NEC, even 200, used the same FF80.
-; This address falls within COMBUF on 100 & M10na, but not on 200 or NEC,
-; yet the same litteral address is used on all platforms.
-; (K85 and M10eu don't count as they are new platforms so they only use the same
-;  address because the others already did and I decided to follow for now.)
-; How can this be safe to be within COMBUFF at all?
-; Is it a magic address? The address is never directly/explicitly referenced
-; in the system rom.
-; TODO: try moving this somewhere more clearly safe like ALTLCD with the rest.
+; Not pktDLEN itself. This is used to fill pktDLEN in outgoing WRITE packet.
+; Curious address, apparently something magic in the main rom, though never directly referenced.
+; 0xFF80 falls within COMBUF on 100 & M10na, but not on 200 or NEC, yet ALL
+; legacy teeny for 100, M10, NEC, 200, used the same literal value 0xFF80.
+; (K85 and M10eu don't count as they are new platforms. They also use the same
+;  address but only because the others already did and I decided to follow.)
 ; platform: COMBUF:
 ; 100       FF46-FF85
 ; 200       FFBB-FFFA
 ; M10na     FF46-FF85
 ; K85       FFBE-FFFD
 ; NEC       FEC4-FF04
+; but trying to change this to another address breaks SAVE
 writeDLEN			EQU		0xFF80
-
+;writeDLEN			EQU		pktDATA + CHUNK_LEN + 1 + 1     ; breaks SAVE
+;writeDLEN			EQU		pktDLEN                         ; breaks SAVE
 
 
 ; -----------------------------------------------------------------------------
@@ -294,8 +292,8 @@ MAIN:
 		STA			KYBCNT			; write 0 to keyboard pending keystrokes count
 		CALL		INLIN			; get a line of input from keyboard
 		; The keyboard buffer now has a command line like |L MYPROG.BA|
-		LXI			H,errNM			; load the address of errNM to HL
-		SHLD		ETRAP			; set errNM as ON ERROR handler
+		LXI			H,errSN			; load the address of errSN to HL  (was NM)
+		SHLD		ETRAP			; set errSN as ON ERROR handler
 		LXI			H,KYBUF+1		; load addr to 2nd byte of keyboard buffer to HL
 		MVI			M,'"'			; write " to 2nd byte of keyboard buffer
 		; before |L MYPROG.BA|
@@ -317,54 +315,73 @@ MAIN:
 		JZ			errFF			; Z = file not found on disk, abort with FF error
 		; file found on disk
 		POP 		PSW				; restore A=cmd
-		SUI			'K'				; if A-'K' = 0
-		JZ			KILL			; cmd is 'K', jump to KILL
-		DCR 		A				; A-1 after A-'K' == A-'L'
-		JZ			LOAD			; if A-'L' = 0, then cmd is 'L', jump to LOAD
+		SUI			'K'				; A -= 'K'
+		JZ			KILL			; if A == 0 then cmd is 'K', jump to KILL
+		DCR 		A				; A--
+		JZ			LOAD			; if A == 0 then cmd is 'L', jump to LOAD
 
 		; if we got here, cmd is unknown
 
-; ERROR CODES  - uses the LXI B trick
-; The first MVI E we jump to executes normally and sets E to something.
-; The remaining stack after that becomes no-ops by the DB's being executed as
-; LXI B, which consumes the next MVI E,b as data overwriting B, which we never use.
+; ERROR CODES - this stack of jump targets uses an opcode-as-data trick
+; 1: The first MVI_E,eXX you hit executes normally and sets E=eXX.
+; 2: The DB opcode_LXI_B after that executes as code and consumes the next
+;    2 bytes as it's operand, which is the next MVI_E and it's eXX operand.
+; 3: The next byte after that is another LXI_B, repeat 2: until end of stack.
+;
+; The first MVI you jump or fall to does what it says, the rest become no-ops.
+; B is never used. The only effect used is E=eXX.
+; Then fall through to ERROR to display it.
 
+errSN:
 		MVI			E,eSN			; fell from above = unknown cmd = syntax error
 		DB			opcode_LXI_B
 errFF:
 		MVI			E,eFF
 		DB			opcode_LXI_B
-errCM:
-		MVI			E,eCM
+errUE:
+		MVI			E,eUE
 		DB			opcode_LXI_B
 errIO:
 		MVI			E,eIO
 		DB			opcode_LXI_B
-errAE:
-		MVI			E,eAE
+errWP:
+		MVI			E,eWP
 		DB			opcode_LXI_B
-errOM:
-		MVI			E,eOM
+errDF:
+		MVI			E,eDF
 		DB			opcode_LXI_B
-errFL:
-		MVI			E,eFL
+errND:
+		MVI			E,eND
 		DB			opcode_LXI_B
-errNM:
-		MVI			E,eNM
 
+; debugging
+;errSE:
+;		MVI			E,eSE
+;		DB			opcode_LXI_B
+;errDE:
+;		MVI			E,eDE
+;		DB			opcode_LXI_B
+
+errHW:
+		MVI			E,eHW
+
+;		E = eXX  some error code
+;		B = junk
+
+; E = eXX
 ERROR:
 		LDA 		LoadingFlag		; A = LoadingFlag
 		ORA 		A				; does LoadingFlag == 0?
 		JZ 			@show			; if 0 skip to @show
-		PUSH 		D				; stash DE (D doesn't matter, E=eXX from above)
-		; jaddr@ts-1
+		PUSH 		D				; stash DE (D doesn't matter, E=eXX from above or from ParseStdReturn)
+		; jaddr@TS[1]
 		LHLD 		RamFileSize		; HL=RamFileSize
 		MOV 		B,H				; B=H
 		MOV 		C,L				; C=L  BC=RamFileSize
 		LHLD 		RamFileStart	; HL=RamFileStart
 		CALL		MASDEL			; delete BC bytes @ HL
 		POP 		D				; restore DE (only care about E)
-		; jaddr@ts
+		; jaddr@TS[0]
 @show:
 		LXI			H,STR_ErrCodes	; HL = start of string of err codes
 		MVI			D,0				; D=0 E=eXX from above
@@ -402,7 +419,7 @@ CheckDSR:
 		IN			FLOWCTL_PORT	; read RS232 flow control pins
 		ANI			DSR_BITMASK		; check !DSR
 		RZ
-		MVI			E,eNR			; set NR error
+		MVI			E,eND			; set ND error  (was NR)
 		JMP			ERROR
 	ENDIF
 
@@ -410,56 +427,61 @@ CheckDSR:
 ; * Send the REQuest packet
 ; * Receive the RETurn packet
 SendPacket:
-; Calculate Packet Checksum
-; Sum all the bytes in the specified range.
-; Take the least significant byte of that sum.
-; Invert all the bits in that byte.
-; The checksummed range is the start of cmd through end of data.
 
 ; -----------------------------------------------------------------------------
-; BUILD OUTGOING PACKET
+; FINISH BUILDING OUTGOING PACKET (calculate and append checksum)
 ; -----------------------------------------------------------------------------
 
-; start at pktTYPE
+		; Calculate Packet Checksum
+		; Sum all the bytes in the specified range.
+		; Take the least significant byte of that sum.
+		; Invert all the bits in that byte.
+		; The checksummed range is the start of cmd through end of data.
+
+		; add cmd and len to ckecksum
 		LXI			H,pktTYPE		; HL @ pktTYPE
-		MOV			A,M				; A = pktTYPE
+		MOV			A,M				; A = cmd
 		INX			H				; HL @ pktDLEN 
-		ADD			M				; A = A + pktDLEN
-		MOV			D,A				; D = A (cmd+len)
-		MOV			A,M				; A = pktDLEN
-		MOV			E,A				; E = pktDLEN
-		MOV			B,A				; B = pktDLEN
-		INX			H				; HL @ pktDATA+0
-		ORA			A				; is pktDLEN 0?
+		ADD			M				; A = A + len
+		MOV			D,A				; D = A
+		MOV			A,M				; A = len
+		MOV			E,A				; E = len
+		MOV			B,A				; B = len
+		INX			H				; HL @ pktDATA
+		ORA			A				; set Z if len==0
 		MOV			A,D				; A = sum from D
-		JZ			@endpkt			; if pktDLEN = 0 then jump to finish checksum
-		; pktDLEN>0, sum pktDLEN bytes from pktDATA 
+		JZ			@endpkt			; if len==0 then jump to finish checksum
+		; len>0, add sum len bytes from pktDATA
+
+		; add data to checksum
 @l0:
-		ADD			M				; add data byte to sum (rolls over every 0xFF) 
+		ADD			M				; add data byte to sum (sum rolls over every 0xFF) 
 		INX			H				; next data byte
 		DCR			E				; E--
-		JNZ			@l0				; repeat for E (pktDLEN) bytes
-		; HL @ pktDLEN+(pktDLEN)
+		JNZ			@l0				; repeat for E (len) bytes
+		; HL @ pktDATA+len
+
+		; append checksum to packet
 @endpkt:
 		; A = sum
 		CMA							; complement A, A = tpdd checksum now
 		; A = CheckSum
 		MOV			M,A				; append checksum to packet
 
-		; Set B counter to pktDLEN+5 for the full packet length
-		; B =  2   + 1    + 1    + pktDLEN + 1
-		;     "ZZ"   TYPE   DLEN   DATA      CHK
-
-		MVI			A,pkt_len_overhead	; A = 5
-		ADD			B				; add pktDLEN from B to A, A = pktDLEN+5
-		MOV			B,A				; B = pktDLEN+5
-		; B = loop counter for all bytes in packet, ZZ to CKSUM
-		; start HL at pktZZ
-		LXI			H,pktZZ			; HL @ pktZZ (0x5A5A aka "ZZ")
-
 ; -----------------------------------------------------------------------------
 ; SEND OUTGOING PACKET
 ; -----------------------------------------------------------------------------
+
+		; Set B counter to len+5 for the full packet length
+		; B =  2   + 1    + 1    + len     + 1
+		;      ZZ    TYPE   DLEN   DATA      CHK
+
+		MVI			A,pkt_len_overhead	; A = 5
+		ADD			B				; A += B -> A = 5+len
+		MOV			B,A				; B = 5+len
+		; B = loop counter for all bytes in packet, ZZ to CKSUM inclusive
+		; start HL at pktZZ
+		LXI			H,pktZZ			; HL @ pktZZ (0x5A5A aka "ZZ")
 
 @send_byte:
 		MOV			A,M				; A = byte from packet
@@ -494,13 +516,20 @@ SendPacket:
 		SIM							; IM = 0 -> enable all interrupts
 		LXI			H,pktDLEN		; HL @ pktDLEN
 		MOV			C,M				; C = DLEN
-		INX			H				; HL @ pktDATA
+		INX			H				; HL++ -> HL@pktDLEN+1 -> HL@pktDATA
 		MOV			A,M				; read 1st byte @ pktDATA
 		ORA			A				; set Z if first byte of data is 0
-		; All return packet types have at least 1 byte of data.
-		; A standard type has exactly 1 byte of data, an error code.
-		; pktDATA=0x00 means no error.
-		; So we are returning Z = success, anything else = A=error_code.
+
+		; return packet types:
+		; LOAD    0x10 read file data return, dlen 0 to 128, A could be data[0] or checksum
+		; DIRENT  0x11 dirent return, dlen 28, A is filename[0]
+		; others  0x12 standard return, dlen 1, A is error code, 0x00 = success
+		; So for most packets we are returning A=err and setting Z if err=0
+		; A & Z don't seem to be meaningful for LOAD or DIRENT
+		; A = error code from drive (except LOAD or DIRENT)
+		; Z = set if A=0
+		; C = return packet data length
+		; HL @ pktDATA (or @checksum if read-file-data len=0)
 		RET
 
 ; read 1 byte from rs232 to M, advance HL
@@ -509,34 +538,19 @@ ReadSerialByteIncHL:
 		CALL		CheckDSR
 	ENDIF
 		CALL		RCV232
-		JC			errIO
-		JNZ			errCM
+		;JC			errIO
+		;JNZ			errCM
+		JNZ			errIO
 		MOV			M,A
 		INX			H
 		RET
 
-; start building DELETE cmd packet
 KILL:
 		MVI			A,cmd_delete
-; start building a short packet (some commands have no data payload)
-ShortPacket:
-		CALL		InitPacket
-jSendPacket:
-		CALL		SendPacket
-		RZ			; return if return packet DLEN is 0 (some commands return no data)
-		; otherwise, decode the result byte
-		; A contains the 1st (and in this case only) byte of pktDATA
-ParseErrorReturn:
-		; A has the error code sent in the data field of the return packet
-		ANI			0xF0		; A &= 0xF0
-		RAR						; Rotate Accumulator Right through carry
-		RAR						; Rotate Accumulator Right through carry
-		RAR						; Rotate Accumulator Right through carry
-		MOV			E,A			; E = eXX error code offset
-		JMP			ERROR
+		JMP			ShortPacket
 
-; activate rs232
 DIRENT:
+		; activate rs232
 		CALL		COMOFF				; disable MDM/COM
 		; original TEENY uses 0x2E -> about 100ms. make it so MS=100 produces 0x2E
 		MVI        D,COM_SETUP_PAUSE_MS*100/215		; 0x2E00 timing loops
@@ -545,15 +559,15 @@ DIRENT:
 		STC								; set carry flag - tells SET232 to apply to the RS232 port
 		CALL		SET232				; configure uart per the stat string
 
-; build a STATUS cmd packet
-		MVI			A,cmd_status		; A = tpdd drive status command
-		CALL		ShortPacket			; write 0x07 (cmd_status) to pktTYPE then call SendPacket (skips the usual packet-building becasue this command has no data payload)
+		; send a STATUS packet
+		MVI			A,cmd_status		; A = cmd_status
+		CALL		ShortPacket			; send STATUS packet
 
-; build a DIRENT packet
-; 2     1   1   24           1     1       1
-; 5A5A  00  1A  filename     attr  action  chk
+		; send a DIRENT packet
+		; 2     1   1   24           1     1       1
+		; 5A5A  00  1A  filename     attr  action  chk
 
-; start building a DIRENT(set_name) cmd packet        
+		; start building a DIRENT(set_name) cmd packet
 		XRA			A					; A = 0
 		CALL		InitPacket			; write 0x00 (cmd_dirent) to pktTYPE (cmd)
 		; HL @ pktDLEN (len)
@@ -578,17 +592,20 @@ DIRENT:
 		MOV			M,B					; M@pktDATA+25 = action = B = 0 = set_name
 		; dirent(set_name) tells the drive the filename for an open/close/read/write/kill to follow
 
-SendPacket2:
+; send a DIRENT or READ packet and handle their special return packets
+SendPacketSpecial:
 		CALL		SendPacket
-		MOV			B,A					; B = A returned from SendPacket   why?(*1)
-		LDA			pktTYPE				; A = packet type that the drive returned
+		MOV			B,A					; B = error code from SendPacket
+		LDA			pktTYPE				; A = return packet type
 		CPI			ret_std				; is it a standard return packet?
-		JZ			ParseErrorReturn	; it's supposed to be a DIRENT or READ return not a standard return
-		MOV			A,B					; A = saved result from SendPacket   why?(*1)
-		ORA			A					; if A = 0 set Z   why?(*1)
-		; places we might be returning to:
-		; * we CALLed from SendOpenCMD
-		; * we fell through from DIRENT
+		JZ			ParseStdReturn		; if it's a standard return then jump to the standard return parser
+		; it's not a stanbdard return (it's a DIRENT or READ return)
+		; restore the A & Z state left by SendPacket
+		MOV			A,B					; A = 1st byte of data
+		ORA			A					; if A = 0 set Z
+		; places RET might go:
+		; * CALL SendPacketSpecial in SendReadCMD
+		; * CALL DIRENT in MAIN
 		RET
 
 SendOpenCMD_write:
@@ -609,7 +626,7 @@ SendFinalWriteChunk:
 		POP 		D
 SendWriteCMD:
 		MVI			A,cmd_write
-		CALL		InitPacket
+		CALL		InitPacket 			; HL@pktDLEN, M=0
 		MOV			M,C					; write C=chunk_len to pktDLEN
 		INX			H					; advance HL to pktDATA
 		MOV			B,C					; tell D2H4Bup how many bytes to copy
@@ -619,24 +636,24 @@ SendWriteCMD:
 LOAD:
 ; FINDFN reads FILNM1 (FC93 on 100) which has been set up by CKFN2 in MAIN
 		CALL		FINDFN				; see if the proposed file already exists in ram
-		JNZ			errAE				; abort with AE error if the file already exists
-		LXI			H,errFL
-		SHLD 		ETRAP				; set errFL as the general error handler
+		JNZ			errFF				; abort with FF error if the file already exists (was AE)
+		LXI			H,errDF				; HL=errDF
+		SHLD 		ETRAP				; set errDF as the general error handler (was FL)
 		CALL		SCNEMP				; find empty ram file direrctory entry
 		PUSH		H
 		CALL		GetFtypeX			; determine the filetype, CO, DO, or BA
 		; BA: A=2 F=SPC
 		; CO: A=0 F=ZP
 		; DO: A=1
-		LHLD		direntFSIZE			; HL = byte-swapped filesize from DIRENT return.
+		LHLD		direntFSIZE			; HL = msb-first filesize from DIRENT return.
 		; direntFSIZE was written by DIRENT: while still in MAIN: before coming here.
 		; All 16-bit values in tpdd packets are msb-first. H=lsb L=msb
 		MOV			B,L					; copy msb to B
 		MOV			C,H					; copy lsb to C
-		; BC = filesize (not byte-swapped)
+		; BC = normal lsb-first filesize
 		MOV			L,C					; copy lsb to L
 		MOV			H,B					; copy msb to H
-		; HL = filesize (not byte-swapped any more)
+		; HL = normal lsb-first filesize
 		SHLD		DskFileSize			; write filesize to DskFileSize
 		DCX			B					; BC-- (filesize minus 1)
 		MOV			E,A					; E = ftype (CO=0 DO=1 BA=2)
@@ -666,9 +683,9 @@ LOAD:
 		DAD			D					; HL += DE
 		DAD			D					; HL += DE
 		DAD			D					; HL += DE
-		; CO: HL = FtypeTable+0
-		; DO: HL = FtypeTable+5
-		; BA: HL = FtypeTable+10
+		; CO: DE=0 -> HL = FtypeTable + 0
+		; DO: DE=1 -> HL = FtypeTable + 5
+		; BA: DE=2 -> HL = FtypeTable + 10
 		MOV			A,M					; A = byte @ HL
 		; CO: A = fattrCO
 		; DO: A = fattrDO
@@ -720,7 +737,7 @@ LOAD:
 		PUSH		H					; stash HL=RamFileStart
 		; jaddr@ts-1
 		CALL		MAKHOL				; create space for new file
-		JC			errOM				; abort if MAKHOL failed from not enough memory
+		JC			errDF				; abort with DF err if MAKHOL failed from not enough memory (was OM)
 		; set a status flag that we are now loading from disk to ram
 		LXI			H,LoadingFlag		; HL = LoadingFlag
 		INR			M					; LoadingFlag++
@@ -730,38 +747,35 @@ LOAD:
 		POP			H					; HL = RamFileStart
 		; jaddr@ts
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; not following the use of pktTYPE here
-
 		LDA			pktTYPE				; A = packet type  (should be 0x10 for read return?)
-		MOV			C,A					; C = packet type  ????????
-		MVI			B,0					; B = 0	 BC = packet type  ???????
-		; C/BC = pktTYPE ????????
-		; DE = tpdd file size
+		MOV			C,A					; C = packet type
+		MVI			B,0					; B = 0, BC = packet type
+		; BC = packet type
+		; DE = tpdd file size lsb-first D=lsb E=msb
 		; HL = ram file start
-		; TS = jCOFILE/jDOFILE/jBAFILE
-		; TS-1 = MkRamDirent
-		; TS-2 = fattrXX
+		; TS[0] = jCOFILE/jDOFILE/jBAFILE
+		; TS[1] = MkRamDirent
+		; TS[2] = fattrXX
 @l1:
-		MOV			A,D					; A = D (filesize lsb)
-		ORA			E					; A=D=lsb OR E=msb , aka set Z when DE==0
-		MOV			A,C					; A = packet type from C
-		STA			pktTYPE				; pktTYPE = packet type from C
+		MOV			A,D					; A = D = filesize lsb
+		ORA			E					; A = DVE (lsbVmsb), iow set Z if DE==0
+		MOV			A,C					; A = C = packet type
+		STA			pktTYPE				; pktTYPE = packet type
 
 		; We did not get here via CALL: ORG->MAIN->JZ LOAD->here
-		; So RZ will "return" to whatever is at top-of-stack -> jXXFILE
+		; So RZ will "return" to whatever is in TS[0] -> jXXFILE
 		RZ								; when DE=0 jump to jXXFILE
 
 		ORA			A					; is packet type 0?
 		CM			SendReadCMD			; call if packet type <0 ???
 		DCX			D					; DE--
 		PUSH		H					; stash HL = current byte position in ram file
-		; jaddr@ts-1
+		; jXXFILE@TS[1]
 		LXI			H,pktDATA			; HL = start of packet data
 		DAD			B					; HL += BC, BC = packet type ???????
 		MOV			A,M					; A = byte @ HL
 		POP			H					; retore HL = byte position in file
-		; jaddr@ts+1
+		; jXXFILE@TS[0]
 		MOV			M,A					; write byte from packet to ram
 		INX			H					; HL++ (advance to next byte of file)
 		; entire packet len always <256, byte is enough
@@ -777,7 +791,7 @@ SendReadCMD:
 ; start READ cmd packet
 		MVI			A,cmd_read			; A = READ packet fmt code
 		CALL		InitPacket			; Construct a tpdd packet
-		CALL		SendPacket2			; send the packet to the drive, read a return packet from the drive
+		CALL		SendPacketSpecial	; send the packet to the drive, read a return packet from the drive
 		XRA			A					; A = 0 ; (*1) why did we bother saving & restoring A? 
 												; IDK but without it, SAVE always errors with AE.
 		MOV			B,A					; B = 0
@@ -860,12 +874,13 @@ GetFtypeX:
 ; copy a file from local ram to tpdd
 SAVE:
 		CALL		DIRENT				; tell the drive our filename
-		JNZ			errAE				; DIRENT returned an error
+		JNZ			errFF				; DIRENT returned file exists err  (was AE)
+		;JNZ			errDE				; dest file already exists on disk
 		LDA			FX1					; read 1st byte of filename ext
 		CPI			'B'					; compare to 'B'
-		JC			errNM				; reject if less than 'B'
+		JC			errSN				; reject if less than 'B'  (was NM)
 		CPI			'E'					; compare to 'E'
-		JNC			errNM				; reject if not less than 'E'
+		JNC			errSN				; reject if not less than 'E'  (was NM)
 		CALL		FINDFN				; find the start of the file in ram
 		; Z = not found, NZ = found
 		; HL: Pointer to file's dir entry
@@ -873,6 +888,7 @@ SAVE:
 		; A: Contains file attribute
 		; BC: Unchanged
 		JZ			errFF				; file not found in RAM
+		;JZ			errSE				; src file not found in RAM
 		CALL		GetFtypeX			; get ftype for AFTEREOF2
 		; CO: A=0 F=ZP
 		; DO: A=1
@@ -938,82 +954,81 @@ SAVE:
 		POP			H					; HL = sof
 		CALL		WriteChunks			; send WRITE packets
 		MVI			A,cmd_close			; A = cmd_close
-		JMP			ShortPacket			; send CLOSE packet
+		;JMP			ShortPacket			; fall through to send CLOSE packet
 
+; Build & send a short packet (commands that have no data payload)
+; A = cmd
+ShortPacket:
+		CALL		InitPacket
+jSendPacket:
+		CALL		SendPacket
+		RZ			; return if return packet DLEN is 0 (some commands return no data)
+		; otherwise, decode the result byte
+		; A = error code return data from drive, the first & only byte of pktDATA
+ParseStdReturn:
+		; A has an error code sent in the data field of the return packet
+		; see dl2/constants.h
+		ANI			0xF0		; A &= 0xF0
+		RAR						; Rotate Accumulator Right through carry
+		RAR						; Rotate Accumulator Right through carry
+		RAR						; Rotate Accumulator Right through carry
+		MOV			E,A			; E = eXX offset into STR_ErrCodes
+		JMP			ERROR
 
 ; I am not following this and I must have the annotations wrong here
 ; initial:
 ; HL = current position = sof
 ; DE = remaining len = len
 WriteChunks:
-		PUSH		H					; TS[0]=position_copy_a
-		PUSH		H					; TS[0]=position_copy_b TS[1]=position_copy_a
+		PUSH		H					; TS[0] = position_a
+		PUSH		H					; TS[0] = position_a TS[1] = position_a
 		LXI			H,CHUNK_LEN			; HL = CHUNK_LEN
 		_RST		rst_CompareDEHL		; compare DE(remaining_len) to HL(chunk_len)
-		; flags: C if HL<DE, Z if HL=DE, only A destroyed
-		JNC			@l0					; exit loop when chunk_len >= remaining_len
+		; flags: C if HL<DE, Z if HL=DE, else HL>DE, only A is destroyed
+		JNC			@end				; exit loop when chunk_len >= remaining_len
 		MOV			C,L					; C = L = chunk_len (HL=chunk_len<=128)
 		MOV			B,H					; B = H = 0         (HL=chunk_len<=128)
 		; BC = chunk_len
-		POP			H					; HL=old_position_copy_b, TS[0]=old_position_copy_a
-		DAD			B					; HL = HL+BC = old_position_copy_b + chunk_len = new_position
-		XTHL							; swap TS:HL -> TS[0]=new_position, HL=old_position_copy_a
-		XCHG							; swap HL:DE -> DE=old_position_copy_a, HL=remaining_len
+		POP			H					; HL = position_a, TS[0] = position_a
+		DAD			B					; HL = HL+BC = position_a + chunk_len = position_b
+		XTHL							; swap TS:HL -> TS[0] = position_b, HL = position_a
+		XCHG							; swap HL:DE -> DE = position_a, HL = remaining_len
 		LXI			B,writeDLEN			; BC = writeDLEN
 		DAD			B					; HL = HL+BC = remaining_len + writeDLEN  ???
-		PUSH		H					; TS[0]=???  TS[1]=new_position
+		PUSH		H					; TS[0] = remaining_len+writeDLEN???  TS[1] = position_b
+		; SendWriteCMD immediately does M@pktDLEN, MOV M,C
+		; so C MUST == number of bytes to send (1 to CHUNK_LEN)
+		; but I don't understand how above does that
 		CALL		SendWriteCMD
-		POP			D					; DE = new_position
-		POP			H					; HL = ???
+		POP			D					; DE = position_b
+		POP			H					; HL = remaining_len+writeDLEN???
 		JMP			WriteChunks
-@l0:
+@end:
 		MOV			C,E
 		POP			H
 		JMP			SendFinalWriteChunk
 
-STR_Err:
-		DB			" Err",CR,LF,0
-
-; Error Codes, both local and from from the drive.
-; See dl2/constants.h for what the drive sends.
-; See ParseErrorReturn above for how we translate what the drive sends.
-; The drive sends codes in the range from 0x00 to 0x8F, and we need to
-; translate those into offsets into this short string.
-STR_ErrCodes:
-
-; this more compact packing is not usable
-; because it ignores that error codes returned by the drive need to mapped
-;		DB			"SNDFFLIOMWPAECMNMNR"
-; offsets into STR_ErrorCodes
-;eSN		EQU			0x00
-;eND		EQU			0x01
-;eDF		EQU			0x02
-;eFF		EQU			0x03
-;eFL		EQU			0x04
-;eIO		EQU			0x06
-;eOM		EQU			0x07
-;eWP		EQU			0x09
-;eAE		EQU			0x0B
-;eCM		EQU			0x0D
-;eNM		EQU			0x0F
-;eNR		EQU			0x11
-
-		DB			"SNFFNRCMIOWPDFNDAEOMFLNM"
-; offsets into STR_ErrCodes
-eSN		EQU			0x00
-eFF		EQU			0x02
-eNR		EQU			0x04
-eCM		EQU			0x06
-eIO		EQU			0x08
-eWP		EQU			0x0A
-eDF		EQU			0x0C
-eND		EQU			0x0E
-eAE		EQU			0x10
-eOM		EQU			0x12
-eFL		EQU			0x14
-eNM		EQU			0x16
-
 STR_Prompt:
 		DB			"> C FFFFFF.XX (C=KLSQ)",CR,LF,"> ",0
+
+STR_Err:
+		DB			" Err",CR,LF,0,"FFUESNIOWPDFNDHW" ;,"SEDE"
+
+STR_ErrCodes		EQU STR_Err+5
+
+; Offsets into STR_ErrCodes. Drive returns 0x00-0x8F -> ParseStdReturn -> eXX
+; see ParseStdReturn & dl2/constants.h
+eFF					EQU		0x02 ; directory - file not found, file already exist
+eUE					EQU		0x04 ; unknown - 0x20-0x2F, never observed, maybe use this spot for a local-only error
+eSN					EQU		0x06 ; syntax
+eIO					EQU		0x08 ; integrity - crc & other data sanity failures, disk/serial/ram
+eWP					EQU		0x0A ; write-protect, format
+eDF					EQU		0x0C ; bounds - dir/file/disk full/exceeded
+eND					EQU		0x0E ; presense - disk changed / not inserted
+eHW					EQU		0x10 ; hardware - physical drive or disk problems
+
+; debugging
+;eSE					EQU		0x12 ; src err
+;eDE					EQU		0x14 ; dest err
 
 PRGEND:

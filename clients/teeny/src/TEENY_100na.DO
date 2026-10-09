@@ -1,9 +1,9 @@
-0'TEENY - TRS-80 Model 100/102 North America - github.com/bkw777/dl2 - loader: co2ba.sh b.kenyon.w@gmail.com 2026-10-06
+0'TEENY - TRS-80 Model 100/102 North America - github.com/bkw777/dl2 - loader: co2ba.sh b.kenyon.w@gmail.com 2026-10-09
 0READF:CLEAR12,F:DEFINTA-E,Q,G,K:DEFSNGF,H-J:DEFSTRL-O:READF,A,J,G,N,E,Q:M="!":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?USING"Installing \    \   0%";N
 1READL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)XORD:B=BXORQ:D=0:POKEI,B:I=I+1:K=KXORB:NEXT:?@18,USING"###%";(I-F)*100/A:IFI<=HTHEN1
 2IFK<>GTHEN?"Bad Checksum":ELSEM=CHR$(34):L="X.DO":OPENLFOROUTPUTAS1:?#1,"0CLEAR0,"F":CALL"J":MENU":CLOSE1:?"Please type:":?"KILL"M""L:?"SAVE"M""N:LOADL
-3DATA62229,731,62229,185,"TEENY",128,64
-4DATA"a@@ybF½a!š!šbJ½jF½¹ïrH½ab³¥a•µâQrê¿!„!†a>³b!’¶aÆ¶vbO!Œ!†azÅ¶¾!‘Š×!—¾!“Š!µµc´Š,³±–!‹ŠQ´}Š>´^@A^BA^FA^HA^PA^RA^TA^VzH½÷ŠÔ³•jB½!„!j@½ß+‘aıµV@Y>§—§aöµâQƒb³[:ó‚ç³‰yx!q!„aL½7cv@‰aL½>cÆ!—>!Ÿ!‡c÷:Š‘³Æc]‚‹³o7~EÀ!‡aJ½>r.š2³cE‚š³aL½!œ6E´E´!LE´M
-5DATA"‚´³ïpaM½!c>÷‰>-š2³‚/³7c‰~Eó³û³ˆ¦°___!ŸƒÀ³‹.Vnç³aî³w¦W~GS´ïó³vZcQÇ¶FI)tFOv`cE‚!ˆ´v!†c0û³!‡zL½¾RŠZ´8÷‰^A~Aó³7c3ƒV´‘~Dó³1c!)tƒV´ï`‚5³a;³b!’¶¤`¥!…µjg½!…!Œ) bD½K!Ÿ|C}‚Ş´!—aRµYYYYY>µQ{µ•c!c!–•c!c&+!c!– )bB½«b@½¥-+š8³aH½tº´jD½«¡zL½!
-6DATA"F@:ó9rL½ˆ÷¼¿´[¥aN½I>¡7cLƒ¡´^C$´¥•~Có³!“´ï!‡!rL½‘¡‰àtµğ»€aµî»ÀdµÚ¹vZ‰ï7c7jB½«jî»Ybî»‰j@½bğ»‰±j@½«[¡ƒybzÙ¼–!ƒ°~B‰c´‚5³zÙ¼¾!‚š>³¾!…’>³ï`Š,³!…µ!~BÑ…•«İa‘=Ó/<Ú'LckM‚>µ=ôˆ•¥!¢´‘¡Õµ~BƒS´¥¥aÀ@Ÿ’ñµ!!„¡I£«AÀ¿I¥0´‘¡ƒÕµ!‹¡ƒ/´`!…22MJ@!“!!†!†!!’!ƒ
-7DATA"!	!!—!!„!†!!„!!…!!!†!Œ!!~`!ƒ`!†!†!†!†!†!†n!˜!˜`h!ƒ}!‹!Œ!“!‘iMJ~`@
+3DATA62240,720,62240,15,"TEENY",128,64
+4DATA"a@@ybF½a!š!šbJ½jF½¹ïrH½am³¥aşµâQrê¿!„!†a4³b!’¶aÆ¶vbO!Œ!†azÅ¶¾!‘Š×!—¾!“Š	µµ^´Š7³±–!‹ŠY´}Š9´^FA^BA^DA^HA^JA^LA^NA^PzH½÷Šß³•jB½!„!j@½ß+‘aµV@Y>§—§a™µâQƒm³[:ó‚ò³‰yx!q!„aL½7cv@‰aL½>cÆ!—>!Ÿ!‡c÷:Šœ³Æc]‚–³o7~EÀ!‡aJ½>r.š=³cE‚¥³aL½!œ6P´P´!LP´M‚
+5DATA"¿³ïpaM½!c>÷‰>-‚=³7c‰~EƒÍµ‹.Vnò³aù³w¦W~GÍµïş³vZcQÇ¶FI)tFOv`cE‚!ƒ´v!†c0†³!‡zL½¾RŠÔµ8÷‰^A~Aş³7c3ƒĞµ‘~Dş³1c!)tƒĞµï`‚7³aÃ³b!’¶¤`¥!€µjg½!…!Œ) bD½K!Ÿ|C}‚Ù´!—aMµYYYYY>µQvµ•c!c!–•c!c&+!c!– )bB½«b@½¥-+šÃ³aH½tµ´jD½«¡zL½!F@:ó9rL½ˆ÷¼º´[¥aN½
+6DATA"I>¡7cLƒœ´^C!Ÿ´¥•~Cş³!´ï!‡!rL½‘¡‰àoµğ»€\µî»À_µÚ¹vZ‰ï7c7jB½«jî»Ybî»‰j@½bğ»‰±j@½«[¡ƒybzÙ¼–!ƒ°~B‰^´‚7³zÙ¼¾!‚š4³¾!…’4³ï`Š7³!€µ!~BÑ…•«İa‘=Ó/<Ú'LckM‚9µ=ôˆ•¥!´‘¡İµ~Bş³†³ˆ¦°___!ŸƒË³¥¥aÀ@Ÿ’ùµ!!„¡I£«AÀ¿I¥+´‘¡ƒİµ!‹¡ƒ*´~`!ƒ`!†!†!†!†!†!†n!˜!˜`h
+7DATA"!ƒ}!‹!Œ!“!‘iMJ~`@`!…22MJ@!†!†!•!…!“!	!!—!!„!†!!„!ˆ!—

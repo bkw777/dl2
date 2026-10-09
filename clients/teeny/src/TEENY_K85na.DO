@@ -1,9 +1,9 @@
-0'TEENY - Kyotronic KC-85 North America - github.com/bkw777/dl2 - loader: co2ba.sh b.kenyon.w@gmail.com 2026-10-06
+0'TEENY - Kyotronic KC-85 North America - github.com/bkw777/dl2 - loader: co2ba.sh b.kenyon.w@gmail.com 2026-10-09
 0READF:CLEAR12,F:DEFINTA-E,Q,G,K:DEFSNGF,H-J:DEFSTRL-O:READF,A,J,G,N,E,Q:M="!":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?USING"Installing \    \   0%";N
 1READL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)XORD:B=BXORQ:D=0:POKEI,B:I=I+1:K=KXORB:NEXT:?@18,USING"###%";(I-F)*100/A:IFI<=HTHEN1
 2IFK<>GTHEN?"Bad Checksum":ELSEM=CHR$(34):L="X.DO":OPENLFOROUTPUTAS1:?#1,"0CLEAR0,"F":CALL"J":MENU":CLOSE1:?"Please type:":?"KILL"M""L:?"SAVE"M""N:LOADL
-3DATA62229,731,62229,5,"TEENY",128,64
-4DATA"a@@ybFΩa!ö!öbJΩjFΩπÔrHΩab≥•aïµçÈQr+øç∏!Öa>≥b!ô∂aÕ∂vbçÖ!ãçYazÃ∂æ!ëä‰!îæ!ìä!éµµçc¥ä,≥±ñ!ãäQ¥}ä>¥^@A^BA^FA^HA^PA^RA^TA^VzHΩ˜ä‘≥ïjBΩ!Ñ!çj@ΩçÁ(ëa˝µV@Y>ßóßaˆµçÈQÉb≥[:ÛÇÁ≥âyx!éq!ÑaLΩ7cv@âaLΩ>c∆!ó>!ü!ác˜:äë≥∆c]Çã≥o7~E¿!áaJΩ>çz+ö2≥cEÇö≥aLΩçJ3çE¥çE¥!èLçE¥MÇ¥≥
-5DATA"ÔpaMΩ!éc>˜âç∆*ö2≥Ç/≥7câ~EçÛ≥ç˚≥à¶∞___!üÉ¿≥ç§+VnçÁ≥aÓ≥wçàW~GçS¥ÔçÛ≥vZcQŒ∂FIç!ÇtFOv`cEÇ!à¥v!Üc0ç˚≥!ázLΩæRäZ¥8˜â^A~AçÛ≥7c3ÉV¥ë~DçÛ≥1c!Åç!ÇtÉV¥ç¿`Ç5≥a;≥b!ô∂çı`•ç!ÖµjgΩ!Ö!å) bDΩK!ü|C}Çﬁ¥!óaRµYYYYY>µQ{µïc!ûc!ñïc!ûc&+!ûc!ñ )bBΩ´b@Ω•ç5(ö8≥aHΩtç∫¥jDΩ´°zLΩ!èF
-6DATA"@:Û9rLΩà˜ºø¥[•aNΩI>°7cLÉ°¥^Cç$¥•ï~CçÛ≥ç!ì¥Ô!á!èrLΩë°â‡tµÇªÄaµÄª¿dµÀπvZâÔ7c7jBΩ´jÄªYbÄªâj@ΩbÇªâ±j@Ω´[°ÉQbzÎºñ!É∞~Bâçc¥Ç5≥zÎºæ!Çö>≥æ!Öí>≥ç¿`ä,≥ç!Öµ!è~B—Öï´ç5aë=”/<⁄'ÅLckMÇ>µ=Ùàï•ç!¢¥ë°ç’µ~BÉS¥••a¿@üíÒµ!ç!Ñ°I£´A¿øI•ç0¥ë°É’µ!ã°É/¥`!Ö22MJ@!ì!é!Ü!Ü!é!í!É
-7DATA"!ç	!è!ó!ê!Ñ!Ü!é!Ñ!Å!Ö!è!ç!Ü!å!é!ç~`!É`!Ü!Ü!Ü!Ü!Ü!Ün!ò!ò`h!É}!ã!å!ì!ëiMJ~`@
+3DATA62240,720,62240,179,"TEENY",128,64
+4DATA"a@@ybFΩa!ö!öbJΩjFΩπÔrHΩam≥•a˛µçÈQr+øç∏!Öa4≥b!ô∂aÕ∂vbçÖ!ãçYazÃ∂æ!ëä‰!îæ!ìä	µµç^¥ä7≥±ñ!ãäY¥}ä9¥^FA^BA^DA^HA^JA^LA^NA^PzHΩ˜äﬂ≥ïjBΩ!Ñ!çj@ΩçÁ(ëaûµV@Y>ßóßaôµçÈQÉm≥[:ÛÇÚ≥âyx!éq!ÑaLΩ7cv@âaLΩ>c∆!ó>!ü!ác˜:äú≥∆c]Çñ≥o7~E¿!áaJΩ>çz+ö=≥cEÇ•≥aLΩçJ3çP¥çP¥!èLçP¥MÇø≥Ô
+5DATA"paMΩ!éc>˜âç∆*Ç=≥7câ~EÉÕµç§+VnçÚ≥a˘≥wçàW~GçÕµÔç˛≥vZcQŒ∂FIç!ÇtFOv`cEÇ!É¥v!Üc0çÜ≥!ázLΩæRä‘µ8˜â^A~Aç˛≥7c3É–µë~Dç˛≥1c!Åç!ÇtÉ–µç¿`Ç7≥a√≥b!ô∂çı`•ç!ÄµjgΩ!Ö!å) bDΩK!ü|C}ÇŸ¥!óaMµYYYYY>µQvµïc!ûc!ñïc!ûc&+!ûc!ñ )bBΩ´b@Ω•ç5(ö√≥aHΩtçµ¥jDΩ´°zLΩ!èF@:Û9rLΩà˜º∫¥[•aNΩI
+6DATA">°7cLÉú¥^Cç!ü¥•ï~Cç˛≥ç!é¥Ô!á!èrLΩë°â‡oµÇªÄ\µÄª¿_µÀπvZâÔ7c7jBΩ´jÄªYbÄªâj@ΩbÇªâ±j@Ω´[°ÉQbzÎºñ!É∞~Bâç^¥Ç7≥zÎºæ!Çö4≥æ!Öí4≥ç¿`ä7≥ç!Äµ!è~B—Öï´ç5aë=”/<⁄'ÅLckMÇ9µ=Ùàï•ç!ù¥ë°ç›µ~Bç˛≥çÜ≥à¶∞___!üÉÀ≥••a¿@üí˘µ!ç!Ñ°I£´A¿øI•ç+¥ë°É›µ!ã°É*¥~`!É`!Ü!Ü!Ü!Ü!Ü!Ün!ò!ò`h!É
+7DATA"}!ã!å!ì!ëiMJ~`@`!Ö22MJ@!Ü!Ü!ï!Ö!ì!é	!è!ó!ê!Ñ!Ü!é!Ñ!à!ó

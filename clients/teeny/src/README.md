@@ -11,3 +11,12 @@ and those both work.
 
 So there is working asm source for all machines one way or another.
 
+Error messages are different than the original TINY/TEENY  
+FF - File (not)Found - directory related errors  
+UE - Unknown Error  
+SN - SyNtax errors  
+IO - I/O - crc & other rs232 & disk data integrity/sanity checks  
+WP - Write-Protect, format  
+DF - Dir/Disk Full, max filesize exceeded, out of memory  
+ND - No Disk - disk changed / not inserted  
+HW - HardWare - physical drive or disk problems
