@@ -13,33 +13,13 @@ and those both work.
 
 So there is working asm source for all machines one way or another.
 
-Error messages are different than the original TINY/TEENY  
-
-By default without `-DINCLUDE_ERRS`, all errors just say "ERR".  
-
-`-DINCLUDE_ERRS` adds these distinct error codes  
-These are similar to but not the same as legacy TEENY.  
-
-| ERR | Meaning | Additional |
-| --- | --- | --- |
-| SN | SyNtax | missing/invalid filename or command |
-| FF | File Found | file NOT found, other directory related errors |
-| IO | I/O | crc & other rs232 & disk data integrity/sanity errors |
-| WP | Write-Protect | also some format errors |
-| DF | Disk Full | directory full, max filesize, out of memory |
-| ND | No Disk | not inserted, disk changed, drive not ready |
-| HW | HardWare | physical drive or disk problems, various sensors |
-| UE | Unknown | other/unknown errors |
-
 # build
 
-default config: 19.2k baud, omit dsr check, omit error codes  
 `$ make clean all`
 
-include dsr check, include old error codes
-`$ make clean all XFLAGS="-DINCLUDE_DSR -DINCLUDE_ERRS"`
+## options
+Use: `make ... XFLAGS="-DFOO -DBAR=baz"`
 
-Makefile build options. Use: `make ... XFLAGS="-DFOO -DBAR=baz"`  
 `-DHIMEM=addr`		default=MAXRAM (of a 32k machine), generate a relocated binary with specified END address  
 `-DINCLUDE_DSR`		defualt no, include code for DSR check  
 `-DBAUD=9600`		default=19200, 19200 9600 4800 2400 1200 600 300 110 75  
@@ -52,6 +32,23 @@ And TPDD1 is also set to 19200 by default (all dip switches set to off).
 FB-100, FDD19, and Purple Computing drives are all hard-wired for 9600 baud.  
 For those drives you can build with `-DBAUD=9600`, or you can change them to
 19200 by removing the solder blob under the small door on the bottom.
+
+Unlike original TINY/TEENY, by default all errors just say "ERR".
+
+`-DINCLUDE_ERRS` adds these distinct error codes  
+These are similar to but not identical to legacy TEENY.
+
+| ERR | Meaning | Additional |
+| --- | --- | --- |
+| SN | SyNtax | missing/invalid filename or command |
+| FF | File Found | file NOT found, other directory related errors |
+| IO | I/O | crc & other rs232 & disk data integrity/sanity errors |
+| WP | Write-Protect | also some format errors |
+| DF | Disk Full | directory full, max filesize, out of memory |
+| ND | No Disk | not inserted, disk changed, drive not ready |
+| HW | HardWare | physical drive or disk problems, various sensors |
+| UE | Unknown | other/unknown errors |
+
 
 # references
 [TEENY Manual](../teenydoc.txt)
