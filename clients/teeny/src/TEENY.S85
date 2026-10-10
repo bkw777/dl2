@@ -630,8 +630,10 @@ LOAD:
 ; FINDFN reads FILNM1 (FC93 on 100) which has been set up by CKFN2 in MAIN
 		CALL		FINDFN				; see if the proposed file already exists in ram
 		JNZ			errFF				; abort with FF error if the file already exists (was AE)
+	IF ERRS
 		LXI			H,errDF				; HL=errDF
-		SHLD 		ETRAP				; set errDF as the general error handler (was FL)
+		SHLD 		ETRAP				; set errDF (was FL) as the general error handler
+	ENDIF
 		CALL		SCNEMP				; find empty ram file direrctory entry
 		PUSH		H					; TS[0] = dirent_start
 		; get extra_len based on file type
