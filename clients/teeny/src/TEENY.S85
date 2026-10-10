@@ -599,24 +599,22 @@ DIRENT:
 		MOV			M,B					; M@pktDATA+25 = action = B = 0 = set_name
 		; dirent(set_name) tells the drive the filename for an open/close/read/write/kill to follow
 
-; send a DIRENT or READ packet and handle their special return packets
-SendPacketSpecial:
+; send a DIRENT or READ packet and detect which kind of return packet we got
 	IF ERRS
+SendPacketSpecial:
 		CALL		SendPacket
-		MOV			B,A					; B = error code from SendPacket
+		MOV			B,A					; B = data[0] from SendPacket
 		LDA			pktTYPE				; A = return packet type
 		CPI			ret_std				; is it a standard return packet?
 		JZ			ParseStdReturn		; if it's a standard return then jump to the standard return parser
 		; it's not a standard return (it's a DIRENT or READ return)
 		; restore the A & Z state left by SendPacket
-		MOV			A,B					; A = 1st byte of data
+		MOV			A,B					; A = data[0]
 		ORA			A					; if A = 0 set Z
 		; places RET might go:
 		; * CALL SendPacketSpecial in SendReadCMD
 		; * CALL DIRENT in MAIN
 		RET
-	ELSE
-		JMP			SendPacket
 	ENDIF
 
 SendOpenCMD_write:
@@ -802,7 +800,11 @@ SendReadCMD:
 ; start READ cmd packet
 		MVI			A,cmd_read			; A = READ packet fmt code
 		CALL		InitPacket			; Construct a tpdd packet
-		CALL		SendPacketSpecial	; send the packet to the drive, read a return packet from the drive
+	IF ERRS
+		CALL		SendPacketSpecial	; send the packet to the drive, read the return packet from the drive, handle std vs special return
+	ELSE
+		CALL		SendPacket			; send the packet to the drive, read a return packet from the drive
+	ENDIF
 		XRA			A					; A = 0 ; (*1) why did we bother saving & restoring A? 
 												; IDK but without it, SAVE always errors with AE.
 		MOV			B,A					; B = 0
