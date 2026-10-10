@@ -600,8 +600,8 @@ DIRENT:
 		; dirent(set_name) tells the drive the filename for an open/close/read/write/kill to follow
 
 ; send a DIRENT or READ packet and detect which kind of return packet we got
-	IF ERRS
 SendPacketSpecial:
+	IF ERRS
 		CALL		SendPacket
 		MOV			B,A					; B = data[0] from SendPacket
 		LDA			pktTYPE				; A = return packet type
@@ -615,6 +615,8 @@ SendPacketSpecial:
 		; * CALL SendPacketSpecial in SendReadCMD
 		; * CALL DIRENT in MAIN
 		RET
+	ELSE
+		JMP			SendPacket
 	ENDIF
 
 SendOpenCMD_write:
@@ -800,13 +802,9 @@ SendReadCMD:
 ; start READ cmd packet
 		MVI			A,cmd_read			; A = READ packet fmt code
 		CALL		InitPacket			; Construct a tpdd packet
-	IF ERRS
 		CALL		SendPacketSpecial	; send the packet to the drive, read the return packet from the drive, handle std vs special return
-	ELSE
-		CALL		SendPacket			; send the packet to the drive, read a return packet from the drive
-	ENDIF
-		XRA			A					; A = 0 ; (*1) why did we bother saving & restoring A? 
-												; IDK but without it, SAVE always errors with AE.
+		; A = data[0], Z = set if A=0 (no error)
+		XRA			A					; A = 0
 		MOV			B,A					; B = 0
 		MOV			C,A					; C = 0
 		STA			pktTYPE				; A = pktTYPE (return packet fmt)
