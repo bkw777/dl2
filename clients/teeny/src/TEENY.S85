@@ -294,7 +294,7 @@ MAIN:
 		CPI			'Q'				; is it 'Q' ?
 		JZ			MENU			; then exit to OS (main menu)
 		CPI			'S'				; is it 'S' ?
-		JZ			SAVE			; then jump to SAVE		maybe rename SAVE, maybe common init code for most commands
+		JZ			SAVE			; then jump to SAVE
 		PUSH 		PSW				; stash A=cmd
 		; if we got here then the command is K, L, or unknown
 		; KILL or LOAD both start with telling the drive the filename
@@ -314,10 +314,7 @@ MAIN:
 ; 2: The DB opcode_LXI_B after that executes as code and consumes the next
 ;    2 bytes as it's operand, which is the next MVI_E and it's eXX operand.
 ; 3: The next byte after that is another LXI_B, repeat 2: until end of stack.
-;
-; The first MVI you jump or fall to does what it says, the rest become no-ops.
-; B is never used. The only effect used is E=eXX.
-; Then fall through to ERROR to display it.
+; 4: Fall through into ERROR with E=eXX.
 
 	IF ERRS
 errSN:
@@ -341,24 +338,14 @@ errDF:
 errND:
 		MVI			E,eND
 		DB			opcode_LXI_B
-
-; debugging
-;errSE:
-;		MVI			E,eSE
-;		DB			opcode_LXI_B
-;errDE:
-;		MVI			E,eDE
-;		DB			opcode_LXI_B
-
 errHW:
 		MVI			E,eHW
 
 ;		E = eXX  some error code
 ;		B = junk
 	ELSE
-	; if not including error codes, define all the jump targets
-	; to be the same as ERROR: so we don't have to have as many ifdefs
-	; all over the rest of the code
+	; if not including error codes, then define all the jump targets to be the
+	; same as ERROR, so we don't have to have as many ifdefs everywhere else
 errSN:
 errFF:
 errUE:
@@ -426,12 +413,9 @@ CheckDSR:
 		RZ
 	IF ERRS
 		MVI			E,eND			; set ND error  (was NR)
-	ENDIF
+	ENDIF ; /ERRS
 		JMP			ERROR
-	ENDIF
-
-
-
+	ENDIF ; /INCLUDE_DSR
 
 DIRENT:
 		; activate rs232
@@ -1040,7 +1024,7 @@ STR_Prompt:
 
 STR_Err:
 	IF ERRS
-		DB			" Err",CR,LF,0,"FFUESNIOWPDFNDHW" ;,"SEDE"
+		DB			" Err",CR,LF,0,"FFUESNIOWPDFNDHW"
 	ELSE
 		DB			"ERR",CR,LF,0
 	ENDIF
@@ -1058,9 +1042,6 @@ eWP					EQU		0x0A ; write-protect, format
 eDF					EQU		0x0C ; bounds - dir/file/disk full/exceeded
 eND					EQU		0x0E ; presense - disk changed / not inserted
 eHW					EQU		0x10 ; hardware - physical drive or disk problems
-; debugging
-;eSE					EQU		0x12 ; src err
-;eDE					EQU		0x14 ; dest err
 	ENDIF
 
 PRGEND:
