@@ -356,6 +356,9 @@ errHW:
 ;		E = eXX  some error code
 ;		B = junk
 	ELSE
+	; if not including error codes, define all the jump targets
+	; to be the same as ERROR: so we don't have to have as many ifdefs
+	; all over the rest of the code
 errSN:
 errFF:
 errUE:
@@ -372,18 +375,16 @@ ERROR:
 		ORA 		A				; does LoadingFlag == 0?
 		JZ 			@show			; if 0 skip to @show
 	IF ERRS
-		PUSH 		D				; stash DE (D doesn't matter, E=eXX from above or from ParseStdReturn)
+		PUSH 		D				; save E=eXX
 	ENDIF
-		; jaddr@TS[1]
 		LHLD 		RamFileSize		; HL=RamFileSize
 		MOV 		B,H				; B=H
 		MOV 		C,L				; C=L  BC=RamFileSize
 		LHLD 		RamFileStart	; HL=RamFileStart
 		CALL		MASDEL			; delete BC bytes @ HL
 	IF ERRS
-		POP 		D				; restore DE (only care about E)
+		POP 		D				; restore E=eXX
 	ENDIF
-		; jaddr@TS[0]
 @show:
 	IF ERRS
 		LXI			H,STR_ErrCodes	; HL = start of string of err codes
