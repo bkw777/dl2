@@ -25,6 +25,6 @@ Error messages are different than the original TINY/TEENY
 | UE | Unknown | other/unknown errors |
 
 # references
-[teenydoc.txt](../teenydoc.txt)
+[TEENY Manual](../teenydoc.txt)
 
 [ROM Cross Reference](https://github.com/bkw777/m100_dev)

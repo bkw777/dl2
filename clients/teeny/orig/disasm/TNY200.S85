@@ -141,12 +141,6 @@ direntFSIZE			EQU		pktDATA + 25		; F817
 
 ; end of ALTLCD				ALTLCD + 0x027F		; FA2F
 
-; Curious location for this variable
-; ALL old versions of TEENY, 100, NEC, even 200, all used the same FF80
-; On 100 FF80 is within COMBUF : FF46-FF85
-; on 200 FF80 is outside COMBUF: FFBB-FFFA
-writeDLEN			EQU		0xFF80				; 1 byte, src for pktDLEN during write chunks loop
-
 ; -----------------------------------------------------------------------------
 ; ORG
 ; -----------------------------------------------------------------------------
@@ -647,7 +641,7 @@ WriteChunks:
 		DAD			B
 		XTHL
 		XCHG
-		LXI			B,writeDLEN
+		LXI			B,0xFFFF-CHUNK_LEN+1
 		DAD			B
 		PUSH		H
 		CALL		SendWriteCMD

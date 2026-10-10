@@ -158,20 +158,6 @@ direntFSIZE			EQU		pktDATA + 25		; FC27
 
 ; end of ALTLCD				ALTLCD + 0x013F		; FCFF
 
-; DLEN for next WRITE packet.
-; Not pktDLEN itself, used to fill pktDLEN in outgoing WRITE packet.
-; Curious location for this variable.
-; ALL old teeny versions for 100, M10, NEC, and even 200, all used the same FF80.
-; How can this be safe to be within COMBUF at all?
-; Or, if the data comes from COMBUF, then why not on the others?
-; On 100 FF80 is within COMBUF: FF46-FF85
-; On 200 FF80 seems unrelated:  FFBB-FFFA
-;    M10                        FF46-FF85
-;    K85                        FFBE-FFFD
-;    NEC                        FEC4-FF04
-writeDLEN			EQU		0xFF80
-
-
 
 ; -----------------------------------------------------------------------------
 ; ORG
@@ -653,7 +639,7 @@ WriteChunks:
 		DAD			B
 		XTHL
 		XCHG
-		LXI			B,writeDLEN
+		LXI			B,0xFFFF-CHUNK_LEN+1
 		DAD			B
 		PUSH		H
 		CALL		SendWriteCMD
