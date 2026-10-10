@@ -52,10 +52,10 @@ CHUNK_LEN			EQU		128		; 1-128
 
 COM_SETUP_PAUSE_MS	EQU		100
 
-	IF NOERRS
-	UNDEFINE ERRS
-	ELSE
+	IF INCLUDE_ERRS
 	DEFINE ERRS
+	ELSE
+	UNDEFINE ERRS
 	ENDIF
 
 ; -----------------------------------------------------------------------------

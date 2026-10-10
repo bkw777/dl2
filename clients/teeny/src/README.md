@@ -3,6 +3,8 @@
 
 A single common TEENY.S85 asm source and Makefile that generates binaries for all different models of machine.
 
+Currently the default config produces a .CO file for Model 100 that is only 653 bytes.
+
 The 100, M10, and K85 binaries built from this source all work.
 
 The 200 & NEC binaries from this source do not work yet,  
@@ -11,7 +13,12 @@ and those both work.
 
 So there is working asm source for all machines one way or another.
 
-Error messages are different than the original TINY/TEENY
+Error messages are different than the original TINY/TEENY  
+
+By default without `-DINCLUDE_ERRS`, all errors just say "ERR".  
+
+`-DINCLUDE_ERRS` adds these distinct error codes  
+These are similar to but not the same as legacy TEENY.  
 
 | ERR | Meaning | Additional |
 | --- | --- | --- |
@@ -26,31 +33,25 @@ Error messages are different than the original TINY/TEENY
 
 # build
 
-default config: 19.2k baud, omit dsr check, include error codes  
+default config: 19.2k baud, omit dsr check, omit error codes  
 `$ make clean all`
 
-include dsr check, larger binary, don't lock up if drive turned off or not connected  
-`$ make clean all XFLAGS='-DINCLUDE_DSR'`
+include dsr check, include old error codes
+`$ make clean all XFLAGS="-DINCLUDE_DSR -DINCLUDE_ERRS"`
 
-omit error codes, all errors just say "ERR", 653 bytes including CO header!  
-`$ make clean all XFLAGS='-DNOERRS'`
-
-Makefile build options. Use: `XFLAGS=-DFOO -DBAR=baz ...`  
+Makefile build options. Use: `make ... XFLAGS="-DFOO -DBAR=baz"`  
 `-DHIMEM=addr`		default=MAXRAM (of a 32k machine), generate a relocated binary with specified END address  
 `-DINCLUDE_DSR`		defualt no, include code for DSR check  
 `-DBAUD=9600`		default=19200, 19200 9600 4800 2400 1200 600 300 110 75  
 `-DCHUNK_LEN=64`	default=128, 1-128, size of chunks to use saving files  
-`-DNOERRS`			omit error codes, all errors just say "ERR"  
+`-DINCLUDE_ERRS`	default no, include code for distinct error codes instead of just "ERR" for all (adds 100 bytes!)  
 
 Default baud is 19200 because TPDD2 only supports 19200 and cannot be changed,   
 And TPDD1 is also set to 19200 by default (all dip switches set to off).
 
-FB-100, FDD19, and Purple Computing drives are all hard-wired for 9600 baud,
-but only by a removable solder-blob. For any of these drives you can either
-remove the solder-blocb with solder wick, or use `-DBAUD=9600`
-
-Example, build just the Model 100 North America binary with some options changed:
-`$ make 100na XFLAGS='-DHIMEM=52000 -DBAUD=9600 -DINCLUDE_DSR -DNOERRS'
+FB-100, FDD19, and Purple Computing drives are all hard-wired for 9600 baud.  
+For those drives you can build with `-DBAUD=9600`, or you can change them to
+19200 by removing the solder blob under the small door on the bottom.
 
 # references
 [TEENY Manual](../teenydoc.txt)

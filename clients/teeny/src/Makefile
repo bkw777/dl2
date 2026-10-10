@@ -18,11 +18,11 @@ ASFLAGS += $(shell $(AS) |awk '/^Z80 Macro Assembler /{split($$4,a,"-");if (a[1]
 # -DINCLUDE_DSR		# include code for DSR check
 # -DBAUD=9600		# [19200] 9600 4800 2400 1200 600 300 110 75
 # -DCHUNK_LEN=64	# 1-[128]
-# -DNOERRS			# no error codes, all errors just say "ERR"
+# -DINCLUDE_ERRS	# include distinct error codes instead of just "ERR" for all (adds 100 bytes!)
 # Use -DBAUD=9600 if you have a FB-100, FDD19, or Purple Computing drive,
 # or remove the solder blob under the little cover on the bottom.
 # Example usage from the make command line:
-# $ make 100na XFLAGS='-DHIMEM=62000 -DBAUD=9600 -DINCLUDE_DSR -DNOERRS'
+# $ make 100na XFLAGS='-DHIMEM=52000 -DBAUD=9600 -DINCLUDE_DSR -DINCLUDE_ERRS'
 XFLAGS :=
 
 # don't delete .CO when building .DO
