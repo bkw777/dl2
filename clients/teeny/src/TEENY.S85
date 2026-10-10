@@ -627,16 +627,6 @@ SendOpenCMD:
 		MOV			M,E					; write E to pktDATA - E = mode write/append/read
 		JMP			jSendPacket			; send the packet
 
-SendFinalWriteChunk:
-		POP 		D
-SendWriteCMD:
-		MVI			A,cmd_write
-		CALL		InitPacket 			; HL@pktDLEN, M=0
-		MOV			M,C					; write C=chunk_len to pktDLEN
-		INX			H					; advance HL to pktDATA
-		MOV			B,C					; tell D2H4Bup how many bytes to copy
-		CALL		D2H4Bup				; copy B bytes from DE to HL
-		JMP			jSendPacket			; send the packet, read it's return packet
 
 LOAD:
 ; FINDFN reads FILNM1 (FC93 on 100) which has been set up by CKFN2 in MAIN
@@ -1017,7 +1007,16 @@ WriteChunks:
 @end:
 		MOV			C,E					; C = remaining_len
 		POP			H					; HL = position_a ; TS[0] = position_a
-		JMP			SendFinalWriteChunk
+		POP 		D					; DE = position_a
+
+SendWriteCMD:
+		MVI			A,cmd_write
+		CALL		InitPacket 			; HL@pktDLEN, M=0
+		MOV			M,C					; write C=chunk_len to pktDLEN
+		INX			H					; advance HL to pktDATA
+		MOV			B,C					; tell D2H4Bup how many bytes to copy
+		CALL		D2H4Bup				; copy B bytes from DE to HL
+		JMP			jSendPacket			; send the packet, read it's return packet
 
 STR_Prompt:
 		DB			"> C FFFFFF.XX (C=KLSQ)",CR,LF,"> ",0

@@ -2,7 +2,7 @@
 0READF:CLEAR12,F:DEFINTA-E,Q,G,K:DEFSNGF,H-J:DEFSTRL-O:READF,A,J,G,N,E,Q:M="!":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?USING"Installing \    \   0%";N
 1READL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)XORD:B=BXORQ:D=0:POKEI,B:I=I+1:K=KXORB:NEXT:?@18,USING"###%";(I-F)*100/A:IFI<=HTHEN1
 2IFK<>GTHEN?"Bad Checksum":ELSEM=CHR$(34):L="X.DO":OPENLFOROUTPUTAS1:?#1,"0CLEAR0,"F":CALL"J":MENU":CLOSE1:?"Please type:":?"KILL"M""L:?"SAVE"M""N:LOADL
-3DATA62316,644,62316,145,"TEENY",128,64
-4DATA"a@@ybF½a!š!šbJ½jF½¹ïrH½a9³¥aµéQr+¿¸!…a€³b!™¶aÍ¶vb…!‹YazÌ¶¾!‘Šä!”¾!“Š#µµ¯³Š€³±–!‹Š2´}ŠÓ´zH½÷Š’³jB½!„!j@½ç(aªµéQƒ9³[:ó‚›³‰yx!Žq!„aL½7cv@‰¤+Vn›³a¢³wˆW~Gçµï§³vZcQÎ¶FI!‚tFOv`cE‚T´v!†c0aL½>cÆ!—>!Ÿ!‡c÷:Šu´Æc]‚o´o7~EÀ!‡aJ½>z+š€³cE‚~´aL½J3)
-5DATA"´)´!L)´M‚!˜´ïpaM½!Žc>÷‰Æ*‚€³7c‰~Eƒçµ^A~A§³7c3ƒêµ‘~D§³1c!!‚tƒêµÀ`‚€³a€³b!™¶õ`¥!šµjg½!…!Œ) bD½K!Ÿ|C}‚ó´!—agµYYYYY>µQ!µ•c!žc!–•c!žc&+!žc!– )bB½«b@½¥5(š€³aH½tOµjD½«¡zL½!F@:ó9rL½ˆ÷¼Tµ[¥aN½I>¡7cLƒ¶´^C9´¥•~C§³_´ï!‡!rL½‘¡‰à	µ‚»€vµ€»ÀyµË¹v
-6DATA"Z‰ï7c7jB½«j€»Yb€»‰j@½b‚»‰±j@½«[¡ƒQbzë¼–!ƒ°~B‰¯³‚€³zë¼¾!‚š€³¾!…’€³À`Š€³!šµ!~BÑ…•«5a‘=Ó/<Ú'LckM‚Óµ=ôˆ•¥7´‘¡îµ~B§³_´ˆ¥¥aÀ@Ÿ’Šµ!!„¡I£«AÀ¿I¥Å´‘¡ƒîµ!‹¡ƒÄ´~`!ƒ`!†!†!†!†!†!†n!˜!˜`h!ƒ}!‹!Œ!“!‘iMJ~`@!…!’!’MJ@
+3DATA62319,641,62319,0,"TEENY",128,64
+4DATA"a@@ybF½a!š!šbJ½jF½¹ïrH½a<³¥aµéQr+¿¸!…aƒ³b!™¶aÍ¶vb…!‹YazÌ¶¾!‘Šä!”¾!“Š!—µµ²³Šƒ³±–!‹Š5´}ŠÇ´zH½÷Š•³jB½!„!j@½ç(aªµéQƒ<³[:ó‚ž³‰yx!Žq!„aL½7cv@‰¤+Vnž³a¥³wˆW~GÛµïª³vZcQÎ¶FI!‚tFOv`cE‚W´v!†c0aL½>cÆ!—>!Ÿ!‡c÷:Šx´Æc]‚r´o7~EÀ!‡aJ½>z+šƒ³cE‚!´aL½J3
+5DATA",´,´!L,´M‚!›´ïpaM½!Žc>÷‰Æ*‚ƒ³7c‰~EƒÛµ^A~Aª³7c3ƒÞµÀ`‚ƒ³aƒ³b!™¶õ`¥!Žµjg½!…!Œ) bD½K!Ÿ|C}‚ç´!—a[µYYYYY>µQ!„µ•c!žc!–•c!žc&+!žc!– )bB½«b@½¥5(šƒ³aH½tCµjD½«¡zL½!F@:ó9rL½ˆ÷¼Hµ[¥aN½I>¡7cLƒª´^C<´¥•~Cª³b´ï!‡!rL½‘¡‰à}µ‚»€jµ€»ÀmµË¹vZ‰ï7c7jB½«j€»Yb
+6DATA"€»‰j@½b‚»‰±j@½«[¡ƒQbzë¼–!ƒ°~B‰²³‚ƒ³zë¼¾!‚šƒ³¾!…’ƒ³À`Šƒ³!Žµ!~BÑ…•«5a‘=Ó/<Ú'LckM‚Çµ=ôˆ•¥:´‘¡âµ~Bª³b´ˆ¥¥aÀ@Ÿ’þµ!!„¡I£«AÀ¿I¥µ‘¡ƒâµ!‹¡‘~Dª³1c!!‚tƒÞµ~`!ƒ`!†!†!†!†!†!†n!˜!˜`h!ƒ}!‹!Œ!“!‘iMJ~`@!…!’!’MJ@
