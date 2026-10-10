@@ -3,7 +3,7 @@
 
 A single common TEENY.S85 asm source and Makefile that generates binaries for all different models of machine.
 
-Currently the default config produces a .CO file for Model 100 that is only 647 bytes.
+Currently the default config produces a .CO file for Model 100 that is only 646 bytes.
 
 The 100, M10, and K85 binaries built from this source all work.
 
@@ -24,7 +24,7 @@ Use: `make ... XFLAGS="-DFOO -DBAR=baz"`
 `-DINCLUDE_DSR`		defualt no, include code for DSR check  
 `-DBAUD=9600`		default=19200, 19200 9600 4800 2400 1200 600 300 110 75  
 `-DCHUNK_LEN=64`	default=128, 1-128, size of chunks to use saving files  
-`-DINCLUDE_ERRS`	default no, include code for distinct error codes instead of just "ERR" for all (adds over 100 bytes!)  
+`-DINCLUDE_ERRS`	default no, include code for distinct error codes instead of just "ER" for all (adds over 100 bytes!)  
 
 Default baud is 19200 because TPDD2 only supports 19200 and cannot be changed,   
 And TPDD1 is also set to 19200 by default (all dip switches set to off).
@@ -33,7 +33,7 @@ FB-100, FDD19, and Purple Computing drives are all hard-wired for 9600 baud.
 For those drives you can build with `-DBAUD=9600`, or you can change them to
 19200 by removing the solder blob under the small door on the bottom.
 
-Unlike original TINY/TEENY, by default all errors just say "ERR".
+Unlike original TINY/TEENY, by default all errors just say "ER".
 
 `-DINCLUDE_ERRS` adds these distinct error codes  
 These are similar to but not identical to legacy TEENY.
