@@ -633,41 +633,43 @@ LOAD:
 		LXI			H,errDF				; HL=errDF
 		SHLD 		ETRAP				; set errDF as the general error handler (was FL)
 		CALL		SCNEMP				; find empty ram file direrctory entry
-		PUSH		H
-		CALL		GetFtypeX			; determine the filetype, CO, DO, or BA
-		; BA: A=2 F=SPC
-		; CO: A=0 F=ZP
+		PUSH		H					; TS[0] = dirent_start
+		; get extra_len based on file type
+		CALL		RamFileExtraLen		; A=extra_len 0|1|2 for CO|DO|BA
+		; CO: A=0
 		; DO: A=1
-		LHLD		direntFSIZE			; HL = msb-first filesize from DIRENT return.
+		; BA: A=2
+		LHLD		direntFSIZE			; HL = big-endian filesize from DIRENT return.
 		; direntFSIZE was written by DIRENT: while still in MAIN: before coming here.
-		; All 16-bit values in tpdd packets are msb-first. H=lsb L=msb
+		; All 16-bit values in tpdd packets are big-endian iow msb-first: H=lsb L=msb
+		; The cpu platform is litte-endian iow 16-bit values are lsb-first.
+		; So byte-swap direntFSIZE to get usable native fsize.
 		MOV			B,L					; copy msb to B
 		MOV			C,H					; copy lsb to C
-		; BC = normal lsb-first filesize
+		; BC = native fsize
 		MOV			L,C					; copy lsb to L
 		MOV			H,B					; copy msb to H
-		; HL = normal lsb-first filesize
-		SHLD		DskFileSize			; write filesize to DskFileSize
-		DCX			B					; BC-- (filesize minus 1)
-		MOV			E,A					; E = ftype (CO=0 DO=1 BA=2)
-		INR			A					; A = ftype+1 (CO=1 DO=2 BA=3)
-@l0:	; add 0/1/2 eof marker bytes to true filesize to get ram filesize
+		; HL = native fsize
+		SHLD		DskFileSize			; write fsize to DskFileSize
+		DCX			B					; BC-- to negate the first BC++ below
+		MOV			E,A					; E = extra_len, save extra_len for later
+		INR			A					; A++ to negate the first A-- below
+@l0:	; add extra_len to fsize to get ram fsize including added eof bytes
 		INX			B					; BC++
 		DCR			A					; A--
 		JNZ			@l0					; repeat until A=0
-		; CO: BC=filesize+0  CO files end is defined in the CO header, no added eof marker bytes
-		; DO: BC=filesize+1  DO files end with 1 added EOF byte (0x1A)
-		; BA: BC=filesize+2  BA files end with 2 added NUL bytes
-		;
 		; A = 0
-		; BC = ram filesize (true filesize + 0, 1, or 2)
+		; BC = ram_fsize full ram file length including added EOF bytes
+		; CO: BC=fsize+0
+		; DO: BC=fsize+1  (0x1A)
+		; BA: BC=fsize+2  (0x00 0x00)
 		;
 		; FtypeTable is a table with 3 blocks, one each for CO, DO, & BA filetypes
 		; Each block is 5 bytes in 3 fields:
 		; 1 byte:  attribute for MKDIRENT   fattrCO fattrDO fattrBA
 		; 2 bytes: jump address             jCOFILE jDOFILE jBAFILE
 		; 2 bytes: start of filetype area   COFILES DOFILES BAFILES
-		MOV			D,A					; D=0 E=0/1/2 DE=0/1/2
+		MOV			D,A					; D=0 E=extra_len DE=extra_len
 		; get the address of the start of FtypeTable
 		LXI			H,FtypeTable		; HL = FtypeTable
 		; move to the correct block for the file type
@@ -676,6 +678,7 @@ LOAD:
 		DAD			D					; HL += DE
 		DAD			D					; HL += DE
 		DAD			D					; HL += DE
+		; HL = FtypeTable + 5*DE
 		; CO: DE=0 -> HL = FtypeTable + 0
 		; DO: DE=1 -> HL = FtypeTable + 5
 		; BA: DE=2 -> HL = FtypeTable + 10
@@ -683,12 +686,12 @@ LOAD:
 		; CO: A = fattrCO
 		; DO: A = fattrDO
 		; BA: A = fattrBA
-		PUSH		PSW					; push fattrXX
+		PUSH		PSW					; TS=fattr,dirent_start
 
 		; attr fattrCO / fattrDO / fattrBA has been read from the jump table and pushed
 
 		LXI			D,MkRamDirent		; DE = MkRamDirent
-		PUSH		D					; push MkRamDirent
+		PUSH		D					; TS=MkRamDirent,fattr,dirent_start
 
 		; MkRamDirent is on the stack
 		; There is no matching pop, it gets used by RET
@@ -698,7 +701,7 @@ LOAD:
 		MOV			E,M					; E = jump addr lsb
 		INX			H					; HL++ to jump addr msb 
 		MOV			D,M					; D = jump addr msb
-		PUSH		D					; push jump addr
+		PUSH		D					; TS=jXXFILE,MkRamDirent,fattr,dirent_start
 
 		; jCOFILE/jDOFILE/jBAFILE is on the stack
 		; There is no matching pop, it gets used by RZ
@@ -727,19 +730,16 @@ LOAD:
 		; DE = ram filesize
 		; HL = start of CO/DO/BA FILES area
 		SHLD		RamFileStart		; RamFileStart = HL (new ram file starts at the beginning of the area for it's type)
-		PUSH		H					; stash HL=RamFileStart
-		; jaddr@ts-1
+		PUSH		H					; TS=RamFileStart,jXXFILE,MkRamDirent,fattr,dirent_start
 		CALL		MAKHOL				; create space for new file
 		JC			errDF				; abort with DF err if MAKHOL failed from not enough memory (was OM)
-		; set a status flag that we are now loading from disk to ram
+		; set a status flag that loading from disk to ram is in progress
 		LXI			H,LoadingFlag		; HL = LoadingFlag
 		INR			M					; LoadingFlag++
 		CALL		SendOpenCMD_read	; open the tpdd file for reading
 		LHLD		DskFileSize			; HL = DskFileSize
 		XCHG							; swap HL:DE  DE = DskFileSize
-		POP			H					; HL = RamFileStart
-		; jaddr@ts
-
+		POP			H					; HL = RamFileStart TS=jXXFILE,MkRamDirent,fattr,dirent_start
 		LDA			pktTYPE				; A = packet type  (should be 0x10 for read return?)
 		MOV			C,A					; C = packet type
 		MVI			B,0					; B = 0, BC = packet type
@@ -749,6 +749,7 @@ LOAD:
 		; TS[0] = jCOFILE/jDOFILE/jBAFILE
 		; TS[1] = MkRamDirent
 		; TS[2] = fattrXX
+		; TS[3] = dirent_start
 @l1:
 		MOV			A,D					; A = D = filesize lsb
 		ORA			E					; A = DVE (lsbVmsb), iow set Z if DE==0
@@ -763,12 +764,12 @@ LOAD:
 		CM			SendReadCMD			; call if packet type <0 ???
 		DCX			D					; DE--
 		PUSH		H					; stash HL = current byte position in ram file
-		; jXXFILE@TS[1]
+		; TS[0]=ram_position TS[1]=jXXFILE
 		LXI			H,pktDATA			; HL = start of packet data
 		DAD			B					; HL += BC, BC = packet type ???????
 		MOV			A,M					; A = byte @ HL
 		POP			H					; retore HL = byte position in file
-		; jXXFILE@TS[0]
+		; TS[0]=jXXFILE
 		MOV			M,A					; write byte from packet to ram
 		INX			H					; HL++ (advance to next byte of file)
 		; entire packet len always <256, byte is enough
@@ -814,10 +815,14 @@ FtypeTable:
 ; so the RET at the end of jCOFILE/jDOFILE/jBAFILE goes to MkRamDirent.
 ; Top of stack has fattrXX on entering MkRamDirent
 
+
+
+; TS=MkRamDirent,fattr,dirent_start
 jDOFILE:
 		MVI			M,0x1A
 		RET								; really a jump to MkRamDirent
 
+; TS=MkRamDirent,fattr,dirent_start
 jBAFILE:
 		; We jumped here by the RZ at the end of the copy-to-ram loop,
 		; HL currently points at the byte after the end of the file.
@@ -836,32 +841,39 @@ jBAFILE:
 		SHLD		DOFILES				; write updated DOFILES
 		RET								; really a jump to MkRamDirent
 
+; TS=MkRamDirent,fattr,dirent_start
 jCOFILE:
 		LHLD		RamFileStart
 		SHLD		COFILES
 		RET								; really a jump to MkRamDirent
 
+; TS=fattr,dirent_start
 MkRamDirent:
-		POP			PSW					; A = fattrXX
+		POP			PSW					; A = fattr  TS=dirent_start
 		LHLD		RamFileStart		; HL = RamFileStart
 		XCHG							; DE = RamFileStart
 		DCX			D					; DE--
-		POP			H					; HL = whatever DE was, DOFILES/COFILES/BAFILES?
+		POP			H					; HL = dirent_start
 		JMP			MKDIRENT
 
-; read 1st byte of fname ext, return:
-; BA -> A=2 F=SPC
-; CO -> A=0 F=ZP
-; DO -> A=1
-GetFtypeX:
-		LDA 		FX1					; read 1st byte of filename extension
-		SUI			'C'					; subtract 'C'
-		; BA: A=FF F=SPC
-		; CO: A=00 F=ZP
-		; DO: A=01 F=
+; return A=0/1/2 depending on file type CO/DO/BA
+; extra ram file length over true file length for added EOF bytes
+; CO: A=0  (none, file is defined by CO header)
+; DO: A=1  (eof = 0x1A)
+; BA: A=2  (eof = 0x00 0x00)
+RamFileExtraLen:
+		LDA 		FX1					; A = FX1[0] 1st byte of filename extension
+		; subtract 'C' because the possible values happen to be contiguous BCD,
+		; and C is the center, so the result will be <0 for BA, 0 for C, >0 for DO
+		SUI			'C'					; A -= 'C'
+		; BA -> A = 0xFF flags SPC  (iow A = -1)
+		; CO -> A = 0x00 flags ZP
+		; DO -> A = 0x01 flags -
+		; if file is CO or DO then A is ready now
 		RP								; return if not S, file is not BA
+		; file is BA, return A=2
 		MVI			A,eofbytesBA		; A = eofbytesBA = 2
-		; BA: A=2 F=SPC
+		; A=0x02 F=SPC
 		RET								; file is BA
 
 ; copy a file from local ram to tpdd
@@ -882,44 +894,37 @@ SAVE:
 		; BC: Unchanged
 		JZ			errFF				; file not found in RAM
 		;JZ			errSE				; src file not found in RAM
-		CALL		GetFtypeX			; get ftype for AFTEREOF2
-		; CO: A=0 F=ZP
+
+		; determine the file type and get the number of extra bytes to add to
+		; fsize to get the full ram file length including added EOF bytes
+		CALL		RamFileExtraLen		; A = extra_len
+		; CO: A=0
 		; DO: A=1
-		; BA: A=2 F=SPC
+		; BA: A=2
 
-; This ftype 0/1/2 stuff is confusing to read because the ftype value is being
-; used in two different ways with two different meanings. What's going on is
-; one sequence of three values just happens to be a mirror image of the other,
-; and I guess it saved a few bytes to capitalize on the coincidence.
-;
-; MKDIRENT ftype is 0=BA, 1=DO, 2=CO
-; And it just happens to also be that:
-; For ftype 0 (BA) the rom adds 2 bytes to mark EOF: 0x00 0x00
-; For ftype 1 (DO) the rom adds 1 byte to mark EOF: 0x1A
-; For ftype 2 (CO) the rom adds 0 bytes to mark EOF: the file is defined by the CO header
-;
-; So it just happens to coincidentally be that: true_fsize = ram_fsize-(2-ftype)
-
-		MOV			C,A					; C = ftypeX
+		; get the MKDIRENT ftype by inverting extra_len
+		; the two values don't actually relate, it's just a coincidence that
+		; ftype BA=0 DO=1 CO=2 is a mirror image of extra_len BA=2 DO=1 CO=0
+		; and I guess it saved a few bytes to take advantage of the coincidence
+		MOV			C,A					; C = extra_len
 		; CO: C=0
 		; DO: C=1
 		; BA: C=2
-		MVI			A,ftypeCO			; A = ftypeCO = 2
-		SUB			C					; A = 2 - ftypeX
+		MVI			A,ftypeCO			; A = highest = ftypeCO = 2
+		SUB			C					; A -= extra_len (A = 2 - extra_len)
 		; CO: A = 2-0 = 2
 		; DO: A = 2-1 = 1
 		; BA: A = 2-2 = 0
-		PUSH		B					; stash BC (B=0? C=ftypeX)
-		PUSH		D					; stash DE (start of file in ram)
+		; A = ftype
+		PUSH		B					; stash BC (B=0? C=extra_len)
+		PUSH		D					; stash DE (start of file data)
 		; DE = start of file data
 		; HL = start of file dirent
 		XCHG							; swap HL:DE
 		; DE = start of file dirent
 		; HL = start of file data
-		; BA: A = 0
-		; DO: A = 1
-		; CO: A = 2
-		CALL		AFTEREOF2			; Advance HL past end of current file based on type in A: 0=BA, 1=DO, 2=CO
+		; A = ftype
+		CALL		AFTEREOF2			; Advance HL past end of current file based on ftype in A: 0=BA, 1=DO, 2=CO
 		POP			D					; restore DE = start of file data
 		MOV			A,L					; A = eof lsb
 		SUB			E					; A = eof lsb - sof lsb
@@ -928,14 +933,14 @@ SAVE:
 		SBB			D					; A = eof msb - sof msb
 		MOV			H,A					; H = A
 		; HL = eof-sof = file length
-		POP			B					; retore B=0 C=ftypeX  CO:0  DO:1  BA:2
+		POP			B					; retore B=0 C=extra_len
 		; Add 1 to both C and HL before entering the following loop because we don't
 		; hit the first JNZ until after running the body at least once.
 		INR			C					; C++
 		INX			H					; HL++
 @l0:	; remove 0/1/2 eof marker bytes from ram filesize to get true filesize
 		DCX			H					; HL-- = length--
-		DCR			C					; C-- = 
+		DCR			C					; C-- = extra_len--
 		JNZ			@l0
 		MOV			A,L					; A = len lsb
 		ORA			H					; len msbVlsb, aka set Z if len=0
