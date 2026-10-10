@@ -980,7 +980,7 @@ WriteChunks:
 		LXI			H,CHUNK_LEN			; HL = CHUNK_LEN
 		_RST		rst_CompareDEHL		; compare DE(remaining_len) to HL(chunk_len)
 		; flags: C if HL<DE, Z if HL=DE, else HL>DE, only A is destroyed
-		JNC			@end				; exit loop when CHUNK_LEN >= remaining_len
+		JNC			@FinalChunk			; exit loop when CHUNK_LEN >= remaining_len
 		MOV			C,L					; C = L = CHUNK_LEN
 		MOV			B,H					; B = H = 0, BC = CHUNK_LEN = 0x0080
 		POP			H					; HL = position_a, TS[0] = position_a
@@ -1004,7 +1004,7 @@ WriteChunks:
 		POP			H					; HL = position_b
 		; HL = new higher start position, DE = new shorter length
 		JMP			WriteChunks
-@end:
+@FinalChunk:
 		MOV			C,E					; C = remaining_len
 		POP			H					; HL = position_a ; TS[0] = position_a
 		POP 		D					; DE = position_a
