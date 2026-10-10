@@ -962,8 +962,14 @@ jSendPacket:
 		; A = error code return data from drive, the first & only byte of pktDATA
 	IF ERRS
 ParseStdReturn:
-		; A has an error code sent in the data field of the return packet
-		; see dl2/constants.h
+		; This collapses 9 blocks of 16 error codes from the drive
+		; into 8 total error codes, each covering a range of related errors.
+		; drive     -> converted
+		; 0x00-0x0F -> n/a, no error, success
+		; 0x10-0x1F -> 0x02 -> directory-related errors like file-not-found
+		; 0x20-0x2F -> 0x04 -> unknown/undocumented
+		; 0x30-0x3F -> 0x06 -> syntax errors like missing filename
+		; etc...
 		ANI			0xF0		; A &= 0xF0
 		RAR						; Rotate Accumulator Right through carry
 		RAR						; Rotate Accumulator Right through carry
