@@ -52,6 +52,12 @@ CHUNK_LEN			EQU		128		; 1-128
 
 COM_SETUP_PAUSE_MS	EQU		100
 
+	IF NOERRS
+	UNDEFINE ERRS
+	ELSE
+	DEFINE ERRS
+	ENDIF
+
 ; -----------------------------------------------------------------------------
 ; ASSEMBLER
 ; -----------------------------------------------------------------------------
@@ -313,6 +319,7 @@ MAIN:
 ; B is never used. The only effect used is E=eXX.
 ; Then fall through to ERROR to display it.
 
+	IF ERRS
 errSN:
 		MVI			E,eSN			; fell from above = unknown cmd = syntax error
 		DB			opcode_LXI_B
@@ -348,22 +355,37 @@ errHW:
 
 ;		E = eXX  some error code
 ;		B = junk
+	ELSE
+errSN:
+errFF:
+errUE:
+errIO:
+errWP:
+errDF:
+errND:
+errHW:
+	ENDIF
 
-; E = eXX
 ERROR:
+		; if we were in the middle of SAVE, then undo the partial new file
 		LDA 		LoadingFlag		; A = LoadingFlag
 		ORA 		A				; does LoadingFlag == 0?
 		JZ 			@show			; if 0 skip to @show
+	IF ERRS
 		PUSH 		D				; stash DE (D doesn't matter, E=eXX from above or from ParseStdReturn)
+	ENDIF
 		; jaddr@TS[1]
 		LHLD 		RamFileSize		; HL=RamFileSize
 		MOV 		B,H				; B=H
 		MOV 		C,L				; C=L  BC=RamFileSize
 		LHLD 		RamFileStart	; HL=RamFileStart
 		CALL		MASDEL			; delete BC bytes @ HL
+	IF ERRS
 		POP 		D				; restore DE (only care about E)
+	ENDIF
 		; jaddr@TS[0]
 @show:
+	IF ERRS
 		LXI			H,STR_ErrCodes	; HL = start of string of err codes
 		MVI			D,0				; D=0 E=eXX from above
 		DAD			D				; HL=STR_Errcodes+eXX
@@ -371,6 +393,7 @@ ERROR:
 		_RST		rst_Print_A			; print it
 		_RST		rst_NextNonSpace	; get next byte of err code
 		_RST		rst_Print_A			; print it
+	ENDIF
 		LXI			H,STR_Err		; get STR_Err
 		CALL		PTILL0			; print it
 		JMP			MAIN			; restart at main
@@ -400,7 +423,9 @@ CheckDSR:
 		IN			FLOWCTL_PORT	; read RS232 flow control pins
 		ANI			DSR_BITMASK		; check !DSR
 		RZ
+	IF ERRS
 		MVI			E,eND			; set ND error  (was NR)
+	ENDIF
 		JMP			ERROR
 	ENDIF
 
@@ -575,12 +600,13 @@ DIRENT:
 
 ; send a DIRENT or READ packet and handle their special return packets
 SendPacketSpecial:
+	IF ERRS
 		CALL		SendPacket
 		MOV			B,A					; B = error code from SendPacket
 		LDA			pktTYPE				; A = return packet type
 		CPI			ret_std				; is it a standard return packet?
 		JZ			ParseStdReturn		; if it's a standard return then jump to the standard return parser
-		; it's not a stanbdard return (it's a DIRENT or READ return)
+		; it's not a standard return (it's a DIRENT or READ return)
 		; restore the A & Z state left by SendPacket
 		MOV			A,B					; A = 1st byte of data
 		ORA			A					; if A = 0 set Z
@@ -588,6 +614,9 @@ SendPacketSpecial:
 		; * CALL SendPacketSpecial in SendReadCMD
 		; * CALL DIRENT in MAIN
 		RET
+	ELSE
+		JMP			SendPacket
+	ENDIF
 
 SendOpenCMD_write:
 		MVI			E,write_mode
@@ -946,6 +975,7 @@ jSendPacket:
 		RZ			; return if return packet DLEN is 0 (some commands return no data)
 		; otherwise, decode the result byte
 		; A = error code return data from drive, the first & only byte of pktDATA
+	IF ERRS
 ParseStdReturn:
 		; A has an error code sent in the data field of the return packet
 		; see dl2/constants.h
@@ -955,6 +985,7 @@ ParseStdReturn:
 		RAR						; Rotate Accumulator Right through carry
 		MOV			E,A			; E = eXX offset into STR_ErrCodes
 		JMP			ERROR
+	ENDIF
 
 ; HL = sof   start of file
 ; DE = len   length of file
@@ -997,8 +1028,13 @@ STR_Prompt:
 		DB			"> C FFFFFF.XX (C=KLSQ)",CR,LF,"> ",0
 
 STR_Err:
+	IF ERRS
 		DB			" Err",CR,LF,0,"FFUESNIOWPDFNDHW" ;,"SEDE"
+	ELSE
+		DB			"ERR",CR,LF,0
+	ENDIF
 
+	IF ERRS
 STR_ErrCodes		EQU STR_Err+5
 
 ; Offsets into STR_ErrCodes. Drive returns 0x00-0x8F -> ParseStdReturn -> eXX
@@ -1011,9 +1047,9 @@ eWP					EQU		0x0A ; write-protect, format
 eDF					EQU		0x0C ; bounds - dir/file/disk full/exceeded
 eND					EQU		0x0E ; presense - disk changed / not inserted
 eHW					EQU		0x10 ; hardware - physical drive or disk problems
-
 ; debugging
 ;eSE					EQU		0x12 ; src err
 ;eDE					EQU		0x14 ; dest err
+	ENDIF
 
 PRGEND:
