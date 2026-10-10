@@ -1,28 +1,25 @@
-; TINY/TEENY disassembly
-; TINY by Ed Giese (Acroatix). TEENY is TINY that Ron Weisen made a bit smaller.
+; TINY/TEENY asm source
+; TINY originally by Ed Giese of Acroatix.
+; TEENY is TINY that Ron Weisen made a bit smaller and batch-drivable.
 ; Originally based on a disassembly of TEENY for Model 100.
 ; This version no longer aims to reproduce the legacy binary.
-; Platform & rom references: https://github.com/bkw777/m100_dev
+; Platform & rom references for porting: https://github.com/bkw777/m100_dev
 ; Brian K. White
 ;
 ; build with:
-;	z88dk-z80asm -m8085_strict -no-synth -DMODEL_100 -b -o=TEENY.CO TEENY.S85 && \
-;	z88dk-z80asm -m8085_strict -no-synth -DMODEL_100 -DPRGLEN=$(wc -c <TEENY.CO) -b -o=TEENY.CO TEENY.S85
+;	z88dk-z80asm -m8085_strict -no-synth -DMODEL_100na -b -o=TEENY.CO TEENY.S85 && \
+;	z88dk-z80asm -m8085_strict -no-synth -DMODEL_100na -DPRGLEN=$(wc -c <TEENY.CO) -b -o=TEENY.CO TEENY.S85
 ;
-; Builds for 100, K85, M10 na & eu, 200, NEC
-; $ make 100
-; or
-; build & verify that the 100 or M10 build reproduces the original exactly
-; $ make verify_100
-; $ make verify_M10
+; so far it builds for 100na, K85na, M10na, M10eu, 200na, NECna
+; $ make clean all
 
 ;;;;
-;;;; 100 works
+;;;; 100na works
 ;;;; M10na works
 ;;;; M10eu works
-;;;; K85 works
-;;;; 200 does not work, but ../orig/disasm/TNY200.S85 does
-;;;; NEC does not work, but ../orig/disasm/TNYNEC.S85 does
+;;;; K85na works
+;;;; 200na does not work, but ../orig/disasm/TNY200.S85 does
+;;;; NECna does not work, but ../orig/disasm/TNYNEC.S85 does
 ;;;;
 
 ; -----------------------------------------------------------------------------
