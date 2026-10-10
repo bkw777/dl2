@@ -430,6 +430,79 @@ CheckDSR:
 		JMP			ERROR
 	ENDIF
 
+
+
+
+DIRENT:
+		; activate rs232
+		CALL		COMOFF				; disable MDM/COM
+		; original TEENY uses 0x2E -> about 100ms. make it so MS=100 produces 0x2E
+		MVI        D,COM_SETUP_PAUSE_MS*100/215		; 0x2E00 timing loops
+		CALL       PAUSE_DEx10us		; burn cpu for DE*10us = about 100ms
+		LXI			H,STR_STAT			; load a STAT string ("98N1D")
+		STC								; set carry flag - tells SET232 to apply to the RS232 port
+		CALL		SET232				; configure uart per the stat string
+
+		; send a STATUS packet
+		MVI			A,cmd_status		; A = cmd_status
+		CALL		ShortPacket			; send STATUS packet
+
+		; send a DIRENT packet
+		; 2     1   1   24           1     1       1
+		; 5A5A  00  1A  filename     attr  action  chk
+
+		; start building a DIRENT(set_name) cmd packet
+		XRA			A					; A = 0
+		CALL		InitPacket			; write 0x00 (cmd_dirent) to pktTYPE (cmd)
+		; HL @ pktDLEN (len)
+		MVI			M,cmd_dirent_dlen	; pktDLEN = 26
+		INX			H					; HL = pktDATA (start of data)
+		; HL @ pktDATA (data)
+		LXI			D,KYBUF+2			; DE = 3rd byte into keyboard buffer (skip over "C ")
+		MVI			B,local_fname_len	; B = 9
+		CALL		D2H4Bup				; append 9 bytes (filename FFFFFF.XX) from DE (keyb buf) to HL (packet data)
+		; HL @ pktDATA+9
+		MVI			B,tpdd_fname_len-local_fname_len	; B = 15, 24 byte tpdd filename field minus 9 bytes XXXXXX.XX
+@l0:
+		MVI			M,SPACE				; append " " to packet data
+		INX			H					; next byte
+		DCR			B					; B--
+		JNZ 		@l0					; repeat 14 more times (write 15 spaces) + 9 bytes filename = 24 bytes tpdd filename field
+		; HL @ pktDATA+24
+		MVI 		M,'F'				; hard-coded always write 'F' in attr field
+		INX			H					; next byte
+		; HL @ pktDATA+25 aka the dirent action field, and B happens to be 0,
+		; which also happens to be the dirent action code for dirent(set_name)
+		MOV			M,B					; M@pktDATA+25 = action = B = 0 = set_name
+		; dirent(set_name) tells the drive the filename for an open/close/read/write/kill to follow
+
+; DIRENT -> SendPacketSpecial -> SendPacket fall-throughs:
+; 1 - DIRENT falls into SendPacketSpecial
+; 2 - if not ERRS, then SendPacketSpecial is replaced by SendPacket
+; So if not ERRS, SendPacketSpecial label still exists but just a label that
+; does nothing but fall into SendPacket, so the CALL from READ and the fall
+; from DIRENT both still work without a needless JMP.
+
+; send a DIRENT or READ packet and detect which kind of return packet we got
+SendPacketSpecial:
+	IF ERRS
+		CALL		SendPacket
+		MOV			B,A					; B = data[0] from SendPacket
+		LDA			pktTYPE				; A = return packet type
+		CPI			ret_std				; is it a standard return packet?
+		JZ			ParseStdReturn		; if it's a standard return then jump to the standard return parser
+		; it's not a standard return (it's a DIRENT or READ return)
+		; restore the A & Z state left by SendPacket
+		MOV			A,B					; A = data[0]
+		ORA			A					; if A = 0 set Z
+		; places RET might go:
+		; * CALL SendPacketSpecial in SendReadCMD
+		; * CALL DIRENT in MAIN
+		RET
+	ENDIF
+
+	; MUST be followed by SendPacket to handle if not ERRS
+
 ; * Calculate & append checksum to packet
 ; * Send the REQuest packet
 ; * Receive the RETurn packet
@@ -555,69 +628,6 @@ ReadSerialByteIncHL:
 KILL:
 		MVI			A,cmd_delete
 		JMP			ShortPacket
-
-DIRENT:
-		; activate rs232
-		CALL		COMOFF				; disable MDM/COM
-		; original TEENY uses 0x2E -> about 100ms. make it so MS=100 produces 0x2E
-		MVI        D,COM_SETUP_PAUSE_MS*100/215		; 0x2E00 timing loops
-		CALL       PAUSE_DEx10us		; burn cpu for DE*10us = about 100ms
-		LXI			H,STR_STAT			; load a STAT string ("98N1D")
-		STC								; set carry flag - tells SET232 to apply to the RS232 port
-		CALL		SET232				; configure uart per the stat string
-
-		; send a STATUS packet
-		MVI			A,cmd_status		; A = cmd_status
-		CALL		ShortPacket			; send STATUS packet
-
-		; send a DIRENT packet
-		; 2     1   1   24           1     1       1
-		; 5A5A  00  1A  filename     attr  action  chk
-
-		; start building a DIRENT(set_name) cmd packet
-		XRA			A					; A = 0
-		CALL		InitPacket			; write 0x00 (cmd_dirent) to pktTYPE (cmd)
-		; HL @ pktDLEN (len)
-		MVI			M,cmd_dirent_dlen	; pktDLEN = 26
-		INX			H					; HL = pktDATA (start of data)
-		; HL @ pktDATA (data)
-		LXI			D,KYBUF+2			; DE = 3rd byte into keyboard buffer (skip over "C ")
-		MVI			B,local_fname_len	; B = 9
-		CALL		D2H4Bup				; append 9 bytes (filename FFFFFF.XX) from DE (keyb buf) to HL (packet data)
-		; HL @ pktDATA+9
-		MVI			B,tpdd_fname_len-local_fname_len	; B = 15, 24 byte tpdd filename field minus 9 bytes XXXXXX.XX
-@l0:
-		MVI			M,SPACE				; append " " to packet data
-		INX			H					; next byte
-		DCR			B					; B--
-		JNZ 		@l0					; repeat 14 more times (write 15 spaces) + 9 bytes filename = 24 bytes tpdd filename field
-		; HL @ pktDATA+24
-		MVI 		M,'F'				; hard-coded always write 'F' in attr field
-		INX			H					; next byte
-		; HL @ pktDATA+25 aka the dirent action field, and B happens to be 0,
-		; which also happens to be the dirent action code for dirent(set_name)
-		MOV			M,B					; M@pktDATA+25 = action = B = 0 = set_name
-		; dirent(set_name) tells the drive the filename for an open/close/read/write/kill to follow
-
-; send a DIRENT or READ packet and detect which kind of return packet we got
-SendPacketSpecial:
-	IF ERRS
-		CALL		SendPacket
-		MOV			B,A					; B = data[0] from SendPacket
-		LDA			pktTYPE				; A = return packet type
-		CPI			ret_std				; is it a standard return packet?
-		JZ			ParseStdReturn		; if it's a standard return then jump to the standard return parser
-		; it's not a standard return (it's a DIRENT or READ return)
-		; restore the A & Z state left by SendPacket
-		MOV			A,B					; A = data[0]
-		ORA			A					; if A = 0 set Z
-		; places RET might go:
-		; * CALL SendPacketSpecial in SendReadCMD
-		; * CALL DIRENT in MAIN
-		RET
-	ELSE
-		JMP			SendPacket
-	ENDIF
 
 SendOpenCMD_write:
 		MVI			E,write_mode
