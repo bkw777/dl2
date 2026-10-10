@@ -975,14 +975,18 @@ WriteChunks:
 		; subtract CHUNK_LEN from remaining_len by adding 0xFFFF-CHUNK_LEN+1
 		LXI			B,0xFFFF-CHUNK_LEN+1	; BC = 0xFF80
 		DAD			B					; HL += BC, iow HL -= CHUNK_LEN
+		; HL = (new, smaller) remaining_len
 		PUSH		H					; TS[0] = remaining_len  TS[1] = position_b
 
-		; HL = (new, smaller) remaining_len
+		; HL = remaining_len
 		; BC = 0xFF80 (what matters next is only that C = CHUNK_LEN)
 		; DE = position_a
 		CALL		SendWriteCMD
+
+		; setup for next chunk
 		POP			D					; DE = remaining_len, TS[0] = position_b
 		POP			H					; HL = position_b
+		; HL = new higher start position, DE = new shorter length
 		JMP			WriteChunks
 @end:
 		MOV			C,E					; C = remaining_len
