@@ -308,12 +308,13 @@ MAIN:
 		JZ			LOAD			; if A == 0 then cmd is 'L', jump to LOAD
 
 		; if we got here, cmd is unknown
+		; fall into errSN
 
 ; ERROR CODES - this stack of jump targets uses an opcode-as-data trick
 ; 1: The first MVI_E,eXX you hit executes normally and sets E=eXX.
-; 2: The DB opcode_LXI_B after that executes as code and consumes the next
-;    2 bytes as it's operand, which is the next MVI_E and it's eXX operand.
-; 3: The next byte after that is another LXI_B, repeat 2: until end of stack.
+; 2: The LXI_B after that executes as code and consumes the next 2 bytes
+;    as it's operand, which is the entire next MVI_E and it's eXX operand.
+; 3: The next byte is another LXI_B, repeat 2: as long as the pattern holds.
 ; 4: Fall through into ERROR with E=eXX.
 
 	IF ERRS
@@ -411,10 +412,7 @@ CheckDSR:
 		IN			FLOWCTL_PORT	; read RS232 flow control pins
 		ANI			DSR_BITMASK		; check !DSR
 		RZ
-	IF ERRS
-		MVI			E,eND			; set ND error  (was NR)
-	ENDIF ; /ERRS
-		JMP			ERROR
+		JMP			errND			; err no disk  (was NR not ready)
 	ENDIF ; /INCLUDE_DSR
 
 DIRENT:
