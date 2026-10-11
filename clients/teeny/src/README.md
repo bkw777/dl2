@@ -3,7 +3,7 @@
 
 A single common TEENY.S85 asm source and Makefile that generates binaries for all different models of machine.
 
-Currently the default config produces a .CO file for Model 100 that is only 640 bytes.
+Currently the default config produces a .CO file for Model 100 that is only 643 bytes.
 
 The 100, M10, and K85 binaries built from this source all work.
 

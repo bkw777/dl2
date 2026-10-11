@@ -462,7 +462,7 @@ DIRENT:
 ; does nothing but fall into SendPacket, so the CALL from READ and the fall
 ; from DIRENT both still work without a needless JMP.
 
-; send a DIRENT or READ packet and detect which kind of return packet we got
+; send a DIRENT or READ packet and detect which kind of return packet we get back
 SendPacketSpecial:
 	IF ERRS
 		CALL		SendPacket
@@ -560,39 +560,45 @@ SendPacket:
 		; tpdd return packet starts with pktTYPE, no ZZ
 		LXI			H,pktTYPE		; HL @ pkTYPE
 		CALL		INT1D			; disable interrupts
-		CALL		ReadSerialByteIncHL	; read byte from serial to pktTYPE, HL @ pktDLEN
-		CALL		ReadSerialByteIncHL	; read byte from serial to pktDLEN, HL @ pktDATA
-		MOV			C,A				; C = return packet DLEN
-		INR			C				; C = DLEN + 1 (data length & 1 byte checksum)
-		; read C more bytes from serial
+		CALL		ReadSerialByteToM	; read byte from serial to pktTYPE, HL @ pktDLEN
+		CALL		ReadSerialByteToM	; read byte from serial to pktDLEN, HL @ pktDATA
+		MOV			C,A				; C = data_len
+		INR			C				; C++ C = data_len + 1 (data + checksum)
+		; read C more bytes from serial (read data and checksum)
 @read_byte:
-		CALL		ReadSerialByteIncHL	; read a byte from serial to pktDATA
+		CALL		ReadSerialByteToM	; read a byte from serial to pktDATA
 		DCR			C				; C--
 		JNZ			@read_byte		; repeat until C = 0
 		; pktDATA now contains the return DATA and the checksum byte
 		; we never use the checksum but we must consume the entire packet
+
+; -----------------------------------------------------------------------------
+; WE SHOULD VERIFY CHECKSUM HERE BUT WE DON'T
+; -----------------------------------------------------------------------------
+
 		XRA			A				; A = 0
 		SIM							; IM = 0 -> enable all interrupts
 		LXI			H,pktDLEN		; HL @ pktDLEN
-		MOV			C,M				; C = DLEN
-		INX			H				; HL++ -> HL@pktDLEN+1 -> HL@pktDATA
-		MOV			A,M				; read 1st byte @ pktDATA
+		MOV			C,M				; C = data_len
+		INX			H				; HL++ -> HL@pktDATA
+		MOV			A,M				; A = data[0]
 		ORA			A				; set Z if first byte of data is 0
 
 		; return packet types:
-		; LOAD    0x10 read file data return, dlen 0 to 128, A could be data[0] or checksum
-		; DIRENT  0x11 dirent return, dlen 28, A is filename[0]
-		; others  0x12 standard return, dlen 1, A is error code, 0x00 = success
+		; LOAD    0x10 read file data return, dlen 0 to 128, A is data[0] but could be checksum if dlen=0
+		; DIRENT  0x11 dirent return, dlen=28, A=filename[0]
+		; others  0x12 standard return, dlen=1, A=error_code, 0x00 = success
 		; So for most packets we are returning A=err and setting Z if err=0
 		; A & Z don't seem to be meaningful for LOAD or DIRENT
-		; A = error code from drive (except LOAD or DIRENT)
+
+		; A = data[0]
 		; Z = set if A=0
-		; C = return packet data length
-		; HL @ pktDATA (or @checksum if read-file-data len=0)
+		; C = data_len
+		; HL @ pktDATA
 		RET
 
-; read 1 byte from rs232 to M, advance HL
-ReadSerialByteIncHL:
+; read 1 byte from rs232 to M, HL++
+ReadSerialByteToM:
 	IF INCLUDE_DSR
 		CALL		CheckDSR
 	ENDIF
@@ -959,7 +965,7 @@ ShortPacket:
 		CALL		InitPacket
 jSendPacket:
 		CALL		SendPacket
-		RZ			; return if return packet DLEN is 0 (some commands return no data)
+		RZ								; no error
 		; otherwise, decode the result byte
 		; A = error code return data from drive, the first & only byte of pktDATA
 	IF ERRS
@@ -977,8 +983,8 @@ ParseStdReturn:
 		RAR						; Rotate Accumulator Right through carry
 		RAR						; Rotate Accumulator Right through carry
 		MOV			E,A			; E = eXX offset into STR_ErrCodes
-		JMP			ERROR
 	ENDIF
+		JMP			ERROR
 
 ; HL = sof   start of file
 ; DE = len   length of file
