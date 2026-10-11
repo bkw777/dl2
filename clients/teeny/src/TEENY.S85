@@ -269,6 +269,7 @@ MAIN:
 		STA			LoadingFlag		; LoadingFlag = 0
 		LXI			H,MAIN			; load MAIN addr to HL
 		PUSH		H				; push HL
+		; TS=MAIN
 		LXI			H,STR_Prompt	; load addr to prompt string to HL
 		CALL		PTILL0			; print HL
 		; we just printed the prompt
@@ -292,12 +293,14 @@ MAIN:
 		CPI			'S'				; is it 'S' ?
 		JZ			SAVE			; then jump to SAVE
 		PUSH 		PSW				; stash A=cmd
+		; TS=cmd,MAIN
 		; if we got here then the command is K, L, or unknown
 		; KILL or LOAD both start with telling the drive the filename
 		CALL		DIRENT          ; set disk filename and see if file exists on disk
 		JZ			errFF			; Z = file not found on disk, abort with FF error
 		; file found on disk
 		POP 		PSW				; restore A=cmd
+		; TS=MAIN
 		SUI			'K'				; A -= 'K'
 		JZ			KILL			; if A == 0 then cmd is 'K', jump to KILL
 		DCR 		A				; A--
@@ -880,9 +883,11 @@ RamFileExtraLen:
 
 ; copy a file from local ram to tpdd
 SAVE:
+		; TS=MAIN
 		CALL		DIRENT				; tell the drive our filename
-		JNZ			errFF				; DIRENT returned file exists err  (was AE)
-		;JNZ			errDE				; dest file already exists on disk
+		; A = B = data[0] from return packet = error, 0=success
+		JNZ			errFF				; DIRENT returned file exists
+		; B = 0  (we got past JNZ)
 		LDA			FX1					; read 1st byte of filename ext
 		CPI			'B'					; compare to 'B'
 		JC			errSN				; reject if less than 'B'  (was NM)
@@ -890,12 +895,11 @@ SAVE:
 		JNC			errSN				; reject if not less than 'E'  (was NM)
 		CALL		FINDFN				; find the start of the file in ram
 		; Z = not found, NZ = found
-		; HL: Pointer to file's dir entry
-		; DE: Points to start of file in RAM
-		; A: Contains file attribute
-		; BC: Unchanged
+		; HL = sod  start of dirent
+		; DE = sof  start of file
+		; A = fattr
+		; BC = unchanged
 		JZ			errFF				; file not found in RAM
-		;JZ			errSE				; src file not found in RAM
 
 		; determine the file type and get the number of extra bytes to add to
 		; fsize to get the full ram file length including added EOF bytes
@@ -904,10 +908,9 @@ SAVE:
 		; DO: A=1
 		; BA: A=2
 
-		; get the MKDIRENT ftype by inverting extra_len
-		; the two values don't actually relate, it's just a coincidence that
+		; Derive MKDIRENT ftype from extra_len. It's just a coincidence that
 		; ftype BA=0 DO=1 CO=2 is a mirror image of extra_len BA=2 DO=1 CO=0
-		; and I guess it saved a few bytes to take advantage of the coincidence
+		; but I guess it saved a few bytes to take advantage of that coincidence
 		MOV			C,A					; C = extra_len
 		; CO: C=0
 		; DO: C=1
@@ -918,43 +921,49 @@ SAVE:
 		; DO: A = 2-1 = 1
 		; BA: A = 2-2 = 0
 		; A = ftype
-		PUSH		B					; stash BC (B=0? C=extra_len)
-		PUSH		D					; stash DE (start of file data)
-		; DE = start of file data
-		; HL = start of file dirent
+		PUSH		B					; stash BC=extra_len (B=0 C=extra_len)
+		; TS=extra_len,MAIN
+		PUSH		D					; stash DE=sof
+		; TS=sof,extra_len,MAIN
+		; DE = sof
+		; HL = sod
 		XCHG							; swap HL:DE
-		; DE = start of file dirent
-		; HL = start of file data
+		; DE = sod
+		; HL = sof
 		; A = ftype
-		CALL		AFTEREOF2			; Advance HL past end of current file based on ftype in A: 0=BA, 1=DO, 2=CO
-		POP			D					; restore DE = start of file data
-		MOV			A,L					; A = eof lsb
-		SUB			E					; A = eof lsb - sof lsb
-		MOV			L,A					; L = A
-		MOV			A,H					; A = eof msb
-		SBB			D					; A = eof msb - sof msb
-		MOV			H,A					; H = A
-		; HL = eof-sof = file length
-		POP			B					; retore B=0 C=extra_len
+		CALL		AFTEREOF2			; HL = sonf (start of next file, aka eof+1)
+		POP			D					; DE = sof
+		; TS=extra_len,MAIN
+		MOV			A,L					; A = sonf_lsb
+		SUB			E					; A -= sof_lsb = ram_len_lsb
+		MOV			L,A					; L = A = ram_len_lsb
+		MOV			A,H					; A = sonf_msb
+		SBB			D					; A -= sof_msb = ram_len_msb
+		MOV			H,A					; H = A = ram_len_msb
+		; HL = ram_len
+		POP			B					; BC = extra_len
+		; TS=MAIN
 		; Add 1 to both C and HL before entering the following loop because we don't
 		; hit the first JNZ until after running the body at least once.
 		INR			C					; C++
 		INX			H					; HL++
-@l0:	; remove 0/1/2 eof marker bytes from ram filesize to get true filesize
+@l0:	; remove extra_len from ram_len to get true_len
+		; (remove 0|1|2 eof bytes from ram file length to get true file length)
 		DCX			H					; HL-- = length--
 		DCR			C					; C-- = extra_len--
-		JNZ			@l0
-		MOV			A,L					; A = len lsb
-		ORA			H					; len msbVlsb, aka set Z if len=0
-		RZ								; if file len=0 then there's nothing to do
-		PUSH		D					; TS[0] = DE = sof
-		PUSH		H					; TS[0] HL = true_len, TS[1] = sof
+		JNZ			@l0					; repeat until C=0
+		MOV			A,L					; A = true_len_lsb
+		ORA			H					; true_len msbVlsb, iow set Z if true_len=0
+		RZ								; if true_len=0 then there's nothing to do
+		PUSH		D					; TS=sof,MAIN
+		PUSH		H					; TS=true_len,sof,MAIN
 		CALL		SendOpenCMD_write	; tell drive to open the file for write
 		POP			D					; DE = true_len
 		POP			H					; HL = sof
 		CALL		WriteChunks			; send WRITE packets
 		MVI			A,cmd_close			; A = cmd_close
-		;JMP			ShortPacket			; fall through to send CLOSE packet
+
+		; fall through to ShortPacket to send CLOSE packet
 
 ; Build & send a short packet (commands that have no data payload)
 ; A = cmd
@@ -985,24 +994,25 @@ ParseStdReturn:
 ; HL = sof   start of file
 ; DE = len   length of file
 WriteChunks:
-		PUSH		H					; TS[0] = position_a
-		PUSH		H					; TS[0] = position_a TS[1] = position_a
+		PUSH		H					; TS=position_a
+		PUSH		H					; TS=position_a,position_a
 		LXI			H,CHUNK_LEN			; HL = CHUNK_LEN
 		_RST		rst_CompareDEHL		; compare DE(remaining_len) to HL(chunk_len)
 		; flags: C if HL<DE, Z if HL=DE, else HL>DE, only A is destroyed
+		; TS=position_a,position_a
 		JNC			@FinalChunk			; exit loop when CHUNK_LEN >= remaining_len
 		MOV			C,L					; C = L = CHUNK_LEN
 		MOV			B,H					; B = H = 0, BC = CHUNK_LEN = 0x0080
-		POP			H					; HL = position_a, TS[0] = position_a
+		POP			H					; HL = position_a  TS=position_a
 		DAD			B					; HL = HL+BC = position_a + CHUNK_LEN = position_b
-		XTHL							; swap TS:HL -> TS[0] = position_b, HL = position_a
+		XTHL							; swap TS:HL -> TS=position_b  HL = position_a
 		XCHG							; swap HL:DE -> DE = position_a, HL = remaining_len
 
 		; subtract CHUNK_LEN from remaining_len by adding 0xFFFF-CHUNK_LEN+1
 		LXI			B,0xFFFF-CHUNK_LEN+1	; BC = 0xFF80
 		DAD			B					; HL += BC, iow HL -= CHUNK_LEN
 		; HL = (new, smaller) remaining_len
-		PUSH		H					; TS[0] = remaining_len  TS[1] = position_b
+		PUSH		H					; TS=remaining_len,position_b
 
 		; HL = remaining_len
 		; BC = 0xFF80 (what matters next is only that C = CHUNK_LEN)
@@ -1015,8 +1025,9 @@ WriteChunks:
 		; HL = new higher start position, DE = new shorter length
 		JMP			WriteChunks
 @FinalChunk:
+		; TS=position_a,position_a
 		MOV			C,E					; C = remaining_len
-		POP			H					; HL = position_a ; TS[0] = position_a
+		POP			H					; HL = position_a  TS=position_a
 		POP 		D					; DE = position_a
 
 SendWriteCMD:
