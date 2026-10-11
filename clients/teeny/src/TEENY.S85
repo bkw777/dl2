@@ -275,19 +275,18 @@ MAIN:
 		; now collect the user input
 		STA			KYBCNT			; write 0 to keyboard pending keystrokes count
 		CALL		INLIN			; get a line of input from keyboard
-		; The keyboard buffer now has a command line like |L MYPROG.BA|
-		LXI			H,errSN			; load the address of errSN to HL  (was NM)
-		SHLD		ETRAP			; set errSN as ON ERROR handler
-		LXI			H,KYBUF+1		; load addr to 2nd byte of keyboard buffer to HL
+		; KYBUF = |L MYPROG.BA|
+		LXI			H,errSN			; HL = errSN
+		SHLD		ETRAP			; set errSN as the ON ERROR handler
+		LXI			H,KYBUF+1		; HL = KYBUF[1]
 		MVI			M,'"'			; write " to 2nd byte of keyboard buffer
-		; before |L MYPROG.BA|
-		; after  |L"MYPROG.BA|
-		; HL still points to the "
-		; The next call reads it the same way BASIC reads ex: |SAVE"MYPROG.BA|
-		; that's why no matching closing " needed
+		; KYBUF = |L"MYPROG.BA|
+		; HL = KYBUF[1] (still on the ")
+		; CKFN2 reads it the same way BASIC reads ex: |SAVE"MYPROG.BA|
+		; that's why no closing " needed
 		CALL		CKFN2			; evaluate & reformat filename
 		CALL		RESETFPS		; reset file pointers
-		LDA			KYBUF			; read 1st byte of keyboard buffer
+		LDA			KYBUF			; A = KYBUF[0]
 		CPI			'Q'				; is it 'Q' ?
 		JZ			MENU			; then exit to OS (main menu)
 		CPI			'S'				; is it 'S' ?
@@ -295,7 +294,7 @@ MAIN:
 		PUSH 		PSW				; stash A=cmd
 		; if we got here then the command is K, L, or unknown
 		; KILL or LOAD both start with telling the drive the filename
-		CALL		DIRENT          ; set disk filename and ask drive if file exists on disk
+		CALL		DIRENT          ; set disk filename and see if file exists on disk
 		JZ			errFF			; Z = file not found on disk, abort with FF error
 		; file found on disk
 		POP 		PSW				; restore A=cmd
@@ -455,12 +454,7 @@ DIRENT:
 		MOV			M,B					; M@pktDATA+25 = action = B = 0 = set_name
 		; dirent(set_name) tells the drive the filename for an open/close/read/write/kill to follow
 
-; DIRENT -> SendPacketSpecial -> SendPacket fall-throughs:
-; 1 - DIRENT falls into SendPacketSpecial
-; 2 - if not ERRS, then SendPacketSpecial is replaced by SendPacket
-; So if not ERRS, SendPacketSpecial label still exists but just a label that
-; does nothing but fall into SendPacket, so the CALL from READ and the fall
-; from DIRENT both still work without a needless JMP.
+		; fall into SendPacketSpecial
 
 ; send a DIRENT or READ packet and detect which kind of return packet we get back
 SendPacketSpecial:
@@ -480,7 +474,7 @@ SendPacketSpecial:
 		RET
 	ENDIF
 
-	; MUST be followed by SendPacket to handle if not ERRS
+	; if not ERRS then fall into SendPacket
 
 ; * Calculate & append checksum to packet
 ; * Send the REQuest packet
@@ -569,15 +563,22 @@ SendPacket:
 		CALL		ReadSerialByteToM	; read a byte from serial to pktDATA
 		DCR			C				; C--
 		JNZ			@read_byte		; repeat until C = 0
-		; pktDATA now contains the return DATA and the checksum byte
-		; we never use the checksum but we must consume the entire packet
+		; return packet is complete
 
-; -----------------------------------------------------------------------------
-; WE SHOULD VERIFY CHECKSUM HERE BUT WE DON'T
-; -----------------------------------------------------------------------------
-
+		; re-enable interrupts
 		XRA			A				; A = 0
 		SIM							; IM = 0 -> enable all interrupts
+
+; -----------------------------------------------------------------------------
+; VERIFY CHECKSUM WOULD GO HERE
+; -----------------------------------------------------------------------------
+
+
+
+; -----------------------------------------------------------------------------
+; RETURN
+; -----------------------------------------------------------------------------
+
 		LXI			H,pktDLEN		; HL @ pktDLEN
 		MOV			C,M				; C = data_len
 		INX			H				; HL++ -> HL@pktDATA
@@ -585,9 +586,9 @@ SendPacket:
 		ORA			A				; set Z if first byte of data is 0
 
 		; return packet types:
-		; LOAD    0x10 read file data return, dlen 0 to 128, A is data[0] but could be checksum if dlen=0
+		; LOAD    0x10 read file data return, dlen=0to128, A is data[0] but could be checksum if dlen=0
 		; DIRENT  0x11 dirent return, dlen=28, A=filename[0]
-		; others  0x12 standard return, dlen=1, A=error_code, 0x00 = success
+		; others  0x12 standard return, dlen=1, A=error_code, 0 = success
 		; So for most packets we are returning A=err and setting Z if err=0
 		; A & Z don't seem to be meaningful for LOAD or DIRENT
 
@@ -619,10 +620,7 @@ SendOpenCMD_write:
 SendOpenCMD:
 		MVI			A,cmd_open
 		CALL		InitPacket
-		; HL @ pktDLEN
-		; InitPacket left HL sitting on pktDLEN and didn't change A.
-		; Why would we write the cmd_open pktTYPE code there?
-		; Because it HAPPENS to be 1, and we HAPPEN to want to write a length of 1.
+		; InitPacket left HL=pktDLEN, A=cmd_open, & cmd_open HAPPENS to be 0x01
 		MOV			M,A					; write 0x01 to pktDLEN - OPEN command has 1 byte of data
 		INX			H					; advance HL to the first byte of pktDATA
 		MOV			M,E					; write E to pktDATA - E = mode write/append/read
@@ -645,9 +643,9 @@ LOAD:
 		; DO: A=1
 		; BA: A=2
 		LHLD		direntFSIZE			; HL = big-endian filesize from DIRENT return.
-		; direntFSIZE was written by DIRENT: while still in MAIN: before coming here.
-		; All 16-bit values in tpdd packets are big-endian iow msb-first: H=lsb L=msb
-		; The cpu platform is litte-endian iow 16-bit values are lsb-first.
+		; direntFSIZE was written by DIRENT while still in MAIN before coming here.
+		; All 16-bit values in tpdd packets are big-endian, iow msb-first: H=lsb L=msb
+		; The cpu platform is litte-endian, iow 16-bit values are lsb-first.
 		; So byte-swap direntFSIZE to get usable native fsize.
 		MOV			B,L					; copy msb to B
 		MOV			C,H					; copy lsb to C
@@ -751,9 +749,9 @@ LOAD:
 		; BC = packet type
 		; DE = tpdd file size lsb-first D=lsb E=msb
 		; HL = ram file start
-		; TS[0] = jCOFILE/jDOFILE/jBAFILE
+		; TS[0] = jXXFILE      jCOFILE|jDOFILE|jBAFILE
 		; TS[1] = MkRamDirent
-		; TS[2] = fattrXX
+		; TS[2] = fattr        fattrCO|fattrDO|fattrBA
 		; TS[3] = dirent_start
 @l1:
 		MOV			A,D					; A = D = filesize lsb
@@ -761,20 +759,20 @@ LOAD:
 		MOV			A,C					; A = C = packet type
 		STA			pktTYPE				; pktTYPE = packet type
 
-		; We did not get here via CALL: ORG->MAIN->JZ LOAD->here
-		; So RZ will "return" to whatever is in TS[0] -> jXXFILE
+		; we did not get here via CALL, so this RZ is just pop & jump
+		; TS=jXXFILE,MkRamDirent,fattr,dirent_start
 		RZ								; when DE=0 jump to jXXFILE
 
 		ORA			A					; is packet type 0?
 		CM			SendReadCMD			; call if packet type <0 ???
 		DCX			D					; DE--
 		PUSH		H					; stash HL = current byte position in ram file
-		; TS[0]=ram_position TS[1]=jXXFILE
+		; TS=ram_position,jXXFILE,MkRamDirent,fattr,dirent_start
 		LXI			H,pktDATA			; HL = start of packet data
 		DAD			B					; HL += BC, BC = packet type ???????
 		MOV			A,M					; A = byte @ HL
 		POP			H					; retore HL = byte position in file
-		; TS[0]=jXXFILE
+		; TS=jXXFILE,MkRamDirent,fattr,dirent_start
 		MOV			M,A					; write byte from packet to ram
 		INX			H					; HL++ (advance to next byte of file)
 		; entire packet len always <256, byte is enough
@@ -819,7 +817,6 @@ FtypeTable:
 ; Then each of these jXXFILE: ends in a RET, and we are still not in a CALL,
 ; so the RET at the end of jCOFILE/jDOFILE/jBAFILE goes to MkRamDirent.
 ; Top of stack has fattrXX on entering MkRamDirent
-
 
 
 ; TS=MkRamDirent,fattr,dirent_start
@@ -966,22 +963,21 @@ ShortPacket:
 jSendPacket:
 		CALL		SendPacket
 		RZ								; no error
+	IF ERRS
 		; otherwise, decode the result byte
 		; A = error code return data from drive, the first & only byte of pktDATA
-	IF ERRS
 ParseStdReturn:
-		; This collapses 9 blocks of 16 error codes from the drive
-		; into 8 total error codes, each covering a range of related errors.
-		; drive     -> converted
-		; 0x00-0x0F -> n/a, no error, success
-		; 0x10-0x1F -> 0x02 -> directory-related errors like file-not-found
-		; 0x20-0x2F -> 0x04 -> unknown/undocumented
-		; 0x30-0x3F -> 0x06 -> syntax errors like missing filename
-		; etc...
+		; This collapses 144 possible return values from the drive (0x00-0x8F)
+		; down to one of 8 error categories or no error.
+		; drive err -> eXX (offset into STR_ErrCodes)
+		; 0x00-0x0F -> 0x00
+		; 0x10-0x1F -> 0x02
+		; 0x20-0x2F -> 0x04
+		; ...
 		ANI			0xF0		; A &= 0xF0
-		RAR						; Rotate Accumulator Right through carry
-		RAR						; Rotate Accumulator Right through carry
-		RAR						; Rotate Accumulator Right through carry
+		RAR						; Rotate A Right through carry
+		RAR						; Rotate A Right through carry
+		RAR						; Rotate A Right through carry
 		MOV			E,A			; E = eXX offset into STR_ErrCodes
 	ENDIF
 		JMP			ERROR
@@ -1013,7 +1009,7 @@ WriteChunks:
 		; DE = position_a
 		CALL		SendWriteCMD
 
-		; setup for next chunk
+		; setup HL & DE for next chunk
 		POP			D					; DE = remaining_len, TS[0] = position_b
 		POP			H					; HL = position_b
 		; HL = new higher start position, DE = new shorter length
