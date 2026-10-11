@@ -885,7 +885,7 @@ RamFileExtraLen:
 SAVE:
 		; TS=MAIN
 		CALL		DIRENT				; tell the drive our filename
-		; A = B = data[0] from return packet = error, 0=success
+		; A = B = data[0] from return packet = error/status, 0=success
 		JNZ			errFF				; DIRENT returned file exists
 		; B = 0  (we got past JNZ)
 		LDA			FX1					; read 1st byte of filename ext
@@ -921,7 +921,9 @@ SAVE:
 		; DO: A = 2-1 = 1
 		; BA: A = 2-2 = 0
 		; A = ftype
-		PUSH		B					; stash BC=extra_len (B=0 C=extra_len)
+		; B = 0  (DIRENT -> A=B=data[0] -> got past JNZ)
+		; C = extra_len
+		PUSH		B					; stash BC=extra_len
 		; TS=extra_len,MAIN
 		PUSH		D					; stash DE=sof
 		; TS=sof,extra_len,MAIN
