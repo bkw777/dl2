@@ -51,8 +51,6 @@ COM_SETUP_PAUSE_MS	EQU		100
 
 	IF INCLUDE_ERRS
 	DEFINE ERRS
-	ELSE
-	UNDEFINE ERRS
 	ENDIF
 
 ; -----------------------------------------------------------------------------
@@ -202,7 +200,11 @@ pkt_len_overhead	EQU		5	; 2(ZZ) + 1(fmt) + 1(len) [DATA] + 1(chk)
 RamFileStart		EQU		ALTLCD + 0x40		; FD00
 RamFileSize			EQU		ALTLCD + 0x42		; FD02
 DskFileSize			EQU		ALTLCD + 0x44		; FD04  native lsb-first copy of tpdd msb-first filesize
-InitialSP			EQU		ALTLCD + 0x46		; FD06  initial stack pointer
+	IF ROM
+initial_sp			EQU		ALTLCD + 0x46		; FD06  initial stack pointer
+	ELSE
+initial_sp			EQU		MAIN + 1			; initial stack pointer
+	ENDIF
 LoadingFlag			EQU		ALTLCD + 0x48		; FD08
 ; TPDD packet
 pktZZ				EQU		ALTLCD + 0x4A		; FD0A  tpdd packet preamble "ZZ"
@@ -221,6 +223,7 @@ direntFSIZE			EQU		pktDATA + tpdd_fname_len + 1	; FD27
 ; end of packet buffer		pktDATA + CHUNK_LEN + 1         ; FD8F
 
 ; end of ALTLCD				ALTLCD + 0x013F		; FDFF
+
 
 ; -----------------------------------------------------------------------------
 ; ORG
@@ -256,25 +259,28 @@ HIMEM				EQU		MAXRAM
 ;------------------------------------------------------------------------------
 PRGTOP:
 PRGEXE:
-		LXI			H,0				; HL = 0
-		DAD			SP				; HL = stack pointer
-		SHLD		InitialSP		; InitialSP = stack pointer
+		LDSI		0				; DE = stack pointer+0
+		XCHG						; HL = stack pointer
+		SHLD		initial_sp		; initial_sp = initial stack pointer
 		LXI			H,ZZ			; HL = "ZZ" = tpdd packet preamble
 		SHLD		pktZZ			; pktZZ = "ZZ" preamble field of packet buffer never changes
 MAIN:
 		; reset stack pointer every time we return to main since we have many aborts after random pushes
-		LHLD		InitialSP		; HL = InitialSP
-		SPHL						; SP = InitialSP
+	IF ROM
+		LHLD		initial_sp		; HL = initial_sp
+		SPHL						; SP = initial_sp
+	ELSE
+		LXI			SP,0*initial_sp	; SP = initial_sp
+	ENDIF
 		XRA			A				; A = 0
 		STA			LoadingFlag		; LoadingFlag = 0
-		LXI			H,MAIN			; load MAIN addr to HL
-		PUSH		H				; push HL
-		; TS=MAIN
-		LXI			H,STR_Prompt	; load addr to prompt string to HL
+		LXI			H,MAIN			; HL = MAIN
+		PUSH		H				; TS = MAIN
+		LXI			H,STR_Prompt	; HL = STR_Prompt
 		CALL		PTILL0			; print HL
 		; we just printed the prompt
 		; now collect the user input
-		STA			KYBCNT			; write 0 to keyboard pending keystrokes count
+		STA			KYBCNT			; KYBCNT = 0 (clear pending keystrokes count)
 		CALL		INLIN			; get a line of input from keyboard
 		; KYBUF = |L MYPROG.BA|
 		LXI			H,errSN			; HL = errSN
@@ -295,9 +301,9 @@ MAIN:
 		PUSH 		PSW				; stash A=cmd
 		; TS=cmd,MAIN
 		; if we got here then the command is K, L, or unknown
-		; KILL or LOAD both start with telling the drive the filename
-		CALL		DIRENT          ; set disk filename and see if file exists on disk
-		JZ			errFF			; Z = file not found on disk, abort with FF error
+		; KILL and LOAD both start with telling the drive the filename
+		CALL		DIRENT          ; tell the drive the filename, detect if exists
+		JZ			errFF			; Z = file not found
 		; file found on disk
 		POP 		PSW				; restore A=cmd
 		; TS=MAIN
@@ -410,8 +416,8 @@ InitPacket:
 CheckDSR:
 		IN			FLOWCTL_PORT	; read RS232 flow control pins
 		ANI			DSR_BITMASK		; check !DSR
-		RZ
-		JMP			errND			; err no disk  (was NR not ready)
+		RZ							; Z = ready
+		JMP			errND			; err no disk
 	ENDIF ; /INCLUDE_DSR
 
 DIRENT:
@@ -528,27 +534,26 @@ SendPacket:
 ; SEND OUTGOING PACKET
 ; -----------------------------------------------------------------------------
 
-		; Set B counter to len+5 for the full packet length
-		; B =  2   + 1    + 1    + len     + 1
-		;      ZZ    TYPE   DLEN   DATA      CHK
+		; pkt_len = data_len + overhead (5)
+		;      ZZ    TYPE   DLEN   DATA       CHK
+		; B =  2   + 1    + 1    + data_len + 1
 
 		MVI			A,pkt_len_overhead	; A = 5
-		ADD			B				; A += B -> A = 5+len
-		MOV			B,A				; B = 5+len
+		ADD			B				; A += B -> A = pkt_len
+		MOV			B,A				; B = pkt_len
 		; B = loop counter for all bytes in packet, ZZ to CKSUM inclusive
-		; start HL at pktZZ
 		LXI			H,pktZZ			; HL @ pktZZ (0x5A5A aka "ZZ")
 
 @send_byte:
-		MOV			A,M				; A = byte from packet
-		CALL		SND232			; send byte out rs232
-		JC			errIO			; if shift+break then jump to errIO
 	IF INCLUDE_DSR
 		CALL		CheckDSR
 	ENDIF
-		INX			H				; advance HL to next byte in packet
+		MOV			A,M				; A = byte from packet
+		CALL		SND232			; send byte out rs232
+		JC			errIO			; shift+break pressed
+		INX			H				; HL++
 		DCR			B				; B--
-		JNZ			@send_byte		; send bytes until B=0
+		JNZ			@send_byte		; repeat until B = 0
 
 ; -----------------------------------------------------------------------------
 ; RECIEVE RETURN PACKET
@@ -607,9 +612,8 @@ ReadSerialByteToM:
 		CALL		CheckDSR
 	ENDIF
 		CALL		RCV232
-		;JC			errIO
-		;JNZ			errCM
-		JNZ			errIO
+		JC			errIO				; shift+break pressed
+		JNZ			errIO				; error
 		MOV			M,A
 		INX			H
 		RET
@@ -762,9 +766,9 @@ LOAD:
 		MOV			A,C					; A = C = packet type
 		STA			pktTYPE				; pktTYPE = packet type
 
-		; we did not get here via CALL, so this RZ is just pop & jump
+		; did not get here via CALL,  this RZ is just pop & jump
 		; TS=jXXFILE,MkRamDirent,fattr,dirent_start
-		RZ								; when DE=0 jump to jXXFILE
+		RZ								; when DE=0 pop & jump to jXXFILE
 
 		ORA			A					; is packet type 0?
 		CM			SendReadCMD			; call if packet type <0 ???
@@ -825,7 +829,7 @@ FtypeTable:
 ; TS=MkRamDirent,fattr,dirent_start
 jDOFILE:
 		MVI			M,0x1A
-		RET								; really a jump to MkRamDirent
+		RET								; pop&jump MkRamDirent
 
 ; TS=MkRamDirent,fattr,dirent_start
 jBAFILE:

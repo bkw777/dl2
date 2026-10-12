@@ -19,6 +19,7 @@ ASFLAGS += $(shell $(AS) |awk '/^Z80 Macro Assembler /{split($$4,a,"-");if (a[1]
 # -DBAUD=9600		# [19200] 9600 4800 2400 1200 600 300 110 75
 # -DCHUNK_LEN=64	# 1-[128]
 # -DINCLUDE_ERRS	# include distinct error codes instead of just "ERR" for all (adds 100 bytes!)
+# -DROM				# don't use any self-modifying code
 # Use -DBAUD=9600 if you have a FB-100, FDD19, or Purple Computing drive,
 # or remove the solder blob under the little cover on the bottom.
 # Example usage from the make command line:
