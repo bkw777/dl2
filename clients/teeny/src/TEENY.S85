@@ -35,23 +35,32 @@
 BAUD 				EQU		19200
 	ENDIF
 
-; The DSR check makes it so we gracefully detect when the drive is not
-; connected or not ready. But since it's not neccessary, and the point of
-; TEENY is to be teeny, the DSR code is not included by default in this version.
-; It is included in most old teeny binaries, though it was a user choice at
-; install-time in TEENY.EXE . If we really cared about robustness and data
-; integrity, we wouldn't be ignoring the checksums on the return packets!
-	;DEFINE INCLUDE_DSR
+; Include code to check DSR to avoid hangs and fail more gracefully
+; when the drive is powered off or the serial connection breaks.
+; It's nice and only adds about a dozen bytes, but it makes it far more
+; picky about serial cables. Without the DSR check you can use practically
+; any cable, even 3-wire.
+	;DEFINE DSR
 
+; length of WRITE packet data field
+; No reason to change this, but the protocol and a real drive allows setting
+; anything from 1 to ~252. For other reasons we are limited to 1-128 without
+; making some other changes. But for instance if you had some kind of weird
+; problem over an unusual link or to an unusual tpdd emulator, you could set
+; this to 64 or 32 or whatever to send smaller packets more likely to get
+; through or to fit within a small rx buffer or something.
 	IFNDEF CHUNK_LEN
 CHUNK_LEN			EQU		128		; 1-128
 	ENDIF
 
 COM_SETUP_PAUSE_MS	EQU		100
 
-	IF INCLUDE_ERRS
-	DEFINE ERRS
-	ENDIF
+; Include code to manage distinct error codes and messages for different
+; events and conditions, and parse the error codes returned by the drive.
+	;DEFINE ERRCODES
+
+; If building to embed in a ROM then don't use any self-modifying code.
+	;DEFINE ROM
 
 ; -----------------------------------------------------------------------------
 ; ASSEMBLER
@@ -325,7 +334,7 @@ MAIN:
 ; 3: The next byte is another LXI_B, repeat 2: as long as the pattern holds.
 ; 4: Fall through into ERROR with E=eXX.
 
-	IF ERRS
+	IF ERRCODES
 errSN:
 		MVI			E,eSN			; fell from above = unknown cmd = syntax error
 		DB			opcode_LXI_B
@@ -370,7 +379,7 @@ ERROR:
 		LDA 		LoadingFlag		; A = LoadingFlag
 		ORA 		A				; does LoadingFlag == 0?
 		JZ 			@show			; if 0 skip to @show
-	IF ERRS
+	IF ERRCODES
 		PUSH 		D				; save E=eXX
 	ENDIF
 		LHLD 		RamFileSize		; HL=RamFileSize
@@ -378,11 +387,11 @@ ERROR:
 		MOV 		C,L				; C=L  BC=RamFileSize
 		LHLD 		RamFileStart	; HL=RamFileStart
 		CALL		MASDEL			; delete BC bytes @ HL
-	IF ERRS
+	IF ERRCODES
 		POP 		D				; restore E=eXX
 	ENDIF
 @show:
-	IF ERRS
+	IF ERRCODES
 		LXI			H,STR_ErrCodes	; HL = start of string of err codes
 		MVI			D,0				; D=0 E=eXX from above
 		DAD			D				; HL=STR_Errcodes+eXX
@@ -470,7 +479,7 @@ DIRENT:
 
 ; send a DIRENT or READ packet and detect which kind of return packet we get back
 SendPacketSpecial:
-	IF ERRS
+	IF ERRCODES
 		CALL		SendPacket
 		MOV			B,A					; B = data[0] from SendPacket
 		LDA			pktTYPE				; A = return packet type
@@ -486,7 +495,7 @@ SendPacketSpecial:
 		RET
 	ENDIF
 
-	; if not ERRS then fall into SendPacket
+	; if not ERRCODES then fall into SendPacket
 
 ; * Calculate & append checksum to packet
 ; * Send the REQuest packet
@@ -641,7 +650,7 @@ LOAD:
 ; FINDFN reads FILNM1 (FC93 on 100) which has been set up by CKFN2 in MAIN
 		CALL		FINDFN				; see if the proposed file already exists in ram
 		JNZ			errFF				; abort with FF error if the file already exists (was AE)
-	IF ERRS
+	IF ERRCODES
 		LXI			H,errDF				; HL=errDF
 		SHLD 		ETRAP				; set errDF (was FL) as the general error handler
 	ENDIF
@@ -981,7 +990,7 @@ ShortPacket:
 jSendPacket:
 		CALL		SendPacket
 		RZ								; no error
-	IF ERRS
+	IF ERRCODES
 		; otherwise, decode the result byte
 		; A = error code return data from drive, the first & only byte of pktDATA
 ParseStdReturn:
@@ -1052,13 +1061,13 @@ STR_Prompt:
 		DB			"> C FFFFFF.XX (C=KLSQ)",CR,LF,"> ",0
 
 STR_Err:
-	IF ERRS
+	IF ERRCODES
 		DB			" Err",CR,LF,0,"FFUESNIOWPDFNDHW"
 	ELSE
 		DB			"ER",CR,LF,0
 	ENDIF
 
-	IF ERRS
+	IF ERRCODES
 STR_ErrCodes		EQU STR_Err+5
 
 ; Offsets into STR_ErrCodes. Drive returns 0x00-0x8F -> ParseStdReturn -> eXX

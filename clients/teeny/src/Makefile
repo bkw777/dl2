@@ -15,15 +15,15 @@ ASFLAGS := -m8085_strict -no-synth # -v
 ASFLAGS += $(shell $(AS) |awk '/^Z80 Macro Assembler /{split($$4,a,"-");if (a[1]>0) print "-DZ88DK="a[1]}')
 
 # -DHIMEM=addr		# [MAXRAM] generate a relocated binary with specified END address
-# -DINCLUDE_DSR		# include code for DSR check
+# -DDSR				# include code for DSR checks
 # -DBAUD=9600		# [19200] 9600 4800 2400 1200 600 300 110 75
 # -DCHUNK_LEN=64	# 1-[128]
-# -DINCLUDE_ERRS	# include distinct error codes instead of just "ERR" for all (adds 100 bytes!)
+# -DERRCODES		# include distinct error codes instead of just "ER" for all (adds over 100 bytes!)
 # -DROM				# don't use any self-modifying code
 # Use -DBAUD=9600 if you have a FB-100, FDD19, or Purple Computing drive,
 # or remove the solder blob under the little cover on the bottom.
 # Example usage from the make command line:
-# $ make 100na XFLAGS='-DHIMEM=52000 -DBAUD=9600 -DINCLUDE_DSR -DINCLUDE_ERRS'
+# $ make 100na XFLAGS='-DBAUD=9600 -DDSR -DERRCODES'
 XFLAGS :=
 
 # don't delete .CO when building .DO
