@@ -24,7 +24,6 @@ So there is working asm source for all machines one way or another.
 | `HIMEM=addr`    | MAXRAM  | generate a relocated binary with specified END address |
 | `DSR`           | no      | include code for DSR check |
 | `BAUD=baud`     | 19200   | 19200 9600 4800 2400 1200 600 300 110 75 |
-<!-- | `CHUNK_LEN=len` | 128     | size of chunks to use saving files, 1-128 | -->
 | `ERRCODES`      | no      | include code for distinct error codes for different events & conditions, and parse the drive response codes |
 
 example  
