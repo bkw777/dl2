@@ -47,7 +47,7 @@ These are similar to but not identical to legacy TEENY.
 | ERR | Meaning       | Additional |
 | --- | ---           | --- |
 | SN  | SyNtax        | missing/invalid filename or command |
-| FF  | File Found    | file NOT found, other directory related errors |
+| FF  | File Found    | dest file already exists, src file not found, other dir errs |
 | IO  | I/O           | crc & other rs232 & disk data integrity/sanity errors |
 | WP  | Write-Protect | also some format errors |
 | DF  | Disk Full     | directory full, max filesize, out of memory |
