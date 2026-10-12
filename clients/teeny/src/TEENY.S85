@@ -203,7 +203,7 @@ DskFileSize			EQU		ALTLCD + 0x44		; FD04  native lsb-first copy of tpdd msb-firs
 	IF ROM
 initial_sp			EQU		ALTLCD + 0x46		; FD06  initial stack pointer
 	ELSE
-initial_sp			EQU		MAIN + 1			; initial stack pointer
+initial_sp			EQU		MAIN@sp + 1			; initial stack pointer
 	ENDIF
 LoadingFlag			EQU		ALTLCD + 0x48		; FD08
 ; TPDD packet
@@ -265,11 +265,14 @@ PRGEXE:
 		LXI			H,ZZ			; HL = "ZZ" = tpdd packet preamble
 		SHLD		pktZZ			; pktZZ = "ZZ" preamble field of packet buffer never changes
 MAIN:
-		; reset stack pointer every time we return to main since we have many aborts after random pushes
+		; reset stack pointer every time we return to main
 	IF ROM
 		LHLD		initial_sp		; HL = initial_sp
 		SPHL						; SP = initial_sp
 	ELSE
+		; 0*foo is just my way of writing 0 for the compiler, while indicating
+		; to humans that the operand is the address of foo and self-modifying
+@sp:
 		LXI			SP,0*initial_sp	; SP = initial_sp
 	ENDIF
 		XRA			A				; A = 0
