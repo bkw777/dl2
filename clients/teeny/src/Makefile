@@ -17,7 +17,6 @@ ASFLAGS += $(shell $(AS) |awk '/^Z80 Macro Assembler /{split($$4,a,"-");if (a[1]
 # -DHIMEM=addr		# [MAXRAM] generate a relocated binary with specified END address
 # -DDSR				# include code for DSR checks
 # -DBAUD=9600		# [19200] 9600 4800 2400 1200 600 300 110 75
-# -DCHUNK_LEN=64	# 1-[128]
 # -DERRCODES		# include distinct error codes instead of just "ER" for all (adds over 100 bytes!)
 # -DROM				# don't use any self-modifying code
 # Use -DBAUD=9600 if you have a FB-100, FDD19, or Purple Computing drive,

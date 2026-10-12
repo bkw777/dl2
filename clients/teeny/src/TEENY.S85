@@ -43,12 +43,7 @@ BAUD 				EQU		19200
 	;DEFINE DSR
 
 ; length of WRITE packet data field
-; No reason to change this, but the protocol and a real drive allows setting
-; anything from 1 to ~252. For other reasons we are limited to 1-128 without
-; making some other changes. But for instance if you had some kind of weird
-; problem over an unusual link or to an unusual tpdd emulator, you could set
-; this to 64 or 32 or whatever to send smaller packets more likely to get
-; through or to fit within a small rx buffer or something.
+; don't change this from 128
 	IFNDEF CHUNK_LEN
 CHUNK_LEN			EQU		128		; 1-128
 	ENDIF
@@ -203,33 +198,34 @@ pkt_len_overhead	EQU		5	; 2(ZZ) + 1(fmt) + 1(len) [DATA] + 1(chk)
 ; APPLICATION
 ; -----------------------------------------------------------------------------
 
-; TINY uses ALTCD for it's variables and packet buffer
-; start of ALTLCD (100)							; FCC0
+; TINY uses ALTLCD for it's variables and packet buffer
+; start of ALTLCD (model 100 na)				; FCC0
 
-RamFileStart		EQU		ALTLCD + 0x40		; FD00
-RamFileSize			EQU		ALTLCD + 0x42		; FD02
-DskFileSize			EQU		ALTLCD + 0x44		; FD04  native lsb-first copy of tpdd msb-first filesize
+RamFileStart		EQU		ALTLCD
+RamFileSize			EQU		RamFileStart + 2
+DskFileSize			EQU		RamFileSize + 2		; native lsb-first copy of tpdd msb-first filesize
 	IF ROM
-initial_sp			EQU		ALTLCD + 0x46		; FD06  initial stack pointer
+initial_sp			EQU		DskFileSize + 2		; initial stack pointer
+LoadingFlag			EQU		initial_sp + 2		; >0 while LOAD in progress
 	ELSE
 initial_sp			EQU		MAIN@sp + 1			; initial stack pointer
+LoadingFlag			EQU		DskFileSize + 2
 	ENDIF
-LoadingFlag			EQU		ALTLCD + 0x48		; FD08
 ; TPDD packet
-pktZZ				EQU		ALTLCD + 0x4A		; FD0A  tpdd packet preamble "ZZ"
-pktTYPE				EQU		ALTLCD + 0x4C		; FD0C  tpdd packet type, cmd_xxx or ret_xxx
-pktDLEN				EQU		ALTLCD + 0x4D		; FD0D  tpdd packet data length, 0-128
-pktDATA				EQU		ALTLCD + 0x4E		; FD0E  tpdd packet data, 0-128 bytes, +1 checksum byte
+pktZZ				EQU		LoadingFlag + 2		; tpdd packet preamble "ZZ"
+pktTYPE				EQU		pktZZ + 2			; tpdd packet type, cmd_xxx or ret_xxx
+pktDLEN				EQU		pktTYPE + 1			; tpdd packet data length, 0-128
+pktDATA				EQU		pktDLEN + 1			; tpdd packet data, 0-128 bytes, +1 checksum byte
 
 ; filesize field within a DIRENT return packet
 ; pktDATA +  0 : fname
 ; pktDATA + 24 : attr
 ; pktDATA + 25 : fsize msb
 ; pktDATA + 26 : fsize lsb
-direntFSIZE			EQU		pktDATA + tpdd_fname_len + 1	; FD27
+direntFSIZE			EQU		pktDATA + tpdd_fname_len + 1
 
 ;              start of data + data len + checksum byte
-; end of packet buffer		pktDATA + CHUNK_LEN + 1         ; FD8F
+; end of packet buffer		pktDATA + CHUNK_LEN + 1
 
 ; end of ALTLCD				ALTLCD + 0x013F		; FDFF
 
@@ -1033,7 +1029,7 @@ WriteChunks:
 		PUSH		H					; TS=remaining_len,position_b
 
 		; HL = remaining_len
-		; BC = 0xFF80 (what matters next is only that C = CHUNK_LEN)
+		; BC = 0xFF80 (B no longer matters, just that C = CHUNK_LEN)
 		; DE = position_a
 		CALL		SendWriteCMD
 

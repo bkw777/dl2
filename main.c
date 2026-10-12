@@ -2134,6 +2134,10 @@ void req_write() {
 
 	if (debug<2) {
 		dbg(1,".");
+		// Technically an invalid assumption, but we have no other way of
+		// detecting the end of a file. Even expiring a timer isn't a valid
+		// assumption. The only way we really know a file is done is by
+		// receiving any other command besides another contiguous req_write().
 		if (gb[1]<REQ_RW_DATA_MAX) dbg(1,"\n"); // final packet
 	}
 
