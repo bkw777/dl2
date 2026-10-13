@@ -150,10 +150,6 @@ fattrCO				EQU		0xA0		; .CO files
 ftypeBA				EQU		0x00
 ftypeDO				EQU		0x01
 ftypeCO				EQU		0x02
-; number of extra bytes in a RAM file vs the true file size
-eofbytesBA			EQU		2
-eofbytesDO			EQU		1
-eofbytesCO			EQU		0
 
 rst_NextNonSpace	EQU		2			; RST 2 = get next non-whitespace char from M to A
 rst_CompareDEHL		EQU		3			; RST 3 = compare DE and HL
@@ -281,7 +277,7 @@ MAIN:
 		LXI			SP,0*initial_sp	; SP = initial_sp
 	ENDIF
 		XRA			A				; A = 0
-		STA			LoadingFlag		; LoadingFlag = 0
+		STA			LoadingFlag		; [LoadingFlag] = 0
 		LXI			H,MAIN			; HL = MAIN
 		PUSH		H				; TS = MAIN
 		LXI			H,STR_Prompt	; HL = STR_Prompt
@@ -294,11 +290,10 @@ MAIN:
 		LXI			H,errSN			; HL = errSN
 		SHLD		ETRAP			; set errSN as the ON ERROR handler
 		LXI			H,KYBUF+1		; HL = KYBUF[1]
-		MVI			M,'"'			; write " to 2nd byte of keyboard buffer
+		MVI			M,'"'			; KYBUF[1]='"'
 		; KYBUF = |L"MYPROG.BA|
 		; HL = KYBUF[1] (still on the ")
 		; CKFN2 reads it the same way BASIC reads ex: |SAVE"MYPROG.BA|
-		; that's why no closing " needed
 		CALL		CKFN2			; evaluate & reformat filename
 		CALL		RESETFPS		; reset file pointers
 		LDA			KYBUF			; A = KYBUF[0]
@@ -306,14 +301,16 @@ MAIN:
 		JZ			MENU			; then exit to OS (main menu)
 		CPI			'S'				; is it 'S' ?
 		JZ			SAVE			; then jump to SAVE
-		PUSH 		PSW				; stash A=cmd
+
+		; if we got here, cmd is K, L, or unknown
+
+		PUSH 		PSW				; stash A = cmd
 		; TS=cmd,MAIN
-		; if we got here then the command is K, L, or unknown
-		; KILL and LOAD both start with telling the drive the filename
-		CALL		DIRENT          ; tell the drive the filename, detect if exists
-		JZ			errFF			; Z = file not found
+		; KILL and LOAD both start with DIRENT
+		CALL		DIRENT          ; tell the drive the filename, Z if !exist
+		JZ			errFF			; FF error if file not found
 		; file found on disk
-		POP 		PSW				; restore A=cmd
+		POP 		PSW				; restore A = cmd
 		; TS=MAIN
 		SUI			'K'				; A -= 'K'
 		JZ			KILL			; if A == 0 then cmd is 'K', jump to KILL
@@ -323,12 +320,14 @@ MAIN:
 		; if we got here, cmd is unknown
 		; fall into errSN
 
+; -----------------------------------------------------------------------------
 ; ERROR CODES - this stack of jump targets uses an opcode-as-data trick
 ; 1: The first MVI_E,eXX you hit executes normally and sets E=eXX.
 ; 2: The LXI_B after that executes as code and consumes the next 2 bytes
 ;    as it's operand, which is the entire next MVI_E and it's eXX operand.
 ; 3: The next byte is another LXI_B, repeat 2: as long as the pattern holds.
 ; 4: Fall through into ERROR with E=eXX.
+; -----------------------------------------------------------------------------
 
 	IF ERRCODES
 errSN:
@@ -370,18 +369,21 @@ errND:
 errHW:
 	ENDIF
 
+; -----------------------------------------------------------------------------
+; ERROR
+; -----------------------------------------------------------------------------
 ERROR:
 		; if we were in the middle of SAVE, then undo the partial new file
-		LDA 		LoadingFlag		; A = LoadingFlag
-		ORA 		A				; does LoadingFlag == 0?
+		LDA 		LoadingFlag		; A = [LoadingFlag]
+		ORA 		A				; does [LoadingFlag] == 0?
 		JZ 			@show			; if 0 skip to @show
 	IF ERRCODES
 		PUSH 		D				; save E=eXX
 	ENDIF
-		LHLD 		RamFileSize		; HL=RamFileSize
-		MOV 		B,H				; B=H
-		MOV 		C,L				; C=L  BC=RamFileSize
-		LHLD 		RamFileStart	; HL=RamFileStart
+		LHLD 		RamFileSize		; HL = [RamFileSize]  HL = ram_fsize
+		MOV 		B,H				; B = H
+		MOV 		C,L				; C = L   BC = ram_fsize
+		LHLD 		RamFileStart	; HL = [RamFileStart]  HL = ram_fstart
 		CALL		MASDEL			; delete BC bytes @ HL
 	IF ERRCODES
 		POP 		D				; restore E=eXX
@@ -400,34 +402,9 @@ ERROR:
 		CALL		PTILL0			; print it
 		JMP			MAIN			; restart at main
 
-	IFNDEF PAUSE_DEx10us			; NEC has this in the system rom
-PAUSE_DEx10us:						; 8-11us/iter * DE iters
-		DCX 		D				; DE--
-		MOV			A,D				; A = D
-		ORA			E				; D V E sets Z only when both D and E == 0
-		JNZ			PAUSE_DEx10us	; repeat until DE=0
-		RET
-	ENDIF
-
-STR_STAT:
-		COM_STAT
-
-InitPacket:
-		LXI 		H,pktTYPE		; HL @ pktTYPE
-		MOV			M,A				; pktTYPE = A = cmd_xxxxx from caller
-		INX			H				; HL @ pktDLEN
-		MVI			M,0				; pktDLEN = 0
-		; HL @ pktDLEN
-		RET
-
-	IF INCLUDE_DSR
-CheckDSR:
-		IN			FLOWCTL_PORT	; read RS232 flow control pins
-		ANI			DSR_BITMASK		; check !DSR
-		RZ							; Z = ready
-		JMP			errND			; err no disk
-	ENDIF ; /INCLUDE_DSR
-
+; -----------------------------------------------------------------------------
+; DIRENT - tell the drive a filename
+; -----------------------------------------------------------------------------
 DIRENT:
 		; activate rs232
 		CALL		COMOFF				; disable MDM/COM
@@ -447,8 +424,8 @@ DIRENT:
 		; 5A5A  00  1A  filename     attr  action  chk
 
 		; start building a DIRENT(set_name) cmd packet
-		XRA			A					; A = 0
-		CALL		InitPacket			; write 0x00 (cmd_dirent) to pktTYPE (cmd)
+		XRA			A					; A = 0 = cmd_dirent
+		CALL		InitPacket			; start building a cmd_dirent packet
 		; HL @ pktDLEN (len)
 		MVI			M,cmd_dirent_dlen	; pktDLEN = 26
 		INX			H					; HL = pktDATA (start of data)
@@ -477,423 +454,434 @@ DIRENT:
 SendPacketSpecial:
 	IF ERRCODES
 		CALL		SendPacket
-		MOV			B,A					; B = data[0] from SendPacket
-		LDA			pktTYPE				; A = return packet type
-		CPI			ret_std				; is it a standard return packet?
+		; A = data[0]
+		; BC = data_len
+		; D = junk partial sum
+		; E = 0
+		; HL = pktDATA
+		; pkt buffer = return packet from drive
+		; Z = set if A=0
+
+		MOV			B,A					; B = data[0]
+		LDA			pktTYPE				; A = [pktTYPE] = ret_pkt_type
+		CPI			ret_std				; is it ret_std?
 		JZ			ParseStdReturn		; if it's a standard return then jump to the standard return parser
 		; it's not a standard return (it's a DIRENT or READ return)
-		; restore the A & Z state left by SendPacket
+		; restore the A & Z state left by SendPacket before returning
 		MOV			A,B					; A = data[0]
 		ORA			A					; if A = 0 set Z
-		; places RET might go:
+
+		; A = data[0]
+		; B = data[0]
+		; C = data_len
+		; D = junk partial sum
+		; E = 0
+		; HL = pktDATA
+		; pkt buffer = return packet from drive
+		; Z set if A=0
+
+		; RET might go to:
 		; * CALL SendPacketSpecial in SendReadCMD
 		; * CALL DIRENT in MAIN
 		RET
 	ENDIF
 
-	; if not ERRCODES then fall into SendPacket
+	; fall into SendPacket if not ERRCODES
 
 ; * Calculate & append checksum to packet
 ; * Send the REQuest packet
 ; * Receive the RETurn packet
 SendPacket:
-
-; -----------------------------------------------------------------------------
-; FINISH BUILDING OUTGOING PACKET (calculate and append checksum)
-; -----------------------------------------------------------------------------
+		; ---------------------------------------------------------------------
+		; FINISH BUILDING OUTGOING PACKET (calculate and append checksum)
+		; ---------------------------------------------------------------------
 
 		; Calculate Packet Checksum
-		; Sum all the bytes in the specified range.
+		; Sum all the bytes in the specified range, modulo 0xFF
 		; Take the least significant byte of that sum.
 		; Invert all the bits in that byte.
 		; The checksummed range is the start of cmd through end of data.
 
-		; add cmd and len to ckecksum
-		LXI			H,pktTYPE		; HL @ pktTYPE
-		MOV			A,M				; A = cmd
-		INX			H				; HL @ pktDLEN 
-		ADD			M				; A = A + len
-		MOV			D,A				; D = A
-		MOV			A,M				; A = len
-		MOV			E,A				; E = len
-		MOV			B,A				; B = len
-		INX			H				; HL @ pktDATA
-		ORA			A				; set Z if len==0
-		MOV			A,D				; A = sum from D
-		JZ			@endpkt			; if len==0 then jump to finish checksum
-		; len>0, add sum len bytes from pktDATA
+		; start checksum = cmd
+		LXI			H,pktTYPE			; HL @ pktTYPE
+		MOV			A,M					; A = cmd
 
-		; add data to checksum
-@l0:
-		ADD			M				; add data byte to sum (sum rolls over every 0xFF) 
-		INX			H				; next data byte
-		DCR			E				; E--
-		JNZ			@l0				; repeat for E (len) bytes
-		; HL @ pktDATA+len
+		; add len
+		INX			H					; HL @ pktDLEN 
+		ADD			M					; A += data_len
+		MOV			D,A					; D = A = sum
+		MOV			A,M					; A = data_len
+		MOV			E,A					; E = data_len
+		MOV			B,A					; B = data_len
+		INX			H					; HL @ pktDATA
+		ORA			A					; set Z if len==0
+		MOV			A,D					; A = D = sum
+		JZ			@endpkt				; if len==0 then jump to finish checksum
 
-		; append checksum to packet
+		; add data
+@add_data_to_sum:
+		ADD			M					; add data byte to sum (rolls over every 0xFF) 
+		INX			H					; HL++  HL @ next data byte
+		DCR			E					; E--
+		JNZ			@add_data_to_sum	; repeat until E=0
+		; D = junk partial sum
+		; E = 0
+
+		; compliment & append to packet
 @endpkt:
-		; A = sum
-		CMA							; complement A, A = tpdd checksum now
-		; A = CheckSum
-		MOV			M,A				; append checksum to packet
+		; A = sum (mod256)
+		; HL @ pktDATA+len+1
+		CMA								; complement A, A = checksum
+		MOV			M,A					; [pktDATA+len+1] = checksum
 
-; -----------------------------------------------------------------------------
-; SEND OUTGOING PACKET
-; -----------------------------------------------------------------------------
+		; ---------------------------------------------------------------------
+		; SEND OUTGOING PACKET
+		; ---------------------------------------------------------------------
 
 		; pkt_len = data_len + overhead (5)
 		;      ZZ    TYPE   DLEN   DATA       CHK
 		; B =  2   + 1    + 1    + data_len + 1
 
 		MVI			A,pkt_len_overhead	; A = 5
-		ADD			B				; A += B -> A = pkt_len
-		MOV			B,A				; B = pkt_len
+		ADD			B					; A += B  A = pkt_len
+		MOV			B,A					; B = pkt_len
 		; B = loop counter for all bytes in packet, ZZ to CKSUM inclusive
-		LXI			H,pktZZ			; HL @ pktZZ (0x5A5A aka "ZZ")
+		LXI			H,pktZZ				; HL @ pktZZ (0x5A5A aka "ZZ")
 
 @send_byte:
-	IF INCLUDE_DSR
+	IF DSR
 		CALL		CheckDSR
 	ENDIF
-		MOV			A,M				; A = byte from packet
-		CALL		SND232			; send byte out rs232
-		JC			errIO			; shift+break pressed
-		INX			H				; HL++
-		DCR			B				; B--
-		JNZ			@send_byte		; repeat until B = 0
+		MOV			A,M					; A = byte from packet
+		CALL		SND232				; send byte out rs232
+		JC			errIO				; shift+break pressed
+		INX			H					; HL++
+		DCR			B					; B--
+		JNZ			@send_byte			; repeat until B = 0
+		; B = 0
 
-; -----------------------------------------------------------------------------
-; RECIEVE RETURN PACKET
-; -----------------------------------------------------------------------------
+		; ---------------------------------------------------------------------
+		; RECIEVE RETURN PACKET
+		; ---------------------------------------------------------------------
 
 		; tpdd return packet starts with pktTYPE, no ZZ
-		LXI			H,pktTYPE		; HL @ pkTYPE
-		CALL		INT1D			; disable interrupts
-		CALL		ReadSerialByteToM	; read byte from serial to pktTYPE, HL @ pktDLEN
-		CALL		ReadSerialByteToM	; read byte from serial to pktDLEN, HL @ pktDATA
-		MOV			C,A				; C = data_len
-		INR			C				; C++ C = data_len + 1 (data + checksum)
+		LXI			H,pktTYPE			; HL = pkTYPE
+
+		; disable interrupts last thing before reading from serial
+		CALL		INT1D				; disable interrupts
+
+		CALL		RXtoM				; [pktTYPE] = A = ret_pkt_type, HL++, HL = pktDLEN
+		CALL		RXtoM				; [pktDLEN] = A = data_len, HL++, HL = pktDATA
+		MOV			C,A					; C = data_len
+		INR			C					; C++  C = data_len+1 (data + checksum)
 		; read C more bytes from serial (read data and checksum)
-@read_byte:
-		CALL		ReadSerialByteToM	; read a byte from serial to pktDATA
-		DCR			C				; C--
-		JNZ			@read_byte		; repeat until C = 0
-		; return packet is complete
+@rx_data:
+		CALL		RXtoM				; [pktDATA++] = A = rxbyte++
+		DCR			C					; C--
+		JNZ			@rx_data			; repeat until C = 0
 
-		; re-enable interrupts
-		XRA			A				; A = 0
-		SIM							; IM = 0 -> enable all interrupts
+		; re-enable interrupts first thing after reading from serial
+		XRA			A					; A = 0
+		SIM								; IM = 0 -> enable all interrupts
 
-; -----------------------------------------------------------------------------
-; VERIFY CHECKSUM WOULD GO HERE
-; -----------------------------------------------------------------------------
+		; A = 0
+		; BC = 0
+		; HL = pktDATA + data_len + 2  (addr of checksum + 1)
+		; packet buffer now contains the complete return packet
+
+		; ---------------------------------------------------------------------
+		; VERIFY CHECKSUM   (WOULD GO HERE)
+		; ---------------------------------------------------------------------
 
 
 
-; -----------------------------------------------------------------------------
-; RETURN
-; -----------------------------------------------------------------------------
+		; ---------------------------------------------------------------------
+		; RETURN
+		; ---------------------------------------------------------------------
 
-		LXI			H,pktDLEN		; HL @ pktDLEN
-		MOV			C,M				; C = data_len
-		INX			H				; HL++ -> HL@pktDATA
-		MOV			A,M				; A = data[0]
-		ORA			A				; set Z if first byte of data is 0
+		LXI			H,pktDLEN			; HL = pktDLEN
+		MOV			C,M					; C = data_len   BC=data_len
+		INX			H					; HL++  HL = pktDATA
+		MOV			A,M					; A = data[0]
+		ORA			A					; set Z if data[0] == 0
 
 		; return packet types:
-		; LOAD    0x10 read file data return, dlen=0to128, A is data[0] but could be checksum if dlen=0
+		; LOAD    0x10 read file data return, dlen=0to128, A=data[0]
 		; DIRENT  0x11 dirent return, dlen=28, A=filename[0]
 		; others  0x12 standard return, dlen=1, A=error_code, 0 = success
 		; So for most packets we are returning A=err and setting Z if err=0
-		; A & Z don't seem to be meaningful for LOAD or DIRENT
+		; A & Z don't seem to be meaningful for LOAD or DIRENT ?
 
 		; A = data[0]
 		; Z = set if A=0
-		; C = data_len
-		; HL @ pktDATA
+		; BC = data_len
+		; D = junk partial sum
+		; E = 0
+		; HL = pktDATA
+		; pkt buffer = return packet from drive
 		RET
 
-; read 1 byte from rs232 to M, HL++
-ReadSerialByteToM:
-	IF INCLUDE_DSR
-		CALL		CheckDSR
-	ENDIF
-		CALL		RCV232
-		JC			errIO				; shift+break pressed
-		JNZ			errIO				; error
-		MOV			M,A
-		INX			H
-		RET
-
+; -----------------------------------------------------------------------------
+; KILL - delete a file on disk
+; -----------------------------------------------------------------------------
 KILL:
 		MVI			A,cmd_delete
 		JMP			ShortPacket
 
-SendOpenCMD_write:
-		MVI			E,write_mode
-SendOpenCMD:
-		MVI			A,cmd_open
-		CALL		InitPacket
-		; InitPacket left HL=pktDLEN, A=cmd_open, & cmd_open HAPPENS to be 0x01
-		MOV			M,A					; write 0x01 to pktDLEN - OPEN command has 1 byte of data
-		INX			H					; advance HL to the first byte of pktDATA
-		MOV			M,E					; write E to pktDATA - E = mode write/append/read
-		JMP			jSendPacket			; send the packet
-
-
+; -----------------------------------------------------------------------------
+; LOAD - copy a file from disk to ram
+; -----------------------------------------------------------------------------
 LOAD:
-; FINDFN reads FILNM1 (FC93 on 100) which has been set up by CKFN2 in MAIN
+; FINDFN reads FILNM1 (FC93 on 100) which has been prepared by CKFN2 in MAIN
 		CALL		FINDFN				; see if the proposed file already exists in ram
-		JNZ			errFF				; abort with FF error if the file already exists (was AE)
+		JNZ			errFF				; destination file already exists in ram
 	IF ERRCODES
-		LXI			H,errDF				; HL=errDF
-		SHLD 		ETRAP				; set errDF (was FL) as the general error handler
+		LXI			H,errDF				; HL = errDF
+		SHLD 		ETRAP				; set errDF as the general error handler
 	ENDIF
 		CALL		SCNEMP				; find empty ram file direrctory entry
-		PUSH		H					; TS[0] = dirent_start
+		PUSH		H					; TS=dirent_start
 		; get extra_len based on file type
-		CALL		RamFileExtraLen		; A=extra_len 0|1|2 for CO|DO|BA
-		; CO: A=0
-		; DO: A=1
-		; BA: A=2
-		LHLD		direntFSIZE			; HL = big-endian filesize from DIRENT return.
+		CALL		RamFileExtraLen		; A = extra_len   0|1|2 for CO|DO|BA
+		LHLD		direntFSIZE			; HL = [direntFSIZE] (big-endian: H=lsb L=msb)
 		; direntFSIZE was written by DIRENT while still in MAIN before coming here.
-		; All 16-bit values in tpdd packets are big-endian, iow msb-first: H=lsb L=msb
-		; The cpu platform is litte-endian, iow 16-bit values are lsb-first.
-		; So byte-swap direntFSIZE to get usable native fsize.
-		MOV			B,L					; copy msb to B
-		MOV			C,H					; copy lsb to C
-		; BC = native fsize
-		MOV			L,C					; copy lsb to L
-		MOV			H,B					; copy msb to H
-		; HL = native fsize
-		SHLD		DskFileSize			; write fsize to DskFileSize
+		; TPDD 16-bit values are big-endian, iow msb-first: H=lsb L=msb
+		; Native 16-bit values are litte-endian, iow lsb-first: H=msb L=lsb
+		; byte-swap [direntFSIZE] to get fsize in usable native form.
+		MOV			B,L					; B = L = disk_fsize_msb
+		MOV			C,H					; C = H = disk_fsize_lsb
+		; BC = disk_fsize
+		MOV			L,C					; L = C = disk_fsize_lsb
+		MOV			H,B					; H = B = disk_fsize_msb
+		; HL = disk_fsize
+		SHLD		DskFileSize			; [DskFileSize] = disk_fsize
 		DCX			B					; BC-- to negate the first BC++ below
-		MOV			E,A					; E = extra_len, save extra_len for later
+		MOV			E,A					; E = extra_len  (saving for later)
 		INR			A					; A++ to negate the first A-- below
-@l0:	; add extra_len to fsize to get ram fsize including added eof bytes
+@incr_len:	; add extra_len to disk_fsize to get ram_fsize including eof bytes
 		INX			B					; BC++
 		DCR			A					; A--
-		JNZ			@l0					; repeat until A=0
+		JNZ			@incr_len			; repeat until A=0
 		; A = 0
-		; BC = ram_fsize full ram file length including added EOF bytes
-		; CO: BC=fsize+0
-		; DO: BC=fsize+1  (0x1A)
-		; BA: BC=fsize+2  (0x00 0x00)
+		; BC = ram_fsize full ram file length including eof bytes
+		; CO: BC = disk_fsize+0
+		; DO: BC = disk_fsize+1  (0x1A)
+		; BA: BC = disk_fsize+2  (0x00 0x00)
 		;
-		; FtypeTable is a table with 3 blocks, one each for CO, DO, & BA filetypes
-		; Each block is 5 bytes in 3 fields:
-		; 1 byte:  attribute for MKDIRENT   fattrCO fattrDO fattrBA
-		; 2 bytes: jump address             jCOFILE jDOFILE jBAFILE
-		; 2 bytes: start of filetype area   COFILES DOFILES BAFILES
+		; TBL_ftypes is a table with 3 entries, one each for CO, DO, & BA filetypes
+		; Each entry is 3 fields totalling 5 bytes:
+		;  fattrXX      1 byte   fattr for XX filetype
+		;  LOAD_End_XX  2 bytes  routine to finish writing XX filetype
+		;  XXFILES      2 bytes  start of XX files area
 		MOV			D,A					; D=0 E=extra_len DE=extra_len
-		; get the address of the start of FtypeTable
-		LXI			H,FtypeTable		; HL = FtypeTable
+		; all possible values of extra_len just happens to be 0,1,2
+		; so it's also (ab)used as the index into TBL_ftypes
+		; get the address of the start of TBL_ftypes
+		LXI			H,TBL_ftypes		; HL = TBL_ftypes
 		; move to the correct block for the file type
 		DAD			D					; HL += DE
 		DAD			D					; HL += DE
 		DAD			D					; HL += DE
 		DAD			D					; HL += DE
 		DAD			D					; HL += DE
-		; HL = FtypeTable + 5*DE
-		; CO: DE=0 -> HL = FtypeTable + 0
-		; DO: DE=1 -> HL = FtypeTable + 5
-		; BA: DE=2 -> HL = FtypeTable + 10
-		MOV			A,M					; A = byte @ HL
-		; CO: A = fattrCO
-		; DO: A = fattrDO
-		; BA: A = fattrBA
+		; HL = TBL_ftypes + 5*DE
+		; CO: DE=0 -> HL = TBL_ftypes + 0
+		; DO: DE=1 -> HL = TBL_ftypes + 5
+		; BA: DE=2 -> HL = TBL_ftypes + 10
+
+		; read 1st byte of table entry & push: fattr
+		; HL @ fattr field
+		MOV			A,M					; A = [HL]   A = fattr
 		PUSH		PSW					; TS=fattr,dirent_start
 
-		; attr fattrCO / fattrDO / fattrBA has been read from the jump table and pushed
-
+		; push MkRamDirent
 		LXI			D,MkRamDirent		; DE = MkRamDirent
 		PUSH		D					; TS=MkRamDirent,fattr,dirent_start
 
-		; MkRamDirent is on the stack
-		; There is no matching pop, it gets used by RET
-		; at the end of jCOFILE/jDOFILE/jBAFILE
+		; read next 2 bytes & push: LOAD_End_XX
+		INX			H					; HL++  HL @ LOAD_End_XX field
+		MOV			E,M					; E = LOAD_End_XX_lsb
+		INX			H					; HL++
+		MOV			D,M					; D = LOAD_End_XX_msb  DE = LOAD_End_XX
+		PUSH		D					; TS=LOAD_End_XX,MkRamDirent,fattr,dirent_start
 
-		INX			H					; HL++ to jump addr lsb
-		MOV			E,M					; E = jump addr lsb
-		INX			H					; HL++ to jump addr msb 
-		MOV			D,M					; D = jump addr msb
-		PUSH		D					; TS=jXXFILE,MkRamDirent,fattr,dirent_start
+		; read next 2 bytes & push: XXFILES
+		INX			H					; HL++  HL @ XXFILES field
+		MOV			E,M					; E = XXFILES_lsb
+		INX			H					; HL++
+		MOV			H,M					; H = XXFILES_msb
+		MOV			L,E					; L = XXFILES_lsb  HL = XXFILES
 
-		; jCOFILE/jDOFILE/jBAFILE is on the stack
-		; There is no matching pop, it gets used by RZ
-		; exiting the loop at the end of LOAD
+		; done reading TBL_ftypes
 
-		INX			H					; HL++ to XXFILES area pointer
-		MOV			E,M					; E = XXFILES pointer lsb
-		INX			H					; HL++ to XXFILES pointer msb
-		MOV			H,M					; H = XXFILES pointer msb
-		MOV			L,E					; L = XXFILES pointer lsb   HL=XXFILES pointer
-
-		; HL = COFILES/DOFILES/BAFILES
-
-		; read the file area start addr from the pointer addr
+		; move HL to DE (destroys HL)
 		MOV			E,M					; E = XXFILES lsb
 		INX			H					; HL++
-		MOV			D,M					; D = XXFILES msb
+		MOV			D,M					; D = XXFILES msb  DE = XXFILES
 
-		; DE = start of COFILES, DOFILES, or BAFILES area
+		; store ram_fsize @ RamFileSize
+		MOV			H,B					; H = ram_fsize msb
+		MOV			L,C					; L = ram_fsize lsb  HL = ram_fsize
+		SHLD		RamFileSize			; [RamFileSize] = ram_fsize
 
-		MOV			H,B					; H = ram filesize msb
-		MOV			L,C					; L = ram filesize lsb
-		; HL = ram filesize
-		SHLD		RamFileSize			; RamFileSize = ram filesize
+		; allocate ram for the new file
 		XCHG							; swap HL:DE
-		; DE = ram filesize
-		; HL = start of CO/DO/BA FILES area
-		SHLD		RamFileStart		; RamFileStart = HL (new ram file starts at the beginning of the area for it's type)
-		PUSH		H					; TS=RamFileStart,jXXFILE,MkRamDirent,fattr,dirent_start
-		CALL		MAKHOL				; create space for new file
-		JC			errDF				; abort with DF err if MAKHOL failed from not enough memory (was OM)
-		; set a status flag that loading from disk to ram is in progress
+		; DE = ram_fsize
+		; HL = XXFILES = start of CO/DO/BA files area
+		SHLD		RamFileStart		; [RamFileStart] = HL = start of CO/DO/BA files area = ram_fstart
+		PUSH		H					; TS=ram_fstart,LOAD_End_XX,MkRamDirent,fattr,dirent_start
+		CALL		MAKHOL				; allocate space for new file
+		JC			errDF				; carry = failed: out of memory
+		; HL = ram_fstart
+		; A BC DE = junk
+
+		; set a status flag that LOAD is currently in progress
 		LXI			H,LoadingFlag		; HL = LoadingFlag
-		INR			M					; LoadingFlag++
+		INR			M					; [LoadingFlag]++
+
+		; open disk file for reading
 		CALL		SendOpenCMD_read	; open the tpdd file for reading
-		LHLD		DskFileSize			; HL = DskFileSize
-		XCHG							; swap HL:DE  DE = DskFileSize
-		POP			H					; HL = RamFileStart TS=jXXFILE,MkRamDirent,fattr,dirent_start
-		LDA			pktTYPE				; A = packet type  (should be 0x10 for read return?)
-		MOV			C,A					; C = packet type
-		MVI			B,0					; B = 0, BC = packet type
-		; BC = packet type
-		; DE = tpdd file size lsb-first D=lsb E=msb
-		; HL = ram file start
-		; TS[0] = jXXFILE      jCOFILE|jDOFILE|jBAFILE
-		; TS[1] = MkRamDirent
-		; TS[2] = fattr        fattrCO|fattrDO|fattrBA
-		; TS[3] = dirent_start
-@l1:
-		MOV			A,D					; A = D = filesize lsb
-		ORA			E					; A = DVE (lsbVmsb), iow set Z if DE==0
-		MOV			A,C					; A = C = packet type
-		STA			pktTYPE				; pktTYPE = packet type
+		; SendOpenCMD_read also falls through into SendReadCMD, so both
+		; OPEN and the first READ have been done, and the packet buffer
+		; contains the first READ_file_data return packet (not OPEN).
+		; A = 0
+		; BC = 0
 
-		; did not get here via CALL,  this RZ is just pop & jump
-		; TS=jXXFILE,MkRamDirent,fattr,dirent_start
-		RZ								; when DE=0 pop & jump to jXXFILE
+		LHLD		DskFileSize			; HL = [DskFileSize]  HL = disk_fsize
+		XCHG							; swap HL:DE  DE = disk_fsize
+		POP			H					; HL = ram_fstart  TS=LOAD_End_XX,MkRamDirent,fattr,dirent_start
 
-		ORA			A					; is packet type 0?
-		CM			SendReadCMD			; call if packet type <0 ???
-		DCX			D					; DE--
-		PUSH		H					; stash HL = current byte position in ram file
-		; TS=ram_position,jXXFILE,MkRamDirent,fattr,dirent_start
-		LXI			H,pktDATA			; HL = start of packet data
-		DAD			B					; HL += BC, BC = packet type ???????
-		MOV			A,M					; A = byte @ HL
-		POP			H					; retore HL = byte position in file
-		; TS=jXXFILE,MkRamDirent,fattr,dirent_start
-		MOV			M,A					; write byte from packet to ram
-		INX			H					; HL++ (advance to next byte of file)
-		; entire packet len always <256, byte is enough
-		INR			C					; C++ (advance to next byte of packet)
-		JMP			@l1					; repeat
+		; BC = 0            (chunk_progress) 0-127 incrementing count of bytes within a chunk
+		; DE = disk_fsize   (remaining_len)  decrimenting count of remaining bytes in file
+		; HL = ram_fstart   (ram_position)   incrimenting ram addr position in destination file
+@CopyByteToRam:
+		; BC = chunk_progress  (0x00-0x7F)
+		; DE = remaining_fsize
+		; HL = ram_position
 
+		; set Z if remaining_fsize=0
+		MOV			A,D					; A = D = remaining_fsize_lsb
+		ORA			E					; A = DVE (remaining_fsize lsb V msb), iow set Z if remaining_fsize=0
+
+		; IF ENTIRE FILE IS DONE
+		; if Z then jump to LOAD_End_XX to finish
+		; TS=LOAD_End_XX,MkRamDirent,fattr,dirent_start
+		RZ								; when DE=0 pop & jump to LOAD_End_XX
+
+		; IF CURRENT CHUNK IS DONE
+		; (dirty ass trick to count 128, shouldn't it compare to [pktDLEN] ? )
+		; if chunk_progress>127 then fetch the next chunk from the drive
+		MOV			A,C					; A = C = chunk_progress    <<<<TESTING
+		ORA			A					; AVA, iow set S if A > 0x7F
+		CM			SendReadCMD			; call if chunk_progress > 127
+		; Only if we did CM:
+		;   A = 0
+		;   BC = 0
+
+		; TODO: could we use main rom D2H4Bup or D2H4Bdn instead?
+
+		DCX			D					; DE--  remaining_fsize--
+		PUSH		H					; stash HL = ram_position
+		; TS=ram_position,LOAD_End_XX,MkRamDirent,fattr,dirent_start
+		LXI			H,pktDATA			; HL = pktDATA
+		DAD			B					; HL += BC = pktDATA + chunk_progress
+		MOV			A,M					; A = [HL]  A = data[chunk_progress]
+		POP			H					; HL = ram_position
+		; TS=LOAD_End_XX,MkRamDirent,fattr,dirent_start
+		MOV			M,A					; [ram_position] = data[chunk_progress] (copy byte from packet buffer to ram file)
+		INX			H					; HL++ (ram_position++)
+		INR			C					; C++ (chunk_progress++)
+
+		JMP			@CopyByteToRam		; repeat
+
+; LOAD-related ----------------------------------------------------------------
 SendOpenCMD_read:
 		MVI			E,read_mode
 		CALL		SendOpenCMD
 SendReadCMD:
 		PUSH		H					; stash HL
 		PUSH		D					; stash DE
-; start READ cmd packet
-		MVI			A,cmd_read			; A = READ packet fmt code
-		CALL		InitPacket			; Construct a tpdd packet
+
+		; start populating READ cmd packet
+		MVI			A,cmd_read			; A = cmd_read, READ command packet type
+		CALL		InitPacket			; start building a new packet in the packet buffer
 		CALL		SendPacketSpecial	; send the packet to the drive, read the return packet from the drive, handle std vs special return
-		; A = data[0], Z = set if A=0 (no error)
+
+	; if ERRCODES
+		; A = data[0]
+		; B = data[0]
+		; C = data_len
+		; D = junk partial sum
+		; E = 0
+		; HL = pktDATA
+		; pkt buffer = return packet from drive
+		; Z if A=0
+
+	; if not ERRCODES
+		; A = data[0]
+		; BC = data_len
+		; D = junk partial sum
+		; E = 0
+		; HL = pktDATA
+		; pkt buffer = return packet from drive
+		; Z if A=0
+
+		; reset BC (chunk_progress) to 0 before return
 		XRA			A					; A = 0
 		MOV			B,A					; B = 0
 		MOV			C,A					; C = 0
-		STA			pktTYPE				; A = pktTYPE (return packet fmt)
 		POP			D					; restore DE
 		POP			H					; restore HL
+		; A = 0
+		; BC = 0
+		; DE = entry
+		; HL = entry
 		RET
 
-; Used in LOAD. The different file types need different operations when
-; inserting a new file in ram.
-FtypeTable:
-	DB fattrCO				; +0
-	DW jCOFILE
-	DW COFILES
-	DB fattrDO				; +5
-	DW jDOFILE
-	DW DOFILES
-	DB fattrBA				; +10
-	DW jBAFILE
-	DW BAFILES
-
-; In LOAD: we pushed fattrXX, then MkRamDirent, then jXXFILE.
-; Then at the end of the copy-to-ram loop we RZ while we are not in a CALL,
-; so RZ takes the jXXFILE addr off the top of the stack and "returns" there.
-; Then each of these jXXFILE: ends in a RET, and we are still not in a CALL,
-; so the RET at the end of jCOFILE/jDOFILE/jBAFILE goes to MkRamDirent.
-; Top of stack has fattrXX on entering MkRamDirent
-
-
+; HL = last byte of file (not including eof) + 1
 ; TS=MkRamDirent,fattr,dirent_start
-jDOFILE:
-		MVI			M,0x1A
-		RET								; pop&jump MkRamDirent
+LOAD_End_DO:
+		; append BA eof mark after new file -> write 0x1A @ HL
+		MVI			M,0x1A				; [HL] = 0x1A
+		RET								; pop & jump to MkRamDirent
 
+; HL = last byte of file (not including eof) + 1
 ; TS=MkRamDirent,fattr,dirent_start
-jBAFILE:
-		; We jumped here by the RZ at the end of the copy-to-ram loop,
-		; HL currently points at the byte after the end of the file.
-		; BA files need 2 NUL added after the contents, write 2 nulls here.
-		XRA			A					; A=0
-		MOV			M,A					; write 0 @ HL
+LOAD_End_BA:
+		; append BA eof mark after new file -> write 0x00 0x00 @ HL
+		XRA			A					; A = 0
+		MOV			M,A					; [HL] = 0
 		INX			H					; HL++
-		MOV			M,A					; write 0 @ HL
-		LHLD		RamFileSize			; HL = RamFileSize
-		XCHG							; DE = RamFileSize
-		; DOFILES area starts immediately after BAFILES area ends.
-		; Update the DOFILES pointer to point to the first byte
-		; after the file we just wrote.
-		LHLD		DOFILES				; HL = DOFILES
-		DAD			D					; add RamFileSize to DOFILES
-		SHLD		DOFILES				; write updated DOFILES
-		RET								; really a jump to MkRamDirent
+		MOV			M,A					; [HL] = 0
+		LHLD		RamFileSize			; HL = [RamFileSize] = ram_fsize (fsize + 2 nuls)
+		XCHG							; DE = ram_fsize
+		; DOFILES must be updated after any change to any BA files
+		; update DOFILES to point to the first byte after the new last BA file
+		LHLD		DOFILES				; HL = [DOFILES] = old_dofiles_start
+		DAD			D					; HL += DE  HL = new_dofiles_start
+		SHLD		DOFILES				; [DOFILES] = new_dofiles_start
+		RET								; pop & jump to MkRamDirent
 
 ; TS=MkRamDirent,fattr,dirent_start
-jCOFILE:
-		LHLD		RamFileStart
-		SHLD		COFILES
-		RET								; really a jump to MkRamDirent
+LOAD_End_CO:
+		; update COFILES to point to start of new ram file
+		; CO files grow down from HIMEM
+		LHLD		RamFileStart		; HL = [RamFileStart] = ram_fstart
+		SHLD		COFILES				; [COFILES] = ram_fstart
+		RET								; pop & jump to MkRamDirent
 
 ; TS=fattr,dirent_start
 MkRamDirent:
 		POP			PSW					; A = fattr  TS=dirent_start
-		LHLD		RamFileStart		; HL = RamFileStart
-		XCHG							; DE = RamFileStart
-		DCX			D					; DE--
+		LHLD		RamFileStart		; HL = [RamFileStart] = ram_fstart
+		XCHG							; DE = ram_fstart
+		DCX			D					; DE--  DE = ram_fstart-1   (why?)
 		POP			H					; HL = dirent_start
 		JMP			MKDIRENT
 
-; return A=0/1/2 depending on file type CO/DO/BA
-; extra ram file length over true file length for added EOF bytes
-; CO: A=0  (none, file is defined by CO header)
-; DO: A=1  (eof = 0x1A)
-; BA: A=2  (eof = 0x00 0x00)
-RamFileExtraLen:
-		LDA 		FX1					; A = FX1[0] 1st byte of filename extension
-		; subtract 'C' because the possible values happen to be contiguous BCD,
-		; and C is the center, so the result will be <0 for BA, 0 for C, >0 for DO
-		SUI			'C'					; A -= 'C'
-		; BA -> A = 0xFF flags SPC  (iow A = -1)
-		; CO -> A = 0x00 flags ZP
-		; DO -> A = 0x01 flags -
-		; if file is CO or DO then A is ready now
-		RP								; return if not S, file is not BA
-		; file is BA, return A=2
-		MVI			A,eofbytesBA		; A = eofbytesBA = 2
-		; A=0x02 F=SPC
-		RET								; file is BA
-
-; copy a file from local ram to tpdd
+; -----------------------------------------------------------------------------
+; SAVE - copy a file from ram to disk
+; -----------------------------------------------------------------------------
 SAVE:
 		; TS=MAIN
 		CALL		DIRENT				; tell the drive our filename
@@ -957,23 +945,23 @@ SAVE:
 		; HL = ram_len
 		POP			B					; BC = extra_len
 		; TS=MAIN
-		; Add 1 to both C and HL before entering the following loop because we don't
-		; hit the first JNZ until after running the body at least once.
-		INR			C					; C++
-		INX			H					; HL++
-@l0:	; remove extra_len from ram_len to get true_len
-		; (remove 0|1|2 eof bytes from ram file length to get true file length)
-		DCX			H					; HL-- = length--
+		; get true_len = ram_len - extra_len
+		INR			C					; C++ = extra_len+1 (negate 1st iter)
+		INX			H					; HL++ = ram_len+1  (negate 1st iter)
+@decr_len:
+		DCX			H					; HL-- = len--
 		DCR			C					; C-- = extra_len--
-		JNZ			@l0					; repeat until C=0
+		JNZ			@decr_len			; repeat until C=0
+		; BC = 0
+		; HL = true_len
 		MOV			A,L					; A = true_len_lsb
 		ORA			H					; true_len msbVlsb, iow set Z if true_len=0
 		RZ								; if true_len=0 then there's nothing to do
 		PUSH		D					; TS=sof,MAIN
 		PUSH		H					; TS=true_len,sof,MAIN
 		CALL		SendOpenCMD_write	; tell drive to open the file for write
-		POP			D					; DE = true_len
-		POP			H					; HL = sof
+		POP			D					; DE = true_len  TS=sof,MAIN
+		POP			H					; HL = sof  TS=MAIN
 		CALL		WriteChunks			; send WRITE packets
 		MVI			A,cmd_close			; A = cmd_close
 
@@ -997,13 +985,26 @@ ParseStdReturn:
 		; 0x10-0x1F -> 0x02
 		; 0x20-0x2F -> 0x04
 		; ...
-		ANI			0xF0		; A &= 0xF0
-		RAR						; Rotate A Right through carry
-		RAR						; Rotate A Right through carry
-		RAR						; Rotate A Right through carry
-		MOV			E,A			; E = eXX offset into STR_ErrCodes
+		ANI			0xF0				; A &= 0xF0
+		RAR								; Rotate A Right through carry
+		RAR								; Rotate A Right through carry
+		RAR								; Rotate A Right through carry
+		MOV			E,A					; E = eXX offset into STR_ErrCodes
 	ENDIF
 		JMP			ERROR
+
+; SAVE-related ----------------------------------------------------------------
+
+SendOpenCMD_write:
+		MVI			E,write_mode
+SendOpenCMD:
+		MVI			A,cmd_open
+		CALL		InitPacket
+		; InitPacket left HL=pktDLEN, A=cmd_open, & cmd_open HAPPENS to be 0x01
+		MOV			M,A					; write 0x01 to pktDLEN - OPEN command has 1 byte of data
+		INX			H					; advance HL to the first byte of pktDATA
+		MOV			M,E					; write E to pktDATA - E = mode write/append/read
+		JMP			jSendPacket			; send the packet
 
 ; HL = sof   start of file
 ; DE = len   length of file
@@ -1014,7 +1015,7 @@ WriteChunks:
 		_RST		rst_CompareDEHL		; compare DE(remaining_len) to HL(chunk_len)
 		; flags: C if HL<DE, Z if HL=DE, else HL>DE, only A is destroyed
 		; TS=position_a,position_a
-		JNC			@FinalChunk			; exit loop when CHUNK_LEN >= remaining_len
+		JNC			WriteFinalChunk		; exit loop when CHUNK_LEN >= remaining_len
 		MOV			C,L					; C = L = CHUNK_LEN
 		MOV			B,H					; B = H = 0, BC = CHUNK_LEN = 0x0080
 		POP			H					; HL = position_a  TS=position_a
@@ -1037,13 +1038,12 @@ WriteChunks:
 		POP			D					; DE = remaining_len, TS[0] = position_b
 		POP			H					; HL = position_b
 		; HL = new higher start position, DE = new shorter length
-		JMP			WriteChunks
-@FinalChunk:
+		JMP			WriteChunks			; repeat
+WriteFinalChunk:
 		; TS=position_a,position_a
 		MOV			C,E					; C = remaining_len
 		POP			H					; HL = position_a  TS=position_a
 		POP 		D					; DE = position_a
-
 SendWriteCMD:
 		MVI			A,cmd_write
 		CALL		InitPacket 			; HL@pktDLEN, M=0
@@ -1052,6 +1052,91 @@ SendWriteCMD:
 		MOV			B,C					; tell D2H4Bup how many bytes to copy
 		CALL		D2H4Bup				; copy B bytes from DE to HL
 		JMP			jSendPacket			; send the packet, read it's return packet
+
+; -----------------------------------------------------------------------------
+; shared
+; -----------------------------------------------------------------------------
+
+InitPacket:
+		; A = cmd
+		LXI 		H,pktTYPE		; HL @ pktTYPE
+		MOV			M,A				; [pktTYPE] = A = cmd
+		INX			H				; HL @ pktDLEN
+		MVI			M,0				; [pktDLEN] = 0
+		; HL @ pktDLEN
+		RET
+
+; return A=0/1/2 depending on file type CO/DO/BA
+; extra ram file length over true file length for added EOF bytes
+; CO: A=0  (none, file is defined by CO header)
+; DO: A=1  (eof = 0x1A)
+; BA: A=2  (eof = 0x00 0x00)
+RamFileExtraLen:
+		LDA 		FX1					; A = FX1[0] 1st byte of filename extension
+		; subtract 'C' because the possible values happen to be contiguous BCD,
+		; and C is the center, so the result will be <0 for BA, 0 for C, >0 for DO
+		SUI			'C'					; A -= 'C'
+		; BA -> A = 0xFF flags SPC  (iow A = -1)
+		; CO -> A = 0x00 flags ZP
+		; DO -> A = 0x01 flags -
+		; if file is CO or DO then A is ready now
+		RP								; return if not S, file is not BA
+		; file is BA, return A=2
+		MVI			A,2		; A = 2
+		; A=0x02 F=SPC
+		RET								; file is BA
+
+	IF DSR
+CheckDSR:
+		IN			FLOWCTL_PORT	; read RS232 flow control pins
+		ANI			DSR_BITMASK		; check !DSR
+		RZ							; Z = ready
+		JMP			errND			; err no disk
+	ENDIF ; /DSR
+
+; read 1 byte from rs232 to M, HL++
+RXtoM:
+	IF DSR
+		CALL		CheckDSR
+	ENDIF
+		CALL		RCV232				; A = rxbyte
+		JC			errIO				; shift+break
+		JNZ			errIO				; error
+		MOV			M,A					; [HL] = A = rxbyte
+		INX			H					; HL++
+		; A = rxbyte
+		; HL = entry+1
+		RET
+
+	IFNDEF PAUSE_DEx10us			; NEC has this in the system rom
+PAUSE_DEx10us:						; 8-11us/iter * DE iters
+		DCX 		D				; DE--
+		MOV			A,D				; A = D
+		ORA			E				; D V E sets Z only when both D and E == 0
+		JNZ			PAUSE_DEx10us	; repeat until DE=0
+		RET
+	ENDIF
+
+; -----------------------------------------------------------------------------
+; strings & data
+; -----------------------------------------------------------------------------
+
+; Used in LOAD for the differences in how each file type is inserted in ram.
+TBL_ftypes:
+		DB fattrCO	; +0*5 for CO files
+		DW LOAD_End_CO
+		DW COFILES
+
+		DB fattrDO	; +1*5 for DO files
+		DW LOAD_End_DO
+		DW DOFILES
+
+		DB fattrBA	; +2*5 for BA files
+		DW LOAD_End_BA
+		DW BAFILES
+
+STR_STAT:
+		COM_STAT
 
 STR_Prompt:
 		DB			"> C FFFFFF.XX (C=KLSQ)",CR,LF,"> ",0
