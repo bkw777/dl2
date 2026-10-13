@@ -11,12 +11,12 @@ SCNEMP			EQU		0x20B5		; scan for an empty directory entry
 RESETFPS		EQU		0x2116+3	; reset file pointers (skip initial CALL)
 AFTEREOF2		EQU		0x2175		; advance HL past end of file, type A
 MKDIRENT		EQU		0x2211		; insert entry into directory
-D2H4Bup			EQU		0x3442		; move the memory pointed to by DE to the memory pointed to by HL
+D2H4Bup			EQU		0x3442		; copy BC bytes from [DE] to [HL], incrimenting
 INLIN			EQU		0x45F8		; input line
 CKFN2			EQU		0x4BC5		; evaluate & reformat filename, write FILNM1
 MENU			EQU		0x54A4		; go to main menu
 MAKHOL			EQU		0x6875		; insert BC number of spaces in memory
-MASDEL			EQU		0x68A7		; delete BC chars at M (in a DO file)
+MASDEL			EQU		0x68A7		; delete BC bytes at M
 RCV232			EQU		0x6A86		; get A from the RS232 with XON/XOFF
 SND232			EQU		0x6B3A		; send A out serial port with XON/XOFF
 COMOFF			EQU		0x6BE4		; deactivate RS232 or Modem
