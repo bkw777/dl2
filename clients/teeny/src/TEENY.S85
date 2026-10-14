@@ -410,7 +410,7 @@ DIRENT:
 		; original TEENY uses 0x2E -> about 100ms. make it so MS=100 produces 0x2E
 		MVI        D,COM_SETUP_PAUSE_MS*100/215		; 0x2E00 timing loops
 		CALL       PAUSE_DEx10us		; burn cpu for DE*10us = about 100ms
-		LXI			H,STR_STAT			; load a STAT string ("98N1D")
+		LXI			H,STR_STAT			; HL @ STAT string ("98N1D")
 		STC								; set carry flag - tells SET232 to apply to the RS232 port
 		CALL		SET232				; configure uart per the stat string
 
@@ -503,19 +503,19 @@ SendPacket:
 		; The checksummed range is the start of cmd through end of data.
 
 		; start checksum = cmd
-		LXI			H,pktTYPE			; HL @ pktTYPE
+		LXI			H,pktTYPE			; HL = pktTYPE
 		MOV			A,M					; A = cmd
 
 		; add len
-		INX			H					; HL @ pktDLEN 
+		INX			H					; HL++ = pktDLEN 
 		ADD			M					; A += data_len
-		MOV			D,A					; D = A = sum
+		MOV			D,A					; D = A = sum_to_dlen
 		MOV			A,M					; A = data_len
 		MOV			E,A					; E = data_len
 		MOV			B,A					; B = data_len
-		INX			H					; HL @ pktDATA
-		ORA			A					; set Z if len==0
-		MOV			A,D					; A = D = sum
+		INX			H					; HL = pktDATA
+		ORA			A					; Z if len==0
+		MOV			A,D					; A = D = sum_to_dlen
 		JZ			@endpkt				; if len==0 then jump to finish checksum
 
 		; add data
@@ -524,7 +524,7 @@ SendPacket:
 		INX			H					; HL++  HL @ next data byte
 		DCR			E					; E--
 		JNZ			@add_data_to_sum	; repeat until E=0
-		; D = junk partial sum
+		; D = junk (sum_to_dlen)
 		; E = 0
 
 		; compliment & append to packet
@@ -615,7 +615,7 @@ SendPacket:
 		; A = data[0]
 		; Z = if A=0
 		; BC = data_len
-		; D = junk partial sum
+		; D = junk (sum_to_dlen)
 		; E = 0
 		; HL = pktDATA
 		; pkt buffer = return packet from drive
