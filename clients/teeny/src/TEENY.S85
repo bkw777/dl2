@@ -95,38 +95,37 @@ FLOWCTL_PORT		EQU		0xBB				; COM & LPT flow control bits
 DSR_BITMASK			EQU		0x20
 	ENDIF
 
-; COM "STAT" string, not including the speed (speed is configurable)
-; TPDD protocol is raw binary data, so must be 8 bit and no xon/xoff
+; COM STAT speed
+	IF BAUD = 75
+	COM_SPEED EQU '1'
+	ELIF BAUD = 110
+	COM_SPEED EQU '2'
+	ELIF BAUD = 300
+	COM_SPEED EQU '3'
+	ELIF BAUD = 600
+	COM_SPEED EQU '4'
+	ELIF BAUD = 1200
+	COM_SPEED EQU '5'
+	ELIF BAUD = 2400
+	COM_SPEED EQU '6'
+	ELIF BAUD = 4800
+	COM_SPEED EQU '7'
+	ELIF BAUD = 9600
+	COM_SPEED EQU '8'
+	ELSE
+	COM_SPEED EQU '9'	; default 19200
+	ENDIF
+
+; COM STAT parameters
+; 8 bit, disable xon/xoff   (TPDD protocol has binary data)
 	IFNDEF COM_PARAMS
 COM_PARAMS MACRO
 	DB "8N1D"
 	ENDM
 	ENDIF
 
-; complete COM STAT string ex: "98N1D"
+; COM STAT string ex: "98N1D"
 COM_STAT MACRO
-	IF BAUD = 19200
-	COM_SPEED EQU '9'
-	ELIF BAUD = 9600
-	COM_SPEED EQU '8'
-	ELIF BAUD = 4800
-	COM_SPEED EQU '7'
-	ELIF BAUD = 2400
-	COM_SPEED EQU '6'
-	ELIF BAUD = 1200
-	COM_SPEED EQU '5'
-	ELIF BAUD = 600
-	COM_SPEED EQU '4'
-	ELIF BAUD = 300
-	COM_SPEED EQU '3'
-	ELIF BAUD = 110
-	COM_SPEED EQU '2'
-	ELIF BAUD = 75
-	COM_SPEED EQU '1'
-	ELSE
-	COM_SPEED EQU '8'	; only some drives can do 19200 but all can do 9600
-	ENDIF
-
 	DB COM_SPEED
 	COM_PARAMS
 	ENDM
@@ -1123,15 +1122,15 @@ PAUSE_DEx10us:						; 8-11us/iter * DE iters
 
 ; Used in LOAD for the differences in how each file type is inserted in ram.
 TBL_ftypes:
-		DB fattrCO			; +0*5 for CO files
+		DB fattrCO					; +0*5 for CO files
 		DW LOAD_End_CO
 		DW COFILES
 
-		DB fattrDO			; +1*5 for DO files
+		DB fattrDO					; +1*5 for DO files
 		DW LOAD_End_DO
 		DW DOFILES
 
-		DB fattrBA			; +2*5 for BA files
+		DB fattrBA					; +2*5 for BA files
 		DW LOAD_End_BA
 		DW BAFILES
 
@@ -1154,7 +1153,7 @@ STR_ErrCodes		EQU STR_Err+5
 ; Offsets into STR_ErrCodes. Drive returns 0x00-0x8F -> ParseStdReturn -> eXX
 ; see ParseStdReturn & dl2/constants.h
 eFF					EQU		0x02 ; directory - file not found, file already exist
-eUE					EQU		0x04 ; unknown - 0x20-0x2F, never observed, maybe use this spot for a local-only error
+eUE					EQU		0x04 ; unknown - 0x20-0x2F, never observed
 eSN					EQU		0x06 ; syntax
 eIO					EQU		0x08 ; integrity - crc & other data sanity failures, disk/serial/ram
 eWP					EQU		0x0A ; write-protect, format
