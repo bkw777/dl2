@@ -164,6 +164,8 @@ FX1					EQU		FILNM1+6	; EXT of FILNM1 after CKFN2 (“CO”, “DO”, “BA”)
 
 ZZ					EQU		0x5A5A				; packet start / preamble, "ZZ"
 
+hard_coded_attr		EQU		'F'
+
 ; commands
 cmd_dirent			EQU		0x00
 cmd_open			EQU		0x01
@@ -188,7 +190,7 @@ read_mode			EQU		0x03
 
 tpdd_fname_len		EQU		24
 cmd_dirent_dlen		EQU		tpdd_fname_len + 1 + 1	; 24(fname) + 1(attr) +1(action)
-pkt_len_overhead	EQU		5	; 2(ZZ) + 1(fmt) + 1(len) [DATA] + 1(chk)
+pkt_len_overhead	EQU		5	; 2(ZZ) + 1(fmt) + 1(len) + 1(chk)
 
 ; -----------------------------------------------------------------------------
 ; APPLICATION
@@ -378,7 +380,7 @@ ERROR:
 		ORA 		A				; does [LoadingFlag] == 0?
 		JZ 			@show			; if 0 skip to @show
 	IF ERRCODES
-		PUSH 		D				; save E=eXX
+		PUSH 		D				; stash E = eXX
 	ENDIF
 		LHLD 		RamFileSize		; HL = [RamFileSize]  HL = ram_fsize
 		MOV 		B,H				; B = H
@@ -386,13 +388,13 @@ ERROR:
 		LHLD 		RamFileStart	; HL = [RamFileStart]  HL = ram_fstart
 		CALL		MASDEL			; delete BC bytes @ HL
 	IF ERRCODES
-		POP 		D				; restore E=eXX
+		POP 		D				; restore E = eXX
 	ENDIF
 @show:
 	IF ERRCODES
 		LXI			H,STR_ErrCodes	; HL = start of string of err codes
-		MVI			D,0				; D=0 E=eXX from above
-		DAD			D				; HL=STR_Errcodes+eXX
+		MVI			D,0				; D = 0   DE = eXX
+		DAD			D				; HL = STR_Errcodes+eXX
 		MOV			A,M				; get first byte of error code
 		_RST		rst_Print_A			; print it
 		_RST		rst_NextNonSpace	; get next byte of err code
@@ -426,26 +428,27 @@ DIRENT:
 		; start building a DIRENT(set_name) cmd packet
 		XRA			A					; A = 0 = cmd_dirent
 		CALL		InitPacket			; start building a cmd_dirent packet
-		; HL @ pktDLEN (len)
-		MVI			M,cmd_dirent_dlen	; pktDLEN = 26
-		INX			H					; HL = pktDATA (start of data)
-		; HL @ pktDATA (data)
+		; HL = pktDLEN (len)
+		MVI			M,cmd_dirent_dlen	; [pktDLEN] = 26
+		INX			H					; HL++
+		; HL = pktDATA (start of data)
 		LXI			D,KYBUF+2			; DE = 3rd byte into keyboard buffer (skip over "C ")
 		MVI			B,local_fname_len	; B = 9
 		CALL		D2H4Bup				; append 9 bytes (filename FFFFFF.XX) from DE (keyb buf) to HL (packet data)
-		; HL @ pktDATA+9
-		MVI			B,tpdd_fname_len-local_fname_len	; B = 15, 24 byte tpdd filename field minus 9 bytes XXXXXX.XX
-@l0:
-		MVI			M,SPACE				; append " " to packet data
-		INX			H					; next byte
+		; pktDATA[0]..pktDATA[8] = "MYPROG.BA"
+		; HL = pktDATA+9  end of filename + 1
+		; fill the rest of the filename field with spaces
+		MVI			B,tpdd_fname_len-local_fname_len	; B = 24-9 = 15
+@append_space:
+		MVI			M,SPACE				; [HL] = " "
+		INX			H					; HL++
 		DCR			B					; B--
-		JNZ 		@l0					; repeat 14 more times (write 15 spaces) + 9 bytes filename = 24 bytes tpdd filename field
-		; HL @ pktDATA+24
-		MVI 		M,'F'				; hard-coded always write 'F' in attr field
+		JNZ 		@append_space		; repeat until B=0
+		; HL = pktDATA+24 = dirent attr field
+		MVI 		M,hard_coded_attr	; [pktDATA+24] = 'F'
 		INX			H					; next byte
-		; HL @ pktDATA+25 aka the dirent action field, and B happens to be 0,
-		; which also happens to be the dirent action code for dirent(set_name)
-		MOV			M,B					; M@pktDATA+25 = action = B = 0 = set_name
+		; HL = pktDATA+25 = dirent action field, code for set_name action is 0
+		MOV			M,B					; [pktDATA+25] = B = 0
 		; dirent(set_name) tells the drive the filename for an open/close/read/write/kill to follow
 
 		; fall into SendPacketSpecial
@@ -460,7 +463,7 @@ SendPacketSpecial:
 		; E = 0
 		; HL = pktDATA
 		; pkt buffer = return packet from drive
-		; Z = set if A=0
+		; Z if A=0
 
 		MOV			B,A					; B = data[0]
 		LDA			pktTYPE				; A = [pktTYPE] = ret_pkt_type
@@ -478,7 +481,7 @@ SendPacketSpecial:
 		; E = 0
 		; HL = pktDATA
 		; pkt buffer = return packet from drive
-		; Z set if A=0
+		; Z if A=0
 
 		; RET might go to:
 		; * CALL SendPacketSpecial in SendReadCMD
@@ -613,7 +616,7 @@ SendPacket:
 		; A & Z don't seem to be meaningful for LOAD or DIRENT ?
 
 		; A = data[0]
-		; Z = set if A=0
+		; Z = if A=0
 		; BC = data_len
 		; D = junk partial sum
 		; E = 0
