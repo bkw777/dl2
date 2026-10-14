@@ -264,19 +264,16 @@ PRGTOP:
 PRGEXE:
 		LDSI		0				; DE = stack pointer+0
 		XCHG						; HL = stack pointer
-		SHLD		initial_sp		; initial_sp = initial stack pointer
+		SHLD		initial_sp		; [initial_sp] = stack pointer
 		LXI			H,ZZ			; HL = "ZZ" = tpdd packet preamble
-		SHLD		pktZZ			; pktZZ = "ZZ" preamble field of packet buffer never changes
+		SHLD		pktZZ			; [pktZZ] = "ZZ" preamble field of packet buffer never changes
 MAIN:
 		; reset stack pointer every time we return to main
 	IF ROM
-		LHLD		initial_sp		; HL = initial_sp
-		SPHL						; SP = initial_sp
+		LHLD		initial_sp		; HL = [initial_sp]
+		SPHL						; SP = HL = saved initial stack pointer
 	ELSE
-		; 0*foo is just my way of writing 0 for the compiler, while indicating
-		; to humans that the operand is the address of foo and self-modifying
-@sp:
-		LXI			SP,0*initial_sp	; SP = initial_sp
+@sp:	LXI			SP,0*initial_sp	; SP = [initial_sp]
 	ENDIF
 		XRA			A				; A = 0
 		STA			LoadingFlag		; [LoadingFlag] = 0
@@ -286,11 +283,11 @@ MAIN:
 		CALL		PTILL0			; print HL
 		; we just printed the prompt
 		; now collect the user input
-		STA			KYBCNT			; KYBCNT = 0 (clear pending keystrokes count)
+		STA			KYBCNT			; [KYBCNT] = 0 (clear pending keystrokes count)
 		CALL		INLIN			; get a line of input from keyboard
 		; KYBUF = |L MYPROG.BA|
 		LXI			H,errSN			; HL = errSN
-		SHLD		ETRAP			; set errSN as the ON ERROR handler
+		SHLD		ETRAP			; [ETRAP] = errSN  set errSN as the ON ERROR handler
 		LXI			H,KYBUF+1		; HL = KYBUF[1]
 		MVI			M,'"'			; KYBUF[1]='"'
 		; KYBUF = |L"MYPROG.BA|
