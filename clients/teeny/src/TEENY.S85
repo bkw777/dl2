@@ -1046,11 +1046,11 @@ WriteFinalChunk:
 		POP 		D					; DE = position_a
 SendWriteCMD:
 		MVI			A,cmd_write
-		CALL		InitPacket 			; HL@pktDLEN, M=0
-		MOV			M,C					; write C=chunk_len to pktDLEN
-		INX			H					; advance HL to pktDATA
-		MOV			B,C					; tell D2H4Bup how many bytes to copy
-		CALL		D2H4Bup				; copy B bytes from DE to HL
+		CALL		InitPacket 			; HL = pktDLEN
+		MOV			M,C					; [pktDLEN] = C = chunk_len
+		INX			H					; HL++ = pktDATA
+		MOV			B,C					; B = C = chunk_len
+		CALL		D2H4Bup				; copy B bytes from [DE] to [HL]
 		JMP			jSendPacket			; send the packet, read it's return packet
 
 ; -----------------------------------------------------------------------------
@@ -1059,9 +1059,9 @@ SendWriteCMD:
 
 InitPacket:
 		; A = cmd
-		LXI 		H,pktTYPE		; HL @ pktTYPE
+		LXI 		H,pktTYPE		; HL = pktTYPE
 		MOV			M,A				; [pktTYPE] = A = cmd
-		INX			H				; HL @ pktDLEN
+		INX			H				; HL = pktDLEN
 		MVI			M,0				; [pktDLEN] = 0
 		; HL @ pktDLEN
 		RET
@@ -1112,7 +1112,7 @@ RXtoM:
 PAUSE_DEx10us:						; 8-11us/iter * DE iters
 		DCX 		D				; DE--
 		MOV			A,D				; A = D
-		ORA			E				; D V E sets Z only when both D and E == 0
+		ORA			E				; DVE -> Z if DE=0
 		JNZ			PAUSE_DEx10us	; repeat until DE=0
 		RET
 	ENDIF
