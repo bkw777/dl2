@@ -234,10 +234,10 @@ direntFSIZE			EQU		pktDATA + tpdd_fname_len + 1
 ; For a .CO file, ORG needs to be calculated backwards from HIMEM-PRGLEN.
 ;
 ; The only way to determine PRGLEN is to build without caring what the
-; addresses are, note the length, and build again with -PRGLEN=length.
+; addresses are, note the length, and build again with -DPRGLEN=length.
 ;
 ; For a temp build just to get the length, don't specify PRGLEN, HIMEM, or ORG
-; For a .CO file just below MAXRAM on a 32k machine, specify -PRGLEN=length
+; For a .CO file just below MAXRAM on a 32k machine, specify -DPRGLEN=length
 ; For a .CO file just below a given HIMEM, specify -DHIMEM=addr -DPRGLEN=length
 ; For a binary that will be included in a rom, specify -DROM -DORG=addr
 
