@@ -8,22 +8,48 @@ MODELS = 100na K85na M10na M10eu 200na NECna
 URL = github.com/bkw777/dl2
 CO2BA_CMD = callba      # savem / callbe
 CO2BA_CMD_NEC = execba  # bsave / execba
+#ASFLAGS := -v
+DEFAULT_TARGET = DO
 
 AS = z88dk-z80asm
-ASFLAGS := -m8085_strict -no-synth # -v
+af = -m8085_strict -no-synth # -v
 # Adds -DZ88DK=ver to flags if the assembler is z88dk.
-ASFLAGS += $(shell $(AS) |awk '/^Z80 Macro Assembler /{split($$4,a,"-");if (a[1]>0) print "-DZ88DK="a[1]}')
+af += $(shell $(AS) |awk '/^Z80 Macro Assembler /{split($$4,a,"-");if (a[1]>0) print "-DZ88DK="a[1]}')
 
-# -DHIMEM=addr		# [MAXRAM] generate a relocated binary with specified END address
-# -DDSR				# include code for DSR checks
-# -DBAUD=9600		# [19200] 9600 4800 2400 1200 600 300 110 75
-# -DERRCODES		# include distinct error codes instead of just "ER" for all (adds over 100 bytes!)
-# -DROM				# don't use any self-modifying code
-# Use -DBAUD=9600 if you have a FB-100, FDD19, or Purple Computing drive,
-# or remove the solder blob under the little cover on the bottom.
-# Example usage from the make command line:
-# $ make 100na XFLAGS='-DBAUD=9600 -DDSR -DERRCODES'
-XFLAGS :=
+# -DBAUD=baud	# [19200] 9600 4800 2400 1200 600 300 110 75
+# -DDSR			# include code for DSR checks
+# -DERRCODES	# add code for different error codes for different conditions
+# -DROM			# don't use any self-modifying code
+# -ORG=addr		# generate a binary with specified ORG instead of HIMEM-LENGTH
+# -DHIMEM=addr	# generate a binary with specified END address instead of MAXRAM
+
+# $ make clean all DBAUD=9600 DSR=true ERRCODES=true
+# $ make clean all ASFLAGS="-DBAUD=9600 -DDSR -DERRCODES"
+
+ifdef BAUD
+	af += -DBAUD=$(BAUD)
+endif
+ifeq ($(DSR),true)
+	af += -DDSR
+endif
+ifeq ($(ERRCODES),true)
+	af += -DERRCODES
+endif
+ifdef ($(ROM),true)
+	af += -DROM
+endif
+ifdef ORG
+	af += -DORG=$(ORG)
+	DEFAULT_TARGET = bin
+endif
+ifdef HIMEM
+	af += -DHIMEM=$(HIMEM)
+endif
+ifeq ($(ROM),true)
+	af += -DROM
+endif
+
+ASFLAGS += $(af)
 
 # don't delete .CO when building .DO
 .SECONDARY:
@@ -32,15 +58,18 @@ XFLAGS :=
 all: $(MODELS)
 
 .PHONY: $(MODELS)
-$(MODELS): % : $(NAME)_%.DO
+$(MODELS): % : $(NAME)_%.$(DEFAULT_TARGET)
 
 $(patsubst %,$(NAME)_%.CO,$(MODELS)): $(NAME)_%.CO : $(SRC) %.S85
-	@$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -b -o=$@ $< && \
-	CMD="$(AS) $(ASFLAGS) $(XFLAGS) -DMODEL_$* -DPRGLEN=`wc -c <$@` -b -o=$@ $<" ; \
+	@$(AS) $(ASFLAGS) -DMODEL_$* -b -o=$@ $< && \
+	CMD="$(AS) $(ASFLAGS) -DMODEL_$* -DPRGLEN=`wc -c <$@` -b -o=$@ $<" ; \
 	echo "$$CMD" ; \
 	eval $$CMD
 	@rm *.o
 	@case $* in 200*|NEC*) echo '!NOTICE!  $* does not work. See ../orig/disasm for working $* source' ;; esac
+
+%.bin: %.CO
+	@mv -v $< $@
 
 %.DO: %.CO
 	@which -s co2ba || echo "Please install https://github.com/bkw777/dl2 for co2ba to generate $@"
@@ -49,17 +78,6 @@ $(patsubst %,$(NAME)_%.CO,$(MODELS)): $(NAME)_%.CO : $(SRC) %.S85
 	CMD="PN=$(NAME) COMMENT=\"$$c - $(URL)\" co2ba $< $$o >$@" ; \
 	echo "$$CMD" ; \
 	eval $$CMD
-
-.PHONY: verify_%
-verify_%: $(NAME)_%.CO
-	@cmp -l $< ../orig/$< && echo "Built $< is identical to reference ../orig/$<."
-	@echo "Note: default config no longer replicates the legacy binary exactly,"
-	@echo "so it's normal for verify to 'fail' now."
-
-.PHONY: load_%
-load_%: $(NAME)_%.DO
-	@which -s dl || echo "Please install https://github.com/bkw777/dl2 to bootstrap $<"
-	dl -v -b $<
 
 .PHONY: clean
 clean:

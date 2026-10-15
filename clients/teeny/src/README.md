@@ -1,17 +1,18 @@
 
 # TEENY regenerated
 
-A single common TEENY.S85 asm source and Makefile that generates binaries for all different models of machine.
+A single common asm source that aims to eventually generate [TEENY](../teenydoc.txt) binaries for all computers sharing the Kyotronic KC-85 platform.  
+(Kyotronic KC-85, TRS-80 Model 100, TANDY 102 200, NEC PC-8201 PC-8201A PC-8300, Olivetti M-10)
 
-Currently the default config produces a .CO file for Model 100 that is only 632 bytes.
+Currently the default config produces a .CO file for TRS-80 Model 100 that is only 632 bytes.  
+(Legacy TEENY for 100 is 753 bytes)
 
 The 100, M10, and K85 binaries built from this source all work.
 
 The 200 & NEC binaries from this source do not work yet,  
-but [../orig/disasm](../orig/disasm) has seperate sources for 200 & NEC,  
-and those both work.
+but [../orig/disasm](../orig/disasm) has source for 200 & NEC which both work.
 
-So there is working asm source for all machines one way or another.
+So there is working asm source for at least the North American version of all machines one way or another.
 
 # build
 
@@ -19,28 +20,25 @@ So there is working asm source for all machines one way or another.
 
 ## options
 
-| -D define       | default | description |
-| ---             | ---     | --- |
-| `HIMEM=addr`    | MAXRAM  | generate a relocated binary with specified END address |
-| `DSR`           | no      | include code for DSR check |
-| `BAUD=baud`     | 19200   | 19200 9600 4800 2400 1200 600 300 110 75 |
-| `ERRCODES`      | no      | include code for distinct error codes for different events & conditions, and parse the drive response codes |
+| option=default    | description |
+| ---               | --- |
+| `BAUD=19200`      | 19200 9600 4800 2400 1200 600 300 110 75 |
+| `DSR=false`       | include code for DSR check |
+| `ERRCODES=false`  | distinct error codes |
+| `HIMEM=<MAXRAM>`  | TOP/EXE = specified HIMEM minus LENGTH |
+| `ORG=<HIMEM-LEN>` | TOP/EXE = specified ORG (overrides HIMEM) |
+| `ROM=false`       | don't include any self-modifying code |
 
-example  
-`z88dk-z80asm -DHIMEM=61000 ...`  
-or  
-`make ... XFLAGS="-DDSR -DBAUD=9600"`
+Use by just adding to the `make` commandline  
+`make clean all DSR=true BAUD=9600`
 
-Default baud is 19200 because TPDD2 only supports 19200 and cannot be changed,   
-And TPDD1 is also set to 19200 by default (all dip switches set to off).
+* Default generates a `.CO` file that ends just below MAXRAM on a 32k machine  
+* `HIMEM=addr` generates a `.CO` file that ends just below `addr`  
+* `ROM=true ORG=addr` generates a `.bin` file that starts at `addr` (overrides HIMEM), and doesn't include any code that modifies the binary at run-time.
 
-FB-100, FDD19, and Purple Computing drives are all hard-wired for 9600 baud.  
-For those drives you can build with `-DBAUD=9600`, or you can change them to
-19200 by removing the solder blob under the small door on the bottom.
+The only operational difference from the original TINY/TEENY is that by default all errors print the same "ER" message instead of different error codes for different errors.
 
-Unlike original TINY/TEENY, by default all errors just say "ER".
-
-`-DERRCODES` adds these distinct error codes  
+`ERRCODES=true` adds these distinct error codes  
 These are similar to but not identical to legacy TEENY.
 
 | ERR | Meaning       | Additional |
@@ -54,6 +52,11 @@ These are similar to but not identical to legacy TEENY.
 | HW  | HardWare      | physical drive or disk problems, various sensors |
 | UE  | Unknown       | other/unknown errors |
 
+DSR is not enabled by default to allow the most possible serial cables to work when connecting to a computer instead of a drive.
+
+You will need `BAUD=9600` if you have a Brother FB-100 or knitking FDD19, and don't want to remove the solder-blob those drives have in place of the dip switch.
+
+You will need `ROM=true` if you want to embed TEENY into a rom. This disables the use of some slightly space-saving tricks that rely on being able to modify values in the binary itself at run-time.
 
 # references
 [TEENY Manual](../teenydoc.txt)

@@ -228,19 +228,29 @@ direntFSIZE			EQU		pktDATA + tpdd_fname_len + 1
 
 
 ; -----------------------------------------------------------------------------
-; ORG
+; ORG & CO header
 ; -----------------------------------------------------------------------------
 
-; ORG & CO Header works backwards from HIMEM-PRGLEN.
-; PRGLEN has to be supplied from outside via -DPRGLEN=len.
-; If no PRGLEN then build with default ORG 0 and no CO header.
+; For a .CO file, ORG needs to be calculated backwards from HIMEM-PRGLEN.
+;
+; The only way to determine PRGLEN is to build without caring what the
+; addresses are, note the length, and build again with -PRGLEN=length.
+;
+; For a temp build just to get the length, don't specify PRGLEN, HIMEM, or ORG
+; For a .CO file just below MAXRAM on a 32k machine, specify -PRGLEN=length
+; For a .CO file just below a given HIMEM, specify -DHIMEM=addr -DPRGLEN=length
+; For a binary that will be included in a rom, specify -DROM -DORG=addr
+
+	; If no -DPRGLEN then don't set ORG and don't include a CO header.
+	; If -DORG then override PRGLEN & HIMEM (ignore them)
+	IFNDEF ORG
 	IFDEF PRGLEN
 	;--------------------------------------------------------------------------
 	; ORG
 	;--------------------------------------------------------------------------
 	IFNDEF HIMEM
 HIMEM				EQU		MAXRAM
-	ENDIF
+	ENDIF ; !HIMEM
 
 	ORG HIMEM-PRGLEN-6			; entry minus length of header
 
@@ -251,6 +261,7 @@ HIMEM				EQU		MAXRAM
 	DW PRGLEN
 	DW PRGEXE
 	ENDIF ; PRGLEN
+	ENDIF ; !ORG
 ;------------------------------------------------------------------------------
 
 
