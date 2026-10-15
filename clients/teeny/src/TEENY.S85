@@ -243,7 +243,9 @@ direntFSIZE			EQU		pktDATA + tpdd_fname_len + 1
 
 	; If no -DPRGLEN then don't set ORG and don't include a CO header.
 	; If -DORG then override PRGLEN & HIMEM (ignore them)
-	IFNDEF ORG
+	IF ORG
+	ORG ORG
+	ELSE
 	IFDEF PRGLEN
 	;--------------------------------------------------------------------------
 	; ORG
