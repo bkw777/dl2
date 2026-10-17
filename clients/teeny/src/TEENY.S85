@@ -6,12 +6,16 @@
 ; Platform & rom references for porting: https://github.com/bkw777/m100_dev
 ; Brian K. White
 ;
-; build with:
-;	z88dk-z80asm -m8085_strict -no-synth -DMODEL_100na -b -o=TEENY.CO TEENY.S85 && \
-;	z88dk-z80asm -m8085_strict -no-synth -DMODEL_100na -DPRGLEN=$(wc -c <TEENY.CO) -b -o=TEENY.CO TEENY.S85
+; build with z88dk-z80asm
 ;
-; so far it builds for 100na, K85na, M10na, M10eu, 200na, NECna
-; $ make clean all
+; 0 - Use the nightly version of z88dk, else include "-DZ88DK=1" on all z80asm commands.
+; Include "-DMODEL_XXXXX" on all z80asm commands: 100na K85na M10na M10eu 200na NECna
+;
+; 1 - Build once without -DPRGLEN=n, note the length in bytes of the generated TEENY.CO
+; z88dk-z80asm -m8085_strict -no-synth -DMODEL_100na -b -o=TEENY.CO TEENY.S85
+;
+; 2 - Finally repeat the same build, with -DPRGLEN=nbytes this time.
+; z88dk-z80asm -m8085_strict -no-synth -DMODEL_100na -DPRGLEN=626 -b -o=TEENY.CO TEENY.S85
 
 ;;;;
 ;;;; 100na works
@@ -34,7 +38,6 @@
 	IFNDEF BAUD
 BAUD 				EQU		19200
 	ENDIF
-
 ; Include code to check DSR to avoid hangs and fail more gracefully
 ; when the drive is powered off or the serial connection breaks.
 ; It's nice and only adds about a dozen bytes, but it makes it far more
@@ -61,9 +64,10 @@ COM_SETUP_PAUSE_MS	EQU		100
 ; ASSEMBLER
 ; -----------------------------------------------------------------------------
 
-; z88dk before db5c165 (20260602) doesn't recognize the intel syntax for RST
+; z88dk before v24830 (db5c165 20260603) doesn't know the intel syntax for RST.
+; "-DZ88DK=version" is generated in Makefile.
 _RST MACRO n
-	IF Z88DK && Z88DK<25000
+	IF Z88DK && Z88DK<24830
 		RST n*8
 	ELSE
 		RST n
@@ -288,22 +292,22 @@ MAIN:
 @sp:	LXI			SP,0*initial_sp	; SP = [initial_sp]
 	ENDIF
 		XRA			A				; A = 0
-		STA			LoadingFlag		; [LoadingFlag] = 0
+		STA			LoadingFlag		; [LoadingFlag] = A = 0
 		LXI			H,MAIN			; HL = MAIN
 		PUSH		H				; TS = MAIN
 		LXI			H,STR_Prompt	; HL = STR_Prompt
 		CALL		PTILL0			; print HL
 		; we just printed the prompt
 		; now collect the user input
-		STA			KYBCNT			; [KYBCNT] = 0 (clear pending keystrokes count)
+		STA			KYBCNT			; [KYBCNT] = A = 0 (clear pending keystrokes count)
 		CALL		INLIN			; get a line of input from keyboard
 		; KYBUF = |L MYPROG.BA|
 		LXI			H,errSN			; HL = errSN
 		SHLD		ETRAP			; [ETRAP] = errSN  set errSN as the ON ERROR handler
-		LXI			H,KYBUF+1		; HL = KYBUF[1]
+		LXI			H,KYBUF+1		; HL = KYBUF+1
 		MVI			M,'"'			; KYBUF[1]='"'
 		; KYBUF = |L"MYPROG.BA|
-		; HL = KYBUF[1] (still on the ")
+		; HL = KYBUF+1 (on the ")
 		; CKFN2 reads it the same way BASIC reads ex: |SAVE"MYPROG.BA|
 		CALL		CKFN2			; evaluate & reformat filename
 		CALL		RESETFPS		; reset file pointers
@@ -313,7 +317,7 @@ MAIN:
 		CPI			'S'				; is it 'S' ?
 		JZ			SAVE			; then jump to SAVE
 
-		; if we got here, cmd is K, L, or unknown
+		; if we got here, cmd is K, L, or invalid
 
 		PUSH 		PSW				; stash A = cmd
 		; TS=cmd,MAIN
@@ -328,16 +332,16 @@ MAIN:
 		DCR 		A				; A--
 		JZ			LOAD			; if A == 0 then cmd is 'L', jump to LOAD
 
-		; if we got here, cmd is unknown
-		; fall into errSN
+		; if we got here, cmd is invalid
+		; fall into errSN - syntax error
 
 ; -----------------------------------------------------------------------------
 ; ERROR CODES - this stack of jump targets uses an opcode-as-data trick
-; 1: The first MVI_E,eXX you hit executes normally and sets E=eXX.
-; 2: The LXI_B after that executes as code and consumes the next 2 bytes
-;    as it's operand, which is the entire next MVI_E and it's eXX operand.
+; 1: The MVI E,eXX that you jump/fall to executes normally and sets E=eXX.
+; 2: The DB opcode_LXI_B after that executes as code, consumes the next 2 bytes
+;    MVI E,eXX as it's operand, which just get copied to B and ignored.
 ; 3: The next byte is another LXI_B, repeat 2: as long as the pattern holds.
-; 4: Fall through into ERROR with E=eXX.
+; 4: Fall into ERROR with E=eXX. B is never used.
 ; -----------------------------------------------------------------------------
 
 	IF ERRCODES
@@ -1104,9 +1108,9 @@ CheckDSR:
 		ANI			DSR_BITMASK		; check !DSR
 		RZ							; Z = ready
 		JMP			errND			; err no disk
-	ENDIF ; /DSR
+	ENDIF ; DSR
 
-; read 1 byte from rs232 to M, HL++
+; read 1 byte from rs232 to [HL], then HL++
 RXtoM:
 	IF DSR
 		CALL		CheckDSR
