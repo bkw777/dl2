@@ -16,15 +16,19 @@ af = -m8085_strict -no-synth # -v
 # Adds -DZ88DK=ver to flags if the assembler is z88dk.
 af += $(shell $(AS) |awk '/^Z80 Macro Assembler /{split($$4,a,"-");if (a[1]>0) print "-DZ88DK="a[1]}')
 
-# -DBAUD=baud	# [19200] 9600 4800 2400 1200 600 300 110 75
-# -DDSR			# include code for DSR checks
-# -DERRCODES	# add code for different error codes for different conditions
-# -DROM			# don't use any self-modifying code
-# -ORG=addr		# generate a binary with specified ORG instead of HIMEM-LENGTH
-# -DHIMEM=addr	# generate a binary with specified END address instead of MAXRAM
+# -DBAUD=baud   # [19200] 9600 4800 2400 1200 600 300 110 75
+# -DDSR         # include code for DSR checks
+# -DERRCODES    # add code for different error codes for different conditions
+# -DROM         # don't use any self-modifying code
+# -ORG=addr     # generate a binary with specified ORG instead of HIMEM-LENGTH
+# -DHIMEM=addr  # generate a binary with specified END address instead of MAXRAM
 
-# $ make clean all DBAUD=9600 DSR=true ERRCODES=true
-# $ make clean all ASFLAGS="-DBAUD=9600 -DDSR -DERRCODES"
+# build all *.CO and *.DO with default config
+#   $ make clean all
+# build all *.CO and *.DO with custom config
+#   $ make clean all DBAUD=9600 DSR=true ERRCODES=true
+# build a rom-embeddable *.bin for Olivetti M-10 EU
+#   $ make clean M10eu ROM=true ORG=0x7CFB
 
 ifdef BAUD
 	af += -DBAUD=$(BAUD)
@@ -35,18 +39,15 @@ endif
 ifeq ($(ERRCODES),true)
 	af += -DERRCODES
 endif
-ifdef ($(ROM),true)
+ifeq ($(ROM),true)
 	af += -DROM
+	DEFAULT_TARGET = bin
 endif
 ifdef ORG
 	af += -DORG=$(ORG)
-	DEFAULT_TARGET = bin
 endif
 ifdef HIMEM
 	af += -DHIMEM=$(HIMEM)
-endif
-ifeq ($(ROM),true)
-	af += -DROM
 endif
 
 ASFLAGS += $(af)
@@ -68,7 +69,7 @@ $(patsubst %,$(NAME)_%.CO,$(MODELS)): $(NAME)_%.CO : $(SRC) %.S85
 	@rm *.o
 	@case $* in 200*|NEC*) echo '!NOTICE!  $* does not work. See ../orig/disasm for working $* source' ;; esac
 
-%.bin: %.CO
+%.bin %.rom: %.CO
 	@mv -v $< $@
 
 %.DO: %.CO
@@ -81,4 +82,4 @@ $(patsubst %,$(NAME)_%.CO,$(MODELS)): $(NAME)_%.CO : $(SRC) %.S85
 
 .PHONY: clean
 clean:
-	rm -f *.o *.bin *.sym *.lis *.map *.def *.CO *.DO
+	rm -f *.o *.bin *.sym *.lis *.map *.def *.CO *.DO *.rom
