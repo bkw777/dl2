@@ -69,7 +69,10 @@ $(patsubst %,$(NAME)_%.CO,$(MODELS)): $(NAME)_%.CO : $(SRC) %.S85
 	@rm *.o
 	@case $* in 200*|NEC*) echo '!NOTICE!  $* does not work. See ../orig/disasm for working $* source' ;; esac
 
-%.bin %.rom: %.CO
+%.bin: %.CO
+	@mv -v $< $@
+
+%.rom: %.CO
 	@mv -v $< $@
 
 %.DO: %.CO
