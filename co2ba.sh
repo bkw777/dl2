@@ -43,8 +43,8 @@ readonly dlen=$LLEN g=$STEP u=",${UNSAFE// /,}," EP ep RP rp
 tb=${XB:1} xb=true ;[[ "${XB:0:1}" = "+" ]] && xb=false ;readonly xb tb # transform B, to encode unsafe bytes
 unset Ev Qd Qv UNTA
 n=$LFIRST
-TIME=false ;[[ "$ACTION" == "TIME" ]] && TIME=true
-NEC=false ;[[ "EXECBA|BSAVE" =~ "$ACTION" ]] && NEC=true
+TIME=false ;[[ "_$ACTION" == "_TIME" ]] && TIME=true
+NEC=false ;[[ "|EXECBA|BSAVE|" =~ "|$ACTION|" ]] && NEC=true
 
 DOCURL="https://github.com/bkw777/dl2/blob/master/co2ba.md"
 abrt () { printf '%s: Usage\n%s IN.CO [call|exec|callba|execba|savem|bsave] > OUT.DO\n\n%s\n\n%b\n' "$0" "${0##*/}" "$DOCURL" "$@" >&2 ;exit 1 ; }
