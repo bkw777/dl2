@@ -30,6 +30,7 @@
 ; CONFIGURATION
 ; -----------------------------------------------------------------------------
 
+; BAUD
 ; TPDD1 default is 19200 but dip switch settable 150-76k.
 ; TPDD2 is 19200 only. (not even solder-jumper option)
 ; Brother FB-100, KnitKing FDD19, and Purple Computing D103 are 9600 only.
@@ -38,6 +39,8 @@
 	IFNDEF BAUD
 BAUD 				EQU		19200
 	ENDIF
+
+; DSR
 ; Include code to check DSR to avoid hangs and fail more gracefully
 ; when the drive is powered off or the serial connection breaks.
 ; It's nice and only adds about a dozen bytes, but it makes it far more
@@ -45,20 +48,24 @@ BAUD 				EQU		19200
 ; any cable, even 3-wire.
 	;DEFINE DSR
 
-; length of WRITE packet data field
-; don't change this from 128
-	IFNDEF CHUNK_LEN
-CHUNK_LEN			EQU		128		; 1-128
-	ENDIF
-
-COM_SETUP_PAUSE_MS	EQU		100
-
+; ERRCODES
 ; Include code to manage distinct error codes and messages for different
 ; events and conditions, and parse the error codes returned by the drive.
 	;DEFINE ERRCODES
 
+; ROM
 ; If building to embed in a ROM then don't use any self-modifying code.
 	;DEFINE ROM
+
+; CHUNK_LEN
+; length of WRITE packet data field
+; It should technically be variable, and maybe one day it will be,
+; but for now don't try to change it from 128.
+	IFNDEF CHUNK_LEN
+CHUNK_LEN			EQU		128			; 1-128
+	ENDIF
+
+COM_SETUP_PAUSE_MS	EQU		100
 
 ; -----------------------------------------------------------------------------
 ; ASSEMBLER
@@ -93,7 +100,7 @@ _RST MACRO n
 	ENDIF
 
 	IFNDEF FLOWCTL_PORT
-FLOWCTL_PORT		EQU		0xBB				; COM & LPT flow control bits
+FLOWCTL_PORT		EQU		0xBB		; COM & LPT flow control bits
 	ENDIF
 	IFNDEF DSR_BITMASK
 DSR_BITMASK			EQU		0x20
@@ -165,7 +172,7 @@ FX1					EQU		FILNM1+6	; EXT of FILNM1 after CKFN2 (“CO”, “DO”, “BA”)
 ; TPDD
 ; -----------------------------------------------------------------------------
 
-ZZ					EQU		0x5A5A				; packet start / preamble, "ZZ"
+ZZ					EQU		0x5A5A		; packet start / preamble, "ZZ"
 
 hard_coded_attr		EQU		'F'
 
@@ -258,7 +265,7 @@ direntFSIZE			EQU		pktDATA + tpdd_fname_len + 1
 HIMEM				EQU		MAXRAM
 	ENDIF ; !HIMEM
 
-	ORG HIMEM-PRGLEN-6			; entry minus length of header
+	ORG HIMEM-PRGLEN-6					; entry minus length of header
 
 	;--------------------------------------------------------------------------
 	; .CO HEADER
@@ -278,59 +285,59 @@ HIMEM				EQU		MAXRAM
 ;------------------------------------------------------------------------------
 PRGTOP:
 PRGEXE:
-		LDSI		0				; DE = stack pointer+0
-		XCHG						; HL = stack pointer
-		SHLD		initial_sp		; [initial_sp] = stack pointer
-		LXI			H,ZZ			; HL = "ZZ" = tpdd packet preamble
-		SHLD		pktZZ			; [pktZZ] = "ZZ" preamble field of packet buffer never changes
+		LDSI		0					; DE = stack pointer+0
+		XCHG							; HL = stack pointer
+		SHLD		initial_sp			; [initial_sp] = stack pointer
+		LXI			H,ZZ				; HL = "ZZ" = tpdd packet preamble
+		SHLD		pktZZ				; [pktZZ] = "ZZ" preamble field of packet buffer never changes
 MAIN:
 		; reset stack pointer every time we return to main
 	IF ROM
-		LHLD		initial_sp		; HL = [initial_sp]
-		SPHL						; SP = HL = saved initial stack pointer
+		LHLD		initial_sp			; HL = [initial_sp]
+		SPHL							; SP = HL = saved initial stack pointer
 	ELSE
-@sp:	LXI			SP,0*initial_sp	; SP = [initial_sp]
+@sp:	LXI			SP,0*initial_sp		; SP = [initial_sp]
 	ENDIF
-		XRA			A				; A = 0
-		STA			LoadingFlag		; [LoadingFlag] = A = 0
-		LXI			H,MAIN			; HL = MAIN
-		PUSH		H				; TS = MAIN
-		LXI			H,STR_Prompt	; HL = STR_Prompt
-		CALL		PTILL0			; print HL
+		XRA			A					; A = 0
+		STA			LoadingFlag			; [LoadingFlag] = A = 0
+		LXI			H,MAIN				; HL = MAIN
+		PUSH		H					; TS = MAIN
+		LXI			H,STR_Prompt		; HL = STR_Prompt
+		CALL		PTILL0				; print HL
 		; we just printed the prompt
 		; now collect the user input
-		STA			KYBCNT			; [KYBCNT] = A = 0 (clear pending keystrokes count)
-		CALL		INLIN			; get a line of input from keyboard
+		STA			KYBCNT				; [KYBCNT] = A = 0 (clear pending keystrokes count)
+		CALL		INLIN				; get a line of input from keyboard
 		; KYBUF = |L MYPROG.BA|
-		LXI			H,errSN			; HL = errSN
-		SHLD		ETRAP			; [ETRAP] = errSN  set errSN as the ON ERROR handler
-		LXI			H,KYBUF+1		; HL = KYBUF+1
-		MVI			M,'"'			; KYBUF[1]='"'
+		LXI			H,errSN				; HL = errSN
+		SHLD		ETRAP				; [ETRAP] = errSN  set errSN as the ON ERROR handler
+		LXI			H,KYBUF+1			; HL = KYBUF+1
+		MVI			M,'"'				; KYBUF[1]='"'
 		; KYBUF = |L"MYPROG.BA|
 		; HL = KYBUF+1 (on the ")
 		; CKFN2 reads it the same way BASIC reads ex: |SAVE"MYPROG.BA|
-		CALL		CKFN2			; evaluate & reformat filename
-		CALL		RESETFPS		; reset file pointers
-		LDA			KYBUF			; A = KYBUF[0]
-		CPI			'Q'				; is it 'Q' ?
-		JZ			MENU			; then exit to OS (main menu)
-		CPI			'S'				; is it 'S' ?
-		JZ			SAVE			; then jump to SAVE
+		CALL		CKFN2				; evaluate & reformat filename
+		CALL		RESETFPS			; reset file pointers
+		LDA			KYBUF				; A = KYBUF[0]
+		CPI			'Q'					; is it 'Q' ?
+		JZ			MENU				; then exit to OS (main menu)
+		CPI			'S'					; is it 'S' ?
+		JZ			SAVE				; then jump to SAVE
 
 		; if we got here, cmd is K, L, or invalid
 
-		PUSH 		PSW				; stash A = cmd
+		PUSH 		PSW					; stash A = cmd
 		; TS=cmd,MAIN
 		; KILL and LOAD both start with DIRENT
-		CALL		DIRENT          ; tell the drive the filename, Z if !exist
-		JZ			errFF			; FF error if file not found
+		CALL		DIRENT      	    ; tell the drive the filename, Z if !exist
+		JZ			errFF				; FF error if file not found
 		; file found on disk
-		POP 		PSW				; restore A = cmd
+		POP 		PSW					; restore A = cmd
 		; TS=MAIN
-		SUI			'K'				; A -= 'K'
-		JZ			KILL			; if A == 0 then cmd is 'K', jump to KILL
-		DCR 		A				; A--
-		JZ			LOAD			; if A == 0 then cmd is 'L', jump to LOAD
+		SUI			'K'					; A -= 'K'
+		JZ			KILL				; if A == 0 then cmd is 'K', jump to KILL
+		DCR 		A					; A--
+		JZ			LOAD				; if A == 0 then cmd is 'L', jump to LOAD
 
 		; if we got here, cmd is invalid
 		; fall into errSN - syntax error
@@ -346,7 +353,7 @@ MAIN:
 
 	IF ERRCODES
 errSN:
-		MVI			E,eSN			; fell from above = unknown cmd = syntax error
+		MVI			E,eSN				; fell from above = unknown cmd = syntax error
 		DB			opcode_LXI_B
 errFF:
 		MVI			E,eFF
@@ -389,33 +396,33 @@ errHW:
 ; -----------------------------------------------------------------------------
 ERROR:
 		; if we were in the middle of SAVE, then undo the partial new file
-		LDA 		LoadingFlag		; A = [LoadingFlag]
-		ORA 		A				; does [LoadingFlag] == 0?
-		JZ 			@show			; if 0 skip to @show
+		LDA 		LoadingFlag			; A = [LoadingFlag]
+		ORA 		A					; does [LoadingFlag] == 0?
+		JZ 			@show				; if 0 skip to @show
 	IF ERRCODES
-		PUSH 		D				; stash E = eXX
+		PUSH 		D					; stash E = eXX
 	ENDIF
-		LHLD 		RamFileSize		; HL = [RamFileSize]  HL = ram_fsize
-		MOV 		B,H				; B = H
-		MOV 		C,L				; C = L   BC = ram_fsize
-		LHLD 		RamFileStart	; HL = [RamFileStart]  HL = ram_fstart
-		CALL		MASDEL			; delete BC bytes @ HL
+		LHLD 		RamFileSize			; HL = [RamFileSize]  HL = ram_fsize
+		MOV 		B,H					; B = H
+		MOV 		C,L					; C = L   BC = ram_fsize
+		LHLD 		RamFileStart		; HL = [RamFileStart]  HL = ram_fstart
+		CALL		MASDEL				; delete BC bytes @ HL
 	IF ERRCODES
-		POP 		D				; restore E = eXX
+		POP 		D					; restore E = eXX
 	ENDIF
 @show:
 	IF ERRCODES
-		LXI			H,STR_ErrCodes	; HL = start of string of err codes
-		MVI			D,0				; D = 0   DE = eXX
-		DAD			D				; HL = STR_Errcodes+eXX
-		MOV			A,M				; get first byte of error code
+		LXI			H,STR_ErrCodes		; HL = start of string of err codes
+		MVI			D,0					; D = 0   DE = eXX
+		DAD			D					; HL = STR_Errcodes+eXX
+		MOV			A,M					; get first byte of error code
 		_RST		rst_Print_A			; print it
 		_RST		rst_NextNonSpace	; get next byte of err code
 		_RST		rst_Print_A			; print it
 	ENDIF
-		LXI			H,STR_Err		; get STR_Err
-		CALL		PTILL0			; print it
-		JMP			MAIN			; restart at main
+		LXI			H,STR_Err			; get STR_Err
+			CALL		PTILL0			; print it
+			JMP			MAIN			; restart at main
 
 ; -----------------------------------------------------------------------------
 ; DIRENT - tell the drive a filename
@@ -994,8 +1001,7 @@ jSendPacket:
 		; otherwise, decode the result byte
 		; A = error code return data from drive, the first & only byte of pktDATA
 ParseStdReturn:
-		; This collapses 144 possible return values from the drive (0x00-0x8F)
-		; down to one of 8 error categories or no error.
+		; shift right 3 bits to collapse 0x00-0x8F down to 0x00-0x10
 		; drive err -> eXX (offset into STR_ErrCodes)
 		; 0x00-0x0F -> 0x00
 		; 0x10-0x1F -> 0x02
@@ -1075,10 +1081,10 @@ SendWriteCMD:
 
 InitPacket:
 		; A = cmd
-		LXI 		H,pktTYPE		; HL = pktTYPE
-		MOV			M,A				; [pktTYPE] = A = cmd
-		INX			H				; HL = pktDLEN
-		MVI			M,0				; [pktDLEN] = 0
+		LXI 		H,pktTYPE			; HL = pktTYPE
+		MOV			M,A					; [pktTYPE] = A = cmd
+		INX			H					; HL = pktDLEN
+		MVI			M,0					; [pktDLEN] = 0
 		; HL @ pktDLEN
 		RET
 
@@ -1104,10 +1110,10 @@ RamFileExtraLen:
 
 	IF DSR
 CheckDSR:
-		IN			FLOWCTL_PORT	; read RS232 flow control pins
-		ANI			DSR_BITMASK		; check !DSR
-		RZ							; Z = ready
-		JMP			errND			; err no disk
+		IN			FLOWCTL_PORT		; read RS232 flow control pins
+		ANI			DSR_BITMASK			; check !DSR
+		RZ								; Z = ready
+		JMP			errND				; err no disk
 	ENDIF ; DSR
 
 ; read 1 byte from rs232 to [HL], then HL++
@@ -1124,12 +1130,12 @@ RXtoM:
 		; HL = entry+1
 		RET
 
-	IFNDEF PAUSE_DEx10us			; NEC has this in the system rom
-PAUSE_DEx10us:						; 8-11us/iter * DE iters
-		DCX 		D				; DE--
-		MOV			A,D				; A = D
-		ORA			E				; DVE -> Z if DE=0
-		JNZ			PAUSE_DEx10us	; repeat until DE=0
+	IFNDEF PAUSE_DEx10us				; NEC has this in the system rom
+PAUSE_DEx10us:							; 8-11us/iter * DE iters
+		DCX 		D					; DE--
+		MOV			A,D					; A = D
+		ORA			E					; DVE -> Z if DE=0
+		JNZ			PAUSE_DEx10us		; repeat until DE=0
 		RET
 	ENDIF
 
@@ -1139,15 +1145,15 @@ PAUSE_DEx10us:						; 8-11us/iter * DE iters
 
 ; Used in LOAD for the differences in how each file type is inserted in ram.
 TBL_ftypes:
-		DB fattrCO					; +0*5 for CO files
+		DB fattrCO						; +0*5 for CO files
 		DW LOAD_End_CO
 		DW COFILES
 
-		DB fattrDO					; +1*5 for DO files
+		DB fattrDO						; +1*5 for DO files
 		DW LOAD_End_DO
 		DW DOFILES
 
-		DB fattrBA					; +2*5 for BA files
+		DB fattrBA						; +2*5 for BA files
 		DW LOAD_End_BA
 		DW BAFILES
 
