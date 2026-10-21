@@ -17,7 +17,7 @@ LANG=C
 : ${XB:=^128}      # ^### +###            default '^128'
 : ${RLE:=false}
 : ${RP:=' '}
-: ${CK:=xor}  # xor, xor+, mod+, sum+
+: ${CK:=xor}       # xor, xor+, mod+, sum+
 : ${YENC:=false}
 : ${CARAT:=false}
 
@@ -43,8 +43,12 @@ readonly dlen=$LLEN g=$STEP u=",${UNSAFE// /,}," EP ep RP rp
 tb=${XB:1} xb=true ;[[ "${XB:0:1}" = "+" ]] && xb=false ;readonly xb tb # transform B, to encode unsafe bytes
 unset Ev Qd Qv UNTA
 n=$LFIRST
-TIME=false ;[[ "_$ACTION" == "_TIME" ]] && TIME=true
-NEC=false ;[[ "|EXECBA|BSAVE|" =~ "|$ACTION|" ]] && NEC=true
+TIME=false
+NEC=false
+case "$ACTION" in
+	TIME) TIME=true ;;
+	EXECBA|BSAVE) NEC=true ;;
+esac
 
 DOCURL="https://github.com/bkw777/dl2/blob/master/co2ba.md"
 abrt () { printf '%s: Usage\n%s IN.CO [call|exec|callba|execba|savem|bsave] > OUT.DO\n\n%s\n\n%b\n' "$0" "${0##*/}" "$DOCURL" "$@" >&2 ;exit 1 ; }
@@ -149,10 +153,10 @@ $TIME && tn=20
 $ik && di=",G,K" dn="F,H-J" || di="" dn="F-K"  # DEFINT DEFSNG
 
 $NEC && {
-	PRI=':CLS:?"Installing",N:LOCATE22,0:?"  0%"'
-	PRP=':LOCATE22,0:?USING"###%";(I-F)*100/A'
+	PRI=':CLS:?"Installing "N:LOCATE18,0:?"  0%"'
+	PRP=':LOCATE18,0:?USING"###%";(I-F)*100/A'
 } || {
-	PRI=':CLS:?USING"Installing \    \   0%";N'
+	PRI=':CLS:?"Installing "N:?@18,"  0%"'
 	PRP=':?@18,USING"###%";(I-F)*100/A'
 }
 
