@@ -784,7 +784,7 @@ LOAD:
 
 		; set Z if remaining_fsize=0
 		MOV			A,D					; A = D = remaining_fsize_lsb
-		ORA			E					; A = DVE (remaining_fsize lsb V msb), iow set Z if remaining_fsize=0
+		ORA			E					; A = D|E (remaining_fsize lsb|msb), iow set Z if remaining_fsize=0
 
 		; IF ENTIRE FILE IS DONE
 		; if Z then jump to LOAD_End_XX to finish
@@ -795,7 +795,7 @@ LOAD:
 		; (dirty ass trick to count 128, shouldn't it compare to [pktDLEN] ? )
 		; if chunk_progress>127 then fetch the next chunk from the drive
 		MOV			A,C					; A = C = chunk_progress    <<<<TESTING
-		ORA			A					; AVA, iow set S if A > 0x7F
+		ORA			A					; A|A, iow set S if A > 0x7F
 		CM			SendReadCMD			; call if chunk_progress > 127
 		; Only if we did CM:
 		;   A = 0
@@ -978,7 +978,7 @@ SAVE:
 		; BC = 0
 		; HL = true_len
 		MOV			A,L					; A = true_len_lsb
-		ORA			H					; true_len msbVlsb, iow set Z if true_len=0
+		ORA			H					; true_len msb|lsb, iow set Z if true_len=0
 		RZ								; if true_len=0 then there's nothing to do
 		PUSH		D					; TS=sof,MAIN
 		PUSH		H					; TS=true_len,sof,MAIN
@@ -1134,7 +1134,7 @@ RXtoM:
 PAUSE_DEx10us:							; 8-11us/iter * DE iters
 		DCX 		D					; DE--
 		MOV			A,D					; A = D
-		ORA			E					; DVE -> Z if DE=0
+		ORA			E					; D|E -> Z if DE=0
 		JNZ			PAUSE_DEx10us		; repeat until DE=0
 		RET
 	ENDIF
