@@ -1145,17 +1145,17 @@ PAUSE_DEx10us:							; 8-11us/iter * DE iters
 
 ; Used in LOAD for the differences in how each file type is inserted in ram.
 TBL_ftypes:
-		DB fattrCO						; +0*5 for CO files
-		DW LOAD_End_CO
-		DW COFILES
+		DB			fattrCO				; +0*5 for CO files
+		DW			LOAD_End_CO
+		DW			COFILES
 
-		DB fattrDO						; +1*5 for DO files
-		DW LOAD_End_DO
-		DW DOFILES
+		DB			fattrDO				; +1*5 for DO files
+		DW			LOAD_End_DO
+		DW			DOFILES
 
-		DB fattrBA						; +2*5 for BA files
-		DW LOAD_End_BA
-		DW BAFILES
+		DB			fattrBA				; +2*5 for BA files
+		DW			LOAD_End_BA
+		DW			BAFILES
 
 STR_STAT:
 		COM_STAT
