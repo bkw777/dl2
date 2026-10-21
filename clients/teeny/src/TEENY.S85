@@ -376,11 +376,11 @@ errND:
 errHW:
 		MVI			E,eHW
 
-;		E = eXX  some error code
-;		B = junk
+; E = eXX  some error code
+; B = junk
 	ELSE
 	; if not including error codes, then define all the jump targets to be the
-	; same as ERROR, so we don't have to have as many ifdefs everywhere else
+	; same as ERROR so we don't have to have as many ifdefs everywhere else
 errSN:
 errFF:
 errUE:
@@ -421,8 +421,8 @@ ERROR:
 		_RST		rst_Print_A			; print it
 	ENDIF
 		LXI			H,STR_Err			; get STR_Err
-			CALL		PTILL0			; print it
-			JMP			MAIN			; restart at main
+		CALL		PTILL0				; print it
+		JMP			MAIN				; restart at main
 
 ; -----------------------------------------------------------------------------
 ; DIRENT - tell the drive a filename
