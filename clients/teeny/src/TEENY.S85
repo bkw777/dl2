@@ -124,7 +124,7 @@ DSR_BITMASK			EQU		0x20
 	ELIF BAUD = 9600
 	COM_SPEED EQU '8'
 	ELSE
-	COM_SPEED EQU '9'	; default 19200
+	COM_SPEED EQU '9'					; default 19200
 	ENDIF
 
 ; COM STAT parameters
@@ -1175,14 +1175,14 @@ STR_ErrCodes		EQU STR_Err+5
 
 ; Offsets into STR_ErrCodes. Drive returns 0x00-0x8F -> ParseStdReturn -> eXX
 ; see ParseStdReturn & dl2/constants.h
-eFF					EQU		0x02 ; directory - file not found, file already exist
-eUE					EQU		0x04 ; unknown - 0x20-0x2F, never observed
-eSN					EQU		0x06 ; syntax
-eIO					EQU		0x08 ; integrity - crc & other data sanity failures, disk/serial/ram
-eWP					EQU		0x0A ; write-protect, format
-eDF					EQU		0x0C ; bounds - dir/file/disk full/exceeded
-eND					EQU		0x0E ; presense - disk changed / not inserted
-eHW					EQU		0x10 ; hardware - physical drive or disk problems
+eFF					EQU		0x02		; directory - file not found, file already exist
+eUE					EQU		0x04		; unknown - 0x20-0x2F, never observed
+eSN					EQU		0x06		; syntax
+eIO					EQU		0x08		; integrity - crc & other data sanity failures, disk/serial/ram
+eWP					EQU		0x0A		; write-protect, format
+eDF					EQU		0x0C		; bounds - dir/file/disk full/exceeded
+eND					EQU		0x0E		; presense - disk changed / not inserted
+eHW					EQU		0x10		; hardware - physical drive or disk problems
 	ENDIF
 
 PRGEND:
