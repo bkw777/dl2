@@ -1,6 +1,6 @@
-0'TEENY - github.com/bkw777/dl2 clients/teeny/orig/disasm TNYNEC.CO - loader: co2ba.sh b.kenyon.w@gmail.com 2026-10-07
-0READF:CLEAR12,F:DEFINTA-E,Q,G,K:DEFSNGF,H-J:DEFSTRL-O:READF,A,J,G,N,E,Q:M="!":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing",N:LOCATE22,0:?"  0%"
-1READL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)XORD:B=BXORQ:D=0:POKEI,B:I=I+1:K=KXORB:NEXT:LOCATE22,0:?USING"###%";(I-F)*100/A:IFI<=HTHEN1
+0'TEENY - github.com/bkw777/dl2 clients/teeny/orig/disasm TNYNEC.CO - loader: co2ba.sh b.kenyon.w@gmail.com 2026-10-21
+0READF:CLEAR12,F:DEFINTA-E,Q,G,K:DEFSNGF,H-J:DEFSTRL-O:READF,A,J,G,N,E,Q:M="!":C=0:I=F:H=F+A-1:K=0:D=0:CLS:?"Installing "N:LOCATE18,0:?"  0%"
+1READL:FORC=1TOLEN(L):O=MID$(L,C,1):IFO=MTHEND=E:NEXT:ELSEB=ASC(O)XORD:B=BXORQ:D=0:POKEI,B:I=I+1:K=KXORB:NEXT:LOCATE18,0:?USING"###%";(I-F)*100/A:IFI<=HTHEN1
 2IFK<>GTHEN?"Bad Checksum":ELSEM=CHR$(34):L="X.DO":OPENLFOROUTPUTAS1:?#1,"0CLEAR0,"F":EXEC"J":MENU":CLOSE1:?"Please type:":?"KILL"M""L:?"SAVE"M""N:LOADL
 3DATA61589,747,61589,251,"TEENY",128,64
 4DATA"a@@ybFºa!ö!öbJºjFºπÔrHºa‚∞•a!Ü±ç!¢Tr(æçÍ!áÔrÏµcQ∞ªçË'aI±bæ≥a±ªvbç˝!ççzcz·µæ!ëä!Ö!ñæ!ìäX≥µç∞±ä∑∞±ñ!ãäû±}ä!ä≤^@A^XA^FA^CA^PA^DA^RA^AzHº˜ä_±ïjBº!Ñ!çj@ºç|,ëar±V@Y>ßóßaQ≥ç!¢TÉ‚∞!ì!é!ç	!è!ç!É!ç!é!í!ó!ê!Ñ!Ü!é!Ñ!Å!Ö!Ü!å~`!É`!Ü!Ü!Ü!Ü!Ü!Ün!ò!ò`h!É}!ã!å!ì!ëiMJ
