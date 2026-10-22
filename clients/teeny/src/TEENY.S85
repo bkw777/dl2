@@ -15,7 +15,7 @@
 ; z88dk-z80asm -m8085_strict -no-synth -DMODEL_100na -b -o=TEENY.CO TEENY.S85
 ;
 ; 2 - Finally repeat the same build, with -DPRGLEN=nbytes this time.
-; z88dk-z80asm -m8085_strict -no-synth -DMODEL_100na -DPRGLEN=626 -b -o=TEENY.CO TEENY.S85
+; z88dk-z80asm -m8085_strict -no-synth -DMODEL_100na -DPRGLEN=624 -b -o=TEENY.CO TEENY.S85
 
 ;;;;
 ;;;; 100na works
@@ -1028,51 +1028,64 @@ SendOpenCMD:
 		MOV			M,E					; write E to pktDATA - E = mode write/append/read
 		JMP			jSendPacket			; send the packet
 
-; HL = sof   start of file
-; DE = len   length of file
+; HL = start of file (remaining)
+; DE = length of file (remaining)
 WriteChunks:
 		PUSH		H					; TS=position_a
-		PUSH		H					; TS=position_a,position_a
+		PUSH		H					; TS=position_a,position_a                  TODO REFACTOR
+
+		; exit to write final chunk if len <= CHUNK_LEN
 		LXI			H,CHUNK_LEN			; HL = CHUNK_LEN
-		_RST		rst_CompareDEHL		; compare DE(remaining_len) to HL(chunk_len)
+		_RST		rst_CompareDEHL		; compare DE(remaining_len) to HL(CHUNK_LEN)
 		; flags: C if HL<DE, Z if HL=DE, else HL>DE, only A is destroyed
+		; DE = remaining_len
+		; HL = CHUNK_LEN
 		; TS=position_a,position_a
 		JNC			WriteFinalChunk		; exit loop when CHUNK_LEN >= remaining_len
-		MOV			C,L					; C = L = CHUNK_LEN
-		MOV			B,H					; B = H = 0, BC = CHUNK_LEN = 0x0080
+
+		; add CHUNK_LEN to position
+		LXI			B,CHUNK_LEN			; BC = CHUNK_LEN
 		POP			H					; HL = position_a  TS=position_a
 		DAD			B					; HL = HL+BC = position_a + CHUNK_LEN = position_b
+		; HL = new higher position
+
 		XTHL							; swap TS:HL -> TS=position_b  HL = position_a
 		XCHG							; swap HL:DE -> DE = position_a, HL = remaining_len
+		; DE = old position
+		; HL = remaining_len
 
 		; subtract CHUNK_LEN from remaining_len
-		LXI			B,0-CHUNK_LEN		; BC = 0-CHUNK_LEN (0xFF80)
-		DAD			B					; HL += BC, iow HL -= CHUNK_LEN
-
-		; HL = (new, smaller) remaining_len
+		DSUB							; HL -= BC  (remaining_len -= CHUNK_LEN)
+		; HL = new smaller remaining_len
 		PUSH		H					; TS=remaining_len,position_b
 
-		; HL = remaining_len
-		; BC = B = 0xFF_but_don't_care  C = CHUNK_LEN = 0x80
+		; BC = B = 0 (don't care)  C = CHUNK_LEN = 0x80
 		; DE = position_a
 		CALL		SendWriteCMD
 
 		; setup HL & DE for next chunk
-		POP			D					; DE = remaining_len, TS[0] = position_b
-		POP			H					; HL = position_b
-		; HL = new higher start position, DE = new shorter length
+		POP			D					; DE = remaining_len, TS[0] = position_b    TODO REFACTOR
+		POP			H					; HL = position_b                           TODO REFACTOR
+		; HL = new higher position, DE = new shorter length
 		JMP			WriteChunks			; repeat
+
+; DE = remaining_len
+; TS=position_a,position_a
 WriteFinalChunk:
-		; TS=position_a,position_a
-		MOV			C,E					; C = remaining_len
-		POP			H					; HL = position_a  TS=position_a
+		; SendWriteCMD needs C=len, DE=start
+		MOV			C,E					; C = E = remaining_len
+		POP			D					; DE = position_a  TS=position_a            TODO REFACTOR
 		POP 		D					; DE = position_a
+		;JMP		SendWriteCMD
+
+; BC = B=X C=CHUNK_LEN
+; DE = position_a
 SendWriteCMD:
 		MVI			A,cmd_write
-		CALL		InitPacket 			; HL = pktDLEN
-		MOV			M,C					; [pktDLEN] = C = chunk_len
+		CALL		InitPacket 			; init cmd_write packet, HL = pktDLEN
+		MOV			M,C					; [pktDLEN] = C = CHUNK_LEN
 		INX			H					; HL++ = pktDATA
-		MOV			B,C					; B = C = chunk_len
+		MOV			B,C					; B = C = CHUNK_LEN
 		CALL		D2H4Bup				; copy B bytes from [DE] to [HL]
 		JMP			jSendPacket			; send the packet, read it's return packet
 

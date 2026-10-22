@@ -4,7 +4,7 @@
 A single common asm source that aims to eventually generate [TEENY](../teenydoc.txt) binaries for all computers sharing the Kyotronic KC-85 platform.  
 (Kyotronic KC-85, TRS-80 Model 100, TANDY 102 200, NEC PC-8201 PC-8201A PC-8300, Olivetti M-10)
 
-Currently the default config produces a .CO file for TRS-80 Model 100 that is only 632 bytes.  
+Currently the default config produces a .CO file for TRS-80 Model 100 that is only 630 bytes.  
 (Legacy TEENY for 100 is 753 bytes)
 
 The 100, M10, and K85 binaries built from this source all work.
