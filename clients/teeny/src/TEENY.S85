@@ -1045,14 +1045,15 @@ WriteChunks:
 		XTHL							; swap TS:HL -> TS=position_b  HL = position_a
 		XCHG							; swap HL:DE -> DE = position_a, HL = remaining_len
 
-		; subtract CHUNK_LEN from remaining_len by adding 0xFFFF-CHUNK_LEN+1
-		LXI			B,0xFFFF-CHUNK_LEN+1	; BC = 0xFF80
+		; subtract CHUNK_LEN from remaining_len
+		LXI			B,0-CHUNK_LEN		; BC = 0-CHUNK_LEN (0xFF80)
 		DAD			B					; HL += BC, iow HL -= CHUNK_LEN
+
 		; HL = (new, smaller) remaining_len
 		PUSH		H					; TS=remaining_len,position_b
 
 		; HL = remaining_len
-		; BC = 0xFF80 (B no longer matters, just that C = CHUNK_LEN)
+		; BC = B = 0xFF_but_don't_care  C = CHUNK_LEN = 0x80
 		; DE = position_a
 		CALL		SendWriteCMD
 
