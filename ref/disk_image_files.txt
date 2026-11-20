@@ -23,7 +23,7 @@ Each record is composed of 3 fields: ID, unknown, DATA
    | 12 bytes | 1 byte |             1280 bytes                |
    +----------+--------+---------------------------------------+
 
-for tpdd2 these correspond to these ram addresses:
+for tpdd2 these correspond to these ram addresses (inside the drive):
 ID    0x8004 to 0x800F
 ?     0x8010
 DATA  0x8013 to 0x8512
